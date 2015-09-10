@@ -1,0 +1,169 @@
+    #!/bin/bash
+    
+    # Copyright 2015 Jelastic, Inc.
+
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+
+    # http://www.apache.org/licenses/LICENSE-2.0
+
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    inherit default os envinfo;
+    include ${deploy_module_inherit} php-common-deploy;
+    include output git log net cartridge-common;
+    [ -f "$cartridge_sdk" ] && source $cartridge_sdk;
+
+    DESCRIPTION="\tJEM Cartridge Manager module";
+    VERSION="1";
+    DEFAULT_ACTION="Usage";
+
+    $PROGRAM git;
+    $PROGRAM curl;
+    $PROGRAM zip;
+    $PROGRAM unzip;
+    $PROGRAM tar;
+    $PROGRAM printenv;
+    $PROGRAM ifconfig;
+    $PROGRAM basename;
+    $PROGRAM uuidgen;
+    $PROGRAM erb;
+    $PROGRAM groupadd;
+    $PROGRAM adduser;
+
+    function doUsage() {
+        showUsageMessage;
+    }
+
+    function checkCartridgeDirectory(){
+        [ ! -d  $CARTRIDGE_HOME ] && mkdir -p $CARTRIDGE_HOME;
+    }
+
+    function parseArguments() {
+    while [ "$1" != "" ]; do
+
+      case $1 in
+
+        -u  | --url )               shift;
+                                    URL=$1;
+                                    ;;
+        -t  | --type )              shift;
+                                    URL_TYPE=$1;
+                                    ;;
+        -v  | --version )           shift;
+                                    VERSION=$1;
+                                    ;;
+        -l  | --login )             shift;
+                                    LOGIN=$1;
+                                    ;;
+        -p  | --password )          shift;
+                                    PASSWORD=$1;
+      esac
+      shift
+    done
+    }
+
+
+    function doInstall(){
+        parseArguments $@;
+        checkCartridgeDirectory;
+        NO_EXPECT="true";
+        LOGIN="__GUEST__";
+        APPROOT=${CARTRIDGE_HOME};
+        WEBROOT=${CARTRIDGE_HOME}; ### backwords compability
+        #PROJECT_NAME="cartridge";
+        local VCS_UPDATE_LOG="/var/log/vcs_update.log";
+
+    case $URL_TYPE in
+
+        ARCHIVE | archive )         deploy $URL && { writeJSONResponceOut "result=>0" "message=>Cartridge installed successfully";  }  ||  {  writeJSONResponceErr "result=>4060" "message=>Deploy failed" ; die -q; } ;
+                                    ;;
+        GIT | git )                 doCheckout $URL &&  { writeJSONResponceOut "result=>0" "message=>Cartridge installed successfully";  } || {  writeJSONResponceErr "result=>4060" "message=>Deploy failed" ; die -q; };
+                                    ;;
+    esac
+
+    return 0;
+    }
+
+    
+
+
+    function doConfigure(){
+        parseArguments $@;
+        configureEnvironment;
+        generateCartDATA; 
+        _setup $VERSION && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully" "cartdata=>$cartdata"; fixOwnership;  }  ||  {  writeJSONResponceErr "result=>4060" "message=>Cartridge setup failed" ; die -q; } ;
+        chmod 755 /etc/jelastic;
+    }
+
+
+    function doStart(){
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_start_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_start_$(echo $Name)" >> $ACTIONS_LOG 2>&1;
+        service cartridge start >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge start failed" ; die -q; } ;
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_start_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_start_$(echo $Name)" >> $ACTIONS_LOG 2>&1;
+    }
+
+    function doStop(){
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_stop_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_stop_$(echo $Name)" >> $ACTIONS_LOG 2>&1;
+        service cartridge stop >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge stop failed" ; die -q; } ;
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_stop_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_stop_$(echo $Name)" >> $ACTIONS_LOG 2>&1;
+    }
+
+    function doRestart(){
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_restart_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_restart_$(echo $Name)" >> $ACTIONS_LOG 2>&1;    
+        service cartridge restart >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge restart failed" ; die -q; } ;
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_restart_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_restart_$(echo $Name)" >> $ACTIONS_LOG 2>&1;  
+    }
+
+    function doReload(){
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_reload_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_reload_$(echo $Name)" >> $ACTIONS_LOG 2>&1;    
+        service cartridge reload >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge reload failed" ; die -q; } ;
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_reload_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_reload_$(echo $Name)" >> $ACTIONS_LOG 2>&1;    
+    }
+
+    function doStatus(){
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_status_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_status_$(echo $Name)" >> $ACTIONS_LOG 2>&1;    
+        service cartridge status >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge status failed" ; die -q; } ;
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_status_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_status_$(echo $Name)" >> $ACTIONS_LOG 2>&1;      
+    }
+
+    function doDeploy(){
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_deploy_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_deploy_$(echo $Name)" >> $ACTIONS_LOG 2>&1;        
+        return 0; 
+        [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_deploy_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_deploy_$(echo $Name)" >> $ACTIONS_LOG 2>&1;        
+    }
+
+    function doRenameContext(){
+        return 0;
+    }
+
+    function doUndeploy(){
+       
+        if [[ -f "$CARTRIDGE_HOME/bin/teardown" ]]
+        then
+        local teardown_script="${CARTRIDGE_HOME}/bin/teardown --version $1";
+            ${teardown_script} > /dev/null 2>&1;
+        fi
+
+    }
+
+    function doSetAdminPassword(){
+        return 0;
+    }
+
+    function doCleanup(){
+        return 0;
+    }
+
+    function doOnExtIpChanged(){
+        return 0;  
+    }
+
+    function doRestore(){
+        return 0;
+    }

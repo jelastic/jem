@@ -1,0 +1,256 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default os envinfo;
+include output ;
+include "$balancer_lib" ;
+inherit extendperm;
+
+DEFAULT_ACTION="Usage";
+DESCRIPTION="Balancer module";
+VERSION="1";
+
+nb_path="/etc/nginx/neighbors/";
+nb_file="common";
+
+function doUsage() {
+    showUsageMessage
+}
+
+function describeSetNeighbors(){
+    echo "Add neighbors balancers"
+}
+
+function doSetNeighbors(){
+    if [ ! -d "$nb_path" ]; then
+        mkdir -p "$nb_path" ;
+    fi
+    echo "$@" > "${nb_path}/$nb_file"
+
+    writeJSONResponceOut "result=>0" "message=>Ok";
+}
+
+
+[ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
+          [ -f "${CARTRIDGE_HOME}/jelastic/scripts/balancer_manager.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/balancer_manager.sh"; 
+} ;
+
+#-------------------------#
+function doAddCommonHost(){
+    while [[ "$1" != "" ]]; do
+        case "$1" in
+            -h|--host ) 
+                    shift;
+                    host="$1";
+                ;;
+        esac
+        shift
+    done
+    [ -z "$host" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
+    addCommonHostConfig "$host";
+    writeJSONResponceOut "result=>0" "message=>Configuration applied!";
+    return 0;
+}
+
+function doRemoveCommonHost(){
+    while [[ "$1" != "" ]]; do
+        case "$1" in
+            -h|--host ) 
+                    shift;
+                    host="$1";
+                ;;
+        esac
+        shift
+    done
+    [ -z "$host" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
+    removeCommonHostConfig "$host";
+    writeJSONResponceOut "result=>0" "message=>Configuration applied!";
+    return 0;
+}
+
+function doRebuildCommon(){
+    rebuildCommon ;
+    [ "$?" -eq 0 ] && {
+        doAction "firewall" "fwreconfigure";
+        writeJSONResponceOut "result=>0" "message=>Configuration applied!"; return 0; 
+    }|| { writeJSONResponceErr "result=>4999" "message=>Configuration not applied!" ; return 1; }
+}
+
+function doAddCluster(){
+    while [[ "$1" != "" ]]; do
+        case "$1" in
+            -h|--host ) 
+                    shift;
+                    host="$1";
+                ;;
+            -g|--group ) 
+                    shift;
+                    group="$1";
+                ;;
+        esac
+        shift
+    done
+    [ -z "$host" -o -z "$group" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
+    addHostToGroup "$host" "$group"
+    writeJSONResponceOut "result=>0" "message=>Configuration applied!"; 
+    return 0;
+}
+
+function doBuildCluster(){
+    while [[ "$1" != "" ]]; do
+        case "$1" in
+            -g|--group ) 
+                    shift;
+                    group="$1";
+                ;;
+        esac
+        shift
+    done
+    [ -z "$group" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
+    buildCluster "$group" ;
+    [ "$?" -eq 0 ] && {
+        writeJSONResponceOut "result=>0" "message=>Configuration applied!"; return 0;  
+    } || { writeJSONResponceErr "result=>4999" "message=>Configuration not applied!" ; return 1; }
+}
+
+function doUnbuildCluster(){
+    while [[ "$1" != "" ]]; do
+        case "$1" in
+            -g|--group ) 
+                    shift;
+                    group="$1";
+                ;;
+        esac
+        shift
+    done
+    [ -z "$group" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
+    unbuildCluster "$group" ;
+    [ "$?" -eq 0 ] && {
+        writeJSONResponceOut "result=>0" "message=>Configuration applied!"; return 0; 
+    } || { writeJSONResponceErr "result=>4999" "message=>Configuration not applied!" ; return 1; }
+}
+
+function doClear(){
+    clearHosts ; 
+    writeJSONResponceOut "result=>0" "message=>Configuration applied!"; 
+    return 0; 
+}
+
+function doReload(){
+    reloadConfigs ;
+    writeJSONResponceOut "result=>0" "message=>Configuration applied!"; 
+    return 0; 
+}
+
+function postRebuildCommonCallback(){
+    ExtendPerm ;
+}
+
+function postAddClusterCallback(){
+    ExtendPerm ;
+}
+
+function postBuildClusterCallback(){
+    ExtendPerm ;
+}
+
+function postUnbuildClusterCallback(){
+    ExtendPerm ;
+}
+
+function postClearCallback(){
+    ExtendPerm ;
+}
+
+function postReloadCallback(){
+    ExtendPerm ;
+}
+
+#--------- describe ------------#
+function describeAddCommonHost(){
+    echo "Add host to common group";
+}
+
+function describeAddCommonHostParameters(){
+    echo "-h <host>";
+}
+
+function describeAddCommonHostOptions(){
+    echo "-h: host";
+}
+
+function describeRemoveCommonHost(){
+    echo "Remove host from common group";
+}
+
+function describeRemoveCommonHostParameters(){
+    echo "-h <host>";
+}
+
+function describeRemoveCommonHostOptions(){
+    echo "-h: host";
+}
+
+function describeRebuildCommon(){
+    echo "Rebuild with common config";
+}
+
+function describeAddCluster(){
+    echo "Add hosts to upstream group_name"
+}
+
+function describeAddClusterParameters(){
+    echo "-h <host> -g <group name>";
+}
+
+function describeAddClusterOptions(){
+    echo "-h: host";
+    echo "-g: group name";
+}
+
+function describeBuildCluster(){
+    echo "Add group 'group_name' to cluster"
+}
+
+function describeBuildClusterParameters(){
+    echo "-g <group name>";
+}
+
+function describeBuildClusterOptions(){
+    echo "-g: group name";
+}
+
+function describeUnbuildCluster(){
+    echo "Remove group 'group_name' from cluster";
+}
+
+function describeUnbuildClusterParameters(){
+    echo "-g <group name>";
+}
+
+function describeUnbuildClusterOptions(){
+    echo "-g: group name";
+}
+
+function describeReload(){
+    echo "Load clean configs"
+}
+
+function describeClear(){
+    echo "Clear upsteams hosts"
+}

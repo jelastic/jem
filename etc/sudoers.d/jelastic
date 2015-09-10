@@ -1,0 +1,40 @@
+Cmnd_Alias TOMCAT = /etc/init.d/tomcat start, /etc/init.d/tomcat stop, /etc/init.d/tomcat restart, /etc/init.d/tomcat status, /etc/init.d/tomcat condrestart
+Cmnd_Alias TOMCAT_SERVICE = /sbin/service tomcat start, /sbin/service tomcat stop, /sbin/service tomcat restart, /sbin/service tomcat status, /sbin/service tomcat condrestart
+
+Cmnd_Alias JETTY = /etc/init.d/jetty start, /etc/init.d/jetty stop, /etc/init.d/jetty run, /etc/init.d/jetty restart, /etc/init.d/jetty check, /etc/init.d/jetty supervise
+Cmnd_Alias JETTY_SERVICE = /sbin/service jetty start, /sbin/service jetty stop, /sbin/service jetty run, /sbin/service jetty restart, /sbin/service jetty check, /sbin/service jetty supervise
+
+Cmnd_Alias MONGO = /etc/init.d/mongod start, /etc/init.d/mongod stop, /etc/init.d/mongod status, /etc/init.d/mongod restart, /etc/init.d/mongod reload, /etc/init.d/mongod force-reload, /etc/init.d/mongod condrestart
+Cmnd_Alias MONGO_SERVICE = /sbin/service mongod start, /sbin/service mongod stop, /sbin/service mongod status, /sbin/service mongod restart, /sbin/service mongod reload, /sbin/service mongod force-reload, /sbin/service mongod condrestart
+
+Cmnd_Alias COUCHDB =  /etc/init.d/couchdb start, /etc/init.d/couchdb stop, /etc/init.d/couchdb restart, /etc/init.d/couchdb status
+Cmnd_Alias COUCHDB_SERVICE =  /sbin/service couchdb start, /sbin/service couchdb stop, /sbin/service couchdb restart, /sbin/service couchdb status
+
+Cmnd_Alias MEMCACHED = /etc/init.d/memcached start, /etc/init.d/memcached stop, /etc/init.d/memcached status, /etc/init.d/memcached restart, /etc/init.d/memcached reload, /etc/init.d/memcached condrestart
+Cmnd_Alias MEMCACHED_SERVICE = /sbin/service memcached start, /sbin/service memcached stop, /sbin/service memcached status, /sbin/service memcached restart, /sbin/service memcached reload, /sbin/service memcached condrestart
+
+Cmnd_Alias MYSQL = /etc/init.d/mysql start, /etc/init.d/mysql stop, /etc/init.d/mysql status, /etc/init.d/mysql restart, /etc/init.d/mysql condrestart, /etc/init.d/mysql try-restart, /etc/init.d/mysql reload, /etc/init.d/mysql force-reload, /etc/init.d/mysql startsos, /etc/init.d/mysql configtest
+Cmnd_Alias MYSQL_SERVICE = /sbin/service mysql start, /sbin/service mysql stop, /sbin/service mysql status, /sbin/service mysql restart, /sbin/service mysql condrestart, /sbin/service mysql try-restart, /sbin/service mysql reload, /sbin/service mysql force-reload, /sbin/service mysql startsos, /sbin/service mysql configtest
+
+Cmnd_Alias POSTGRESQL = /etc/init.d/postgresql start, /etc/init.d/postgresql stop, /etc/init.d/postgresql status, /etc/init.d/postgresql restart, /etc/init.d/postgresql condrestart, /etc/init.d/postgresql try-restart, /etc/init.d/postgresql reload, /etc/init.d/postgresql force-reload, /etc/init.d/postgresql condstop
+Cmnd_Alias POSTGRESQL_SERVICE = /sbin/service postgresql start, /sbin/service postgresql stop, /sbin/service postgresql status, /sbin/service postgresql restart, /sbin/service postgresql condrestart, /sbin/service postgresql try-restart, /sbin/service postgresql reload, /sbin/service postgresql force-reload, /sbin/service postgresql condstop
+
+Cmnd_Alias NGINX = /etc/init.d/nginx start, /etc/init.d/nginx stop, /etc/init.d/nginx restart, /etc/init.d/nginx condrestart, /etc/init.d/nginx try-restart, /etc/init.d/nginx force-reload, /etc/init.d/nginx upgrade, /etc/init.d/nginx reload, /etc/init.d/nginx status, /etc/init.d/nginx help, /etc/init.d/nginx configtest
+Cmnd_Alias NGINX_SERVICE = /sbin/service nginx start, /sbin/service nginx stop, /sbin/service nginx restart, /sbin/service nginx condrestart, /sbin/service nginx try-restart, /sbin/service nginx force-reload, /sbin/service nginx upgrade, /sbin/service nginx reload, /sbin/service nginx status, /sbin/service nginx help, /sbin/service nginx configtest
+
+Cmnd_Alias HTTPD =  /etc/init.d/httpd start, /etc/init.d/httpd stop, /etc/init.d/httpd restart, /etc/init.d/httpd condrestart, /etc/init.d/httpd try-restart, /etc/init.d/httpd force-reload, /etc/init.d/httpd reload|status, /etc/init.d/httpd fullstatus, /etc/init.d/httpd graceful, /etc/init.d/httpd help, /etc/init.d/httpd configtest, /etc/init.d/httpd status, /etc/init.d/httpd reload
+Cmnd_Alias HTTPD_SERVICE =  /sbin/service httpd start, /sbin/service httpd stop, /sbin/service httpd restart, /sbin/service httpd condrestart, /sbin/service httpd try-restart, /sbin/service httpd force-reload, /sbin/service httpd reload|status, /sbin/service httpd fullstatus, /sbin/service httpd graceful, /sbin/service httpd help, /sbin/service httpd configtest, /sbin/service httpd status, /sbin/service httpd reload
+
+Cmnd_Alias PHP_FPM = /etc/init.d/php-fpm start, /etc/init.d/php-fpm stop, /etc/init.d/php-fpm status, /etc/init.d/php-fpm restart, /etc/init.d/php-fpm condrestart, /etc/init.d/php-fpm try-restart, /etc/init.d/php-fpm reload, /etc/init.d/php-fpm force-reload
+Cmnd_Alias PHP_FPM_SERVICE = /sbin/service php-fpm start, /sbin/service php-fpm stop, /sbin/service php-fpm status, /sbin/service php-fpm restart, /sbin/service php-fpm condrestart, /sbin/service php-fpm try-restart, /sbin/service php-fpm reload, /sbin/service php-fpm force-reload
+
+Cmnd_Alias GLASSFISH_DOMAIN1 = /etc/init.d/glassfish-domain1 stop, /etc/init.d/glassfish-domain1 start, /etc/init.d/glassfish-domain1 restart, /etc/init.d/glassfish-domain1 condrestart, /etc/init.d/glassfish-domain1 status
+Cmnd_Alias GLASSFISH_DOMAIN1_SERVICE = /sbin/service glassfish-domain1 stop, /sbin/service glassfish-domain1 start, /sbin/service glassfish-domain1 restart, /sbin/service glassfish-domain1 condrestart, /sbin/service glassfish-domain1 status
+
+Cmnd_Alias CARTRIDGE = /etc/init.d/cartridge stop, /etc/init.d/cartridge start, /etc/init.d/cartridge restart, /etc/init.d/cartridge condrestart, /etc/init.d/cartridge status, /usr/bin/npm, /usr/bin/pip
+Cmnd_Alias CARTRIDGE_SERVICE = /sbin/service cartridge stop, /sbin/service cartridge start, /sbin/service cartridge restart, /sbin/service cartridge condrestart, /sbin/service cartridge status
+
+Cmnd_Alias CUSTOM_IMPR = /usr/bin/passwd jelastic-ftp, /usr/bin/jem firewall fwstart, /usr/bin/jem firewall list *
+
+%ssh-access ALL = NOPASSWD: TOMCAT, TOMCAT_SERVICE, JETTY, JETTY_SERVICE,  MONGO, MONGO_SERVICE, COUCHDB, COUCHDB_SERVICE, MEMCACHED, MEMCACHED_SERVICE, MYSQL, MYSQL_SERVICE, POSTGRESQL, POSTGRESQL_SERVICE, NGINX, NGINX_SERVICE, HTTPD, HTTPD_SERVICE, PHP_FPM, PHP_FPM_SERVICE, GLASSFISH_DOMAIN1, GLASSFISH_DOMAIN1_SERVICE, CARTRIDGE, CARTRIDGE_SERVICE, CUSTOM_IMPR
+

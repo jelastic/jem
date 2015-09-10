@@ -1,0 +1,361 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+inherit default fsutils;
+
+
+VERSION="1";
+DEFAULT_ACTION="Usage";
+DESCRIPTION="Works with file system";
+
+
+function doUsage() {
+    showUsageMessage;
+}
+
+FS_PATH="";
+FS_USER="";
+FS_SOURCE="";
+FS_DESTINATION="";
+$PROGRAM 'dirname';
+$PROGRAM 'basename';
+
+function onModLoadCallback(){
+    local temp=`getopt -o u:,s:,p:,d: -l user:,destinationpath:,sourcepath:,path: -- "$@" 2>>"$JEM_CALLS_LOG"`
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp"
+    while true ; do
+        case "${1}" in
+            --user|-u)
+                FS_USER=$2;
+                shift 2;
+                ;;
+            --path|-p)
+                FS_PATH=$2;
+                shift 2;
+                ;;
+            -s|--sourcepath)
+                FS_SOURCE=$2
+                shift 2;
+                ;;
+            -d|--destinationpath)
+                FS_DESTINATION="$2"
+                shift 2;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+    done;
+    # echo "USER: ${FS_USER}|PATH: ${FS_PATH}|SOURCE: ${FS_SOURCE}|DEST: ${FS_DESTINATION}";
+
+}
+
+# checkRights	
+# fileExists
+# dirExists
+# unitExists
+
+function checkUser(){
+    if [ -z "$FS_USER" ]; then
+        writeJSONResponceErr "result=>4032" "message=>User not defined";
+        return 32;
+    fi
+    if ! userExists "$FS_USER"; then
+        writeJSONResponceErr "result=>4034" "message=>No such user '$FS_USER'";
+        return 34;
+    fi
+}
+
+# FS_PATH:
+#   path - list 
+#   file - read
+
+function doRead() {
+    checkUser ;
+    local result_code=$?;
+    if [ "$result_code" -gt 0 ] ; then
+        return $result_code;
+    fi
+    if ! checkUnit "$FS_PATH"; then
+        writeJSONResponceErr "result=>4035" "message=>Path '$FS_PATH' not exists";
+        return 35;
+    fi
+
+    local read_access="false";
+    if checkRights "$FS_USER" "$FS_PATH" "read" ; then
+        read_access="true";
+        if dirExists "$FS_PATH" ; then
+            if ! checkRights "$FS_USER" "$FS_PATH" "execute" ; then
+                read_access="false";
+            fi
+        fi
+    fi
+
+    if [ "$read_access" == "true" ]; then
+        return 0 ;
+    else
+        writeJSONResponceErr "result=>4037" "message=>Permission denied";
+        return 37;
+    fi
+}
+
+function doWrite() {
+	checkUser ;
+	local result_code=$?;
+	if [ "$result_code" -gt 0 ] ; then
+		return $result_code;
+	fi
+	if [ -z "$FS_PATH" ]; then
+		writeJSONResponceErr "result=>4033" "message=>Path not defined";
+		return 33;
+	fi
+
+	local parent_dir=`"$DIRNAME" "$FS_PATH"` ;
+	if ! unitExists "$parent_dir"; then
+		writeJSONResponceErr "result=>4043" "message=>Directory '$parent_dir' not exists";
+		return 43;
+	fi
+
+	if fileExists "$FS_PATH"; then
+		if ! checkRights "$FS_USER" "$FS_PATH" "write" ; then
+			writeJSONResponceErr "result=>4037" "message=>Permission denied";
+			return 37;
+		fi
+	else
+		if ! checkRights "$FS_USER" "$parent_dir" "write" ; then
+			writeJSONResponceErr "result=>4037" "message=>Permission denied";
+			return 37;
+		fi
+	fi
+	return 0;
+
+}
+
+function doCreate() {
+    checkUser ;
+    local result_code=$?;
+    if [ "$result_code" -gt 0 ] ; then
+        return $result_code;
+    fi
+    if [ -z "$FS_PATH" ]; then
+      writeJSONResponceErr "result=>4033" "message=>Path not defined";
+      return 33;
+    fi
+    if unitExists "$FS_PATH"; then
+        writeJSONResponceErr "result=>4036" "message=>Path '$FS_PATH' already exists";
+        return 36;
+    fi
+    local parent_dir=`"$DIRNAME" "$FS_PATH"` ;
+    if ! unitExists "$parent_dir"; then
+        writeJSONResponceErr "result=>4043" "message=>Directory '$parent_dir' not exists";
+        return 43;
+    fi
+
+    if ! checkRights "$FS_USER" "$parent_dir" "write" ; then
+        writeJSONResponceErr "result=>4037" "message=>Permission denied";
+        return 37;
+    fi
+    return 0;
+}
+
+function doDelete() {
+    checkUser ;
+    local result_code=$?;
+    if [ "$result_code" -gt 0 ] ; then
+        return $result_code;
+    fi
+    if ! checkUnit "$FS_PATH"; then
+        writeJSONResponceErr "result=>4035" "message=>Path '$FS_PATH' not exists";
+        return 35;
+    fi
+
+    if ! checkRights "$FS_USER" "$FS_PATH" "write" ; then
+       writeJSONResponceErr "result=>4037" "message=>Permission denied";
+       return 37;
+    fi
+    local parent_dir=`"$DIRNAME" "$FS_PATH"`;
+    if ! unitExists "$parent_dir"; then
+        writeJSONResponceErr "result=>4043" "message=>Directory '$parent_dir' not exists";
+        return 43;
+    fi
+    if checkRights "$FS_USER" "$parent_dir" "write" ; then
+        if checkRights "$FS_USER" "$parent_dir" "execute" ; then
+            return 0;
+        fi
+    fi
+    writeJSONResponceErr "result=>4037" "message=>Permission denied";
+    return 37;
+}
+
+function doCopy() {
+	checkUser ;
+    local result_code=$?;
+    if [ "$result_code" -gt 0 ] ; then
+        return $result_code;
+    fi
+
+    if ! checkUnit "$FS_SOURCE"; then
+        writeJSONResponceErr "result=>4040" "message=>Source path '$FS_SOURCE' not exists";
+        return 40;
+    fi
+    if [ -z "$FS_DESTINATION" ]; then
+        writeJSONResponceErr "result=>4033" "message=>Variable 'destination' is not defined";
+        return 33;
+    fi
+    FS_PATH="$FS_SOURCE";
+    doRead;
+    local return_result=$?;
+    if [ "$return_result" -gt 0 ]; then
+        return $return_result;
+    fi
+
+    if fileExists "$FS_DESTINATION"; then
+        writeJSONResponceErr "result=>4041" "message=>Destination directory '$FS_DESTINATION' already exists";
+        return 41;
+    fi
+
+    if [ "${FS_DESTINATION:(-1)}" == "/" ]; then
+    #${FS_DESTINATION} - directory
+        if ! dirExists "$FS_DESTINATION"; then
+            writeJSONResponceErr "result=>4042" "message=>Destination directory '$FS_DESTINATION' not exists";
+            return 42;
+        else
+            if ! checkRights "$FS_USER" "$FS_DESTINATION" "write" ; then
+                writeJSONResponceErr "result=>4037" "message=>Permission denied";
+                return 37;
+            fi
+            if ! checkRights "$FS_USER" "$FS_DESTINATION" "execute" ; then
+                writeJSONResponceErr "result=>4037" "message=>Permission denied";
+				return 37;
+            fi
+            local file=`"$BASENAME" "$FS_SOURCE"`;
+            if fileExists "$FS_DESTINATION/$file"; then
+                writeJSONResponceErr "result=>4041" "message=>Destination file '$FS_DESTINATION/$file' already exists";
+                return 41;
+            fi    
+        fi
+    else
+		FS_PATH="$FS_DESTINATION";
+		doWrite
+        return_result=$?;
+            return $return_result;
+    fi
+    return 0;
+}
+
+function doMove() {
+	doCopy ;
+    local return_result=$?;
+    if [ "$return_result" -gt 0 ]; then
+        return $return_result;
+    fi   
+    FS_PATH="$FS_SOURCE";
+    doDelete;
+    local return_result=$?;
+    if [ "$return_result" -gt 0 ]; then
+        return $return_result;
+    fi   
+    return 0;
+}
+
+function doUpload() {
+	doCreate
+	return $?;
+}
+
+function describeRead() {
+    echo "Check read permission for given file";
+}
+
+function describeCreate() {
+    echo "Check possibility create a file in the specified path";
+}
+
+function describeDelete() {
+    echo "Check possibility delete a file in the specified path";
+}
+
+function describeCopy() {
+    echo "Check possibility copy a file from  the specified path to destination";
+}
+
+function describeMove() {
+    echo "Check possibility move a file from  the specified path to destination";
+}
+
+function describeUpload() {
+    echo "Check possibility upload a file to the specified path";
+}
+
+function describeReadParameters() {
+    echo "-p <path> -u <user>";
+}
+
+function describeGlobalOptions(){
+    echo "-p: full path";
+    echo "-u: user name";
+}
+
+function describeReadOptions() {
+    describeGlobalOptions
+}
+
+function describeCreateParameters() {
+    echo "-p <path> -u <user>";
+}
+
+function describeCreateOptions() {
+    describeGlobalOptions;
+}
+
+function describeDeleteParameters() {
+    echo "-p <path> -u <user>";
+}
+
+function describeDeleteOptions() {
+    describeGlobalOptions
+}
+
+function describeCopyParameters() {
+    echo "-u <user> -s <source path> -d <destination path>";
+}
+
+function describeCopyOptions() {
+    echo "-d: destination path";
+    echo "-s: source path";
+    echo "-u: user name";
+}
+
+function describeMoveParameters() {
+    echo "-u <user> -s <source path> -d <destination path>";
+}
+
+function describeMoveOptions() {
+    echo "-d: destination path";
+    echo "-s: source path";
+    echo "-u: user name";
+}
+
+function describeUploadParameters() {
+    echo "-u <user> -p <path>";
+}
+
+function describeUploadOptins() {
+    describeGlobalOptions
+}

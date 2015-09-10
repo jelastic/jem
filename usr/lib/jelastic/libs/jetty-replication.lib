@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${JETTYREPLICATIONLIB_VERSION:-}" ] && return 0;
+JETTYREPLICATIONLIB_VERSION="0.1";
+
+VTUN_SERVICE="vtund" ;
+JETTY_SERVICE="jetty"
+IF_NAME='tap' ;
+$PROGRAM 'ifconfig';
+VTUND_CONF="/etc/vtund.conf" ;
+VTUN_INIT_SCRIPT="/etc/init.d/vtund" ;
+
+$PROGRAM 'grep';
+$PROGRAM 'awk';
+$PROGRAM 'sed';
+$PROGRAM 'chkconfig';
+
+include os default out;
+
+function cleanMac(){
+	count=$($GREP -c 'ip \"link' $VTUND_CONF ) ; 
+	if [ "$count" -ne 0 ]
+	then
+	    $SED -i '/^ip \"link/d' $VTUND_CONF  ;
+    fi
+    $SED -i "s/REMOTE_HOST[\=[:digit:]\.]\{1,\}/REMOTE_HOST=/" $VTUN_INIT_SCRIPT ;
+}
+
+function setMac(){
+	mac=''
+	until [ -n "$mac" ] 
+	do
+		sleep 1
+		mac=$(ip l show tap | sed -n -re '/\s*link/{s/.*ether\s+(\S+)\s+.*/\1/;p}')
+	done
+	$SED -i "/^ifconfig/iip \"link set %% addr $mac\";" $VTUND_CONF
+}
+
+function setHost() {
+	local IP=$1 ;
+	$SED -i "s/^REMOTE_HOST=/REMOTE_HOST=$IP/"  $VTUN_INIT_SCRIPT ;
+	chmod a+x $VTUN_INIT_SCRIPT ; 
+}
+
+
+function enableReplication(){
+	local ip=$1;
+	stopServiceSilent $VTUN_SERVICE
+	cleanMac
+	setHost $ip
+	startServiceSilent $VTUN_SERVICE
+
+	sleep 2
+        while :
+        do
+                CURTAPIP=$( /sbin/ip a l | $GREP tap| $GREP 'inet ' | $AWK '{print $2}'| $SED 's/\/[0-9]*//g' )
+                [ -n "$CURTAPIP" ] && break || { sleep 2; continue; }
+        done
+    $CHKCONFIG --level 3 $VTUN_SERVICE on
+    setMac
+    stopServiceSilent $JETTY_SERVICE
+    startServiceSilent $JETTY_SERVICE
+
+	return 0;
+}
+
+function disableReplication(){
+        stopServiceSilent $VTUN_SERVICE
+        $CHKCONFIG --level 3 $VTUN_SERVICE off
+        cleanMac
+
+}

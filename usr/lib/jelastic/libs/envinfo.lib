@@ -1,0 +1,199 @@
+#!/bin/bash
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[[ -n "${META_FILE}" ]] && [ -e "${META_FILE}" ] && source ${META_FILE} ;
+
+OVERRIDE_DIR="/var/lib/jelastic/overrides/"
+extipchange_module_inherit="common-extipch";
+gw_boost_lib_inherit="user-common";
+DEPLOY_LOG="/dev/null";
+
+case ${COMPUTE_TYPE} in
+	balancer)
+		DATA_OWNER='nginx:nginx';
+		SERVICE='nginx';
+		ssl_module_inherit="nginx-php-ssl";
+		balancer_lib="balancer-nginx";
+	;;
+	nginx-php)
+		DATA_OWNER='nginx:nginx';
+		SERVICE='nginx';
+		deploy_module_inherit="php-common-deploy";
+		engine_module_inherit="nginx-php-engine";
+		ssl_module_inherit="nginx-php-ssl";
+		setmemory_lib="php-setmem";
+		WEBROOT="/var/www/webroot";
+		VCS_UPDATE_LOG="/var/log/nginx/vcs_update.log";
+		VCS_AUTORESOLVE_LOG="/var/log/nginx/vcs_autoresolve.log";
+		DEPLOY_LOG="/var/log/nginx/deploy.log";
+	;;
+	apache-php)
+		DATA_OWNER='apache:apache';
+		SERVICE='httpd';
+		deploy_module_inherit="php-common-deploy";
+		engine_module_inherit="apache-php-engine";
+		ssl_module_inherit="apache-php-ssl";
+		setmemory_lib="php-setmem";
+		WEBROOT="/var/www/webroot";
+		VCS_UPDATE_LOG="/var/log/httpd/vcs_update.log";
+		VCS_AUTORESOLVE_LOG="/var/log/httpd/vcs_autoresolve.log";
+		DEPLOY_LOG="/var/log/httpd/deploy.log";
+	;;
+	apache-ruby)
+		DATA_OWNER='apache:apache';
+		SERVICE='httpd';
+		deploy_module_inherit="ruby-common-deploy";
+		engine_module_inherit="ruby-common-engine";
+		ssl_module_inherit="apache-php-ssl";
+		setmemory_lib="php-setmem";
+		WEBROOT="/var/www/webroot";
+		VCS_UPDATE_LOG="/var/log/httpd/vcs_update.log";
+		VCS_AUTORESOLVE_LOG="/var/log/httpd/vcs_autoresolve.log"
+		RAKE_DEPLOY_LOG="/var/log/httpd/rake_deploy.log";
+		BUNDLE_INSTALL_LOG="/var/log/httpd/bundle_install.log";
+		RVM_PATH="/usr/lib/rvm";
+	;;
+	nginx-ruby)
+		DATA_OWNER='nginx:nginx';
+		SERVICE='nginx';
+		deploy_module_inherit="ruby-common-deploy";
+		engine_module_inherit="ruby-common-engine";
+		ssl_module_inherit="nginx-php-ssl";
+#		setmemory_lib="php-setmem";
+		WEBROOT="/var/www/webroot";
+		VCS_UPDATE_LOG="/var/log/nginx/vcs_update.log";
+		VCS_AUTORESOLVE_LOG="/var/log/nginx/vcs_autoresolve.log"
+		RAKE_DEPLOY_LOG="/var/log/nginx/rake_deploy.log";
+		BUNDLE_INSTALL_LOG="/var/log/nginx/bundle_install.log";
+		RVM_PATH="/usr/lib/rvm";
+	;;
+	tomcat | tomee)
+		DATA_OWNER='tomcat:nobody';
+		SERVICE='tomcat';
+		deploy_module_inherit="java-common-deploy";
+		engine_module_inherit="java-common-engine";
+		replication_module_inherit="tomcat-replication";
+		ssl_module_inherit="tomcat-ssl";
+		WEBROOT="/opt/tomcat/webapps";
+		APPS_DIR="/opt/tomcat/webapps";
+	;;
+	jetty)
+		DATA_OWNER='jetty:jetty';
+		SERVICE='jetty';
+		deploy_module_inherit="java-common-deploy";
+		engine_module_inherit="java-common-engine";
+		replication_module_inherit="jetty-replication";
+		ssl_module_inherit="jetty-ssl";
+		WEBROOT="/opt/jetty/webapps";
+		WORKDIR="/opt/jetty/work";
+	;;
+	glassfish)
+		DATA_OWNER='glassfish:glassfish';
+		SERVICE='glassfish-domain1';
+		deploy_module_inherit="glassfish-deploy";
+		engine_module_inherit="java-common-engine";
+		replication_module_inherit="glassfish-replication";
+		ssl_module_inherit="glassfish-ssl";
+		glassfish_tools="/usr/bin/perl /usr/lib/jelastic/libs/glassfish-tools.lib";
+		password_storage="/var/lib/jelastic/glalssfish/passwords";
+		extipchange_module_inherit="glassfish-extipch";
+		passwd_module_inherit="glassfish-passwd";
+		default_user="admin";
+	;;
+	maven)
+		WEBROOT="/var/lib/jelastic/PROJECTS";
+		DATA_OWNER='apache:apache';
+		engine_module_inherit="java-common-engine";
+		VCS_UPDATE_LOG="/var/log/maven/vcs_update.log";
+		VCS_AUTORESOLVE_LOG="/var/log/maven/vcs_autoresolve.log";
+	;;
+	mariadb	)
+		DATA_OWNER='mysql:mysql';
+		SERVICE='mysql';
+		passwd_module_inherit="mysql-passwd";
+		dumper_module_inherit="mysql-dumper";
+		default_user="root";
+		DB_DATA_DIR="/var/lib/mysql"
+	;;
+	mysql)
+		DATA_OWNER='mysql:mysql';
+		SERVICE='mysql';
+		passwd_module_inherit="mysql-passwd";
+		dumper_module_inherit="mysql-dumper";
+		default_user="root";
+		DB_DATA_DIR="/var/lib/mysql"
+	;;
+	mongodb)
+		DATA_OWNER='mongod:mongod';
+		SERVICE='mongod';
+		passwd_module_inherit="mongo-passwd";
+		default_user="admin";
+		DB_DATA_DIR="/var/lib/mongo/"
+	;;
+	postgres)
+		DATA_OWNER='postgres:postgres';
+		SERVICE='postgresql';
+		passwd_module_inherit="postgres-passwd";
+		dumper_module_inherit="postgres-dumper";
+		default_user="webadmin";
+		DB_DATA_DIR="/var/lib/pgsql/"
+	;;
+	couchdb)
+		DATA_OWNER='couchdb:couchdb';
+		SERVICE='couchdb';
+		passwd_module_inherit="couchdb-passwd";
+		default_user="admin";
+		DB_DATA_DIR="/var/lib/couchdb/"
+	;;
+	memcached)
+		DATA_OWNER='memcached:memcached';
+		SERVICE='memcached';
+	;;
+	gate)
+		gw_boost_lib_inherit="user-gate";
+	;;
+	cartridge)
+		DATA_OWNER='jelastic:jelastic';
+		SERVICE='cartridge';
+		passwd_module_inherit="cartridge-passwd";
+		deploy_module_inherit="cartridge-deploy";
+		engine_module_inherit="cartridge-engine";
+		dumper_module_inherit="cartridge-dumper";
+		extipchange_module_inherit="cartridge-extipch";
+		cartridge_sdk="/var/lib/jelastic/libs/cartridge-sdk.lib";
+		RAKE_DEPLOY_LOG="/opt/repo/log/rake_deploy.log";
+	        CARTRIDGE_HOME="/opt/repo";
+    		default_user="admin";
+	        RUNAS="jelastic";
+    		VCS_UPDATE_LOG="$CARTRIDGE_HOME/logs/vcs_update.log";
+	        VCS_AUTORESOLVE_LOG="$CARTRIDGE_HOME/logs/vcs_autoresolve.log";
+	        BUNDLE_INSTALL_LOG="$CARTRIDGE_HOME/log/bundle_install.log";
+	;;
+	gate)
+		gw_boost_lib_inherit="usermanage-gate";
+	;;
+esac
+
+[ -d "$OVERRIDE_DIR" ] && {
+		[  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -eq 0 ] && return 0;
+		for override_lib in $(ls $OVERRIDE_DIR/*.lib)
+        do
+              source $override_lib;
+        done
+
+}
+
+return 0;
+

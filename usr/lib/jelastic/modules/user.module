@@ -1,0 +1,277 @@
+#!/bin/bash 
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default config envinfo;
+inherit ${gw_boost_lib_inherit};
+inherit extendperm;
+
+DESCRIPTION="Manipulate ssh keys, users";
+VERSION="1"
+DEFAULT_ACTION="Usage";
+$PROGRAM 'useradd';
+$PROGRAM 'groupadd';
+$PROGRAM 'getent';
+$PROGRAM 'id';
+$PROGRAM 'awk';
+$PROGRAM 'chmod';
+$PROGRAM 'chown';
+
+declare _UID;
+declare _GID;
+declare _USER_NAME="jelastic";
+declare _homedir;
+declare _USER_EXISTS;
+declare _GROUP_EXISTS;
+declare _SSH_PRIVATE_KEY;
+declare _REFORM_MESSAGE;
+declare _SUPPLEMENTARY_GROUPS;
+declare _response_GUID;
+declare _REGENERATE_KEY="no";
+declare _ACCESS_TYPE;
+declare _ACCESS_ACTION;
+_SSH_ACCESS_GROUP="ssh-access";
+declare -r _JELASTIC_SHELL="/opt/jsh/jsh"
+
+VERBOSE=1;
+function onModLoadCallback() {
+	[[ "$UID" != '0' ]] && {  writeJSONResponceErr "result=>4034" "message=>You must be root!"; die -q; }
+}
+
+function doUsage() {
+    showUsageMessage
+}	
+
+function checkUserExists(){
+	local user=${1};
+	# response=$($GETENT passwd ${user});
+	response=$($GREP -E "^${user}:" /etc/passwd );
+	_USER_EXISTS=$?;
+	log "Check user ${response}";
+}
+
+function checkGroupExists(){
+	local group=${1};
+	response=$($GETENT group ${group});
+	_GROUP_EXISTS=$?;
+	log "Check group ${response} $_GROUP_EXISTS";
+}
+
+function groupId(){
+	local group=${1};
+	unset _response_GUID;
+	log "groupId: ${group}";
+	[ -z "$group" ] && {  writeJSONResponceErr "result=>4036" "message=>Can not get GUID!"; die -q; };
+	checkGroupExists "${group}";
+	[ "$_GROUP_EXISTS" -ne 0 ] && {
+		log "Adding group ${group}";
+		$GROUPADD "${group}" 2>&1 | $GRAB_OUTPUT ;
+		result=$?;
+		[ "$result" -ne 0 ] && { echo "ERROR adding group !!!!!!!!!!!!!!!!!!!!!!!!!"; }
+	}
+	_response_GUID=$($GETENT group ${group} | $AWK -F: '{ print $3 }');
+	
+}
+
+function __injected() {
+    local CTID=$1
+    [[ -z "${CTID}" ]] && {
+	writeJSONResponceErr "result=>4037" "message=>Container not found"
+	die -q
+    }
+    local pubkey;
+    $PROGRAM 'mktemp'
+    $PROGRAM 'ssh-keygen'
+    $PROGRAM 'vzctl'
+    $PROGRAM 'hostname'
+    tmpfile=$($MKTEMP --dry-run)
+    label="ssh-gate@jelastic.com"
+    response=$(${SSH_KEYGEN} -C $label -P "" -q -f $tmpfile 2>&1);
+    log "ssh-keygen response ${response}";
+    $VZCTL exec $CTID "[[ ! -d '/root/.ssh' ]] && { mkdir -p /root/.ssh; chmod 0700 /root/.ssh 2>>"$JEM_CALLS_LOG"; }"
+    pubkey=$(cat "${tmpfile}.pub")
+    $VZCTL exec $CTID "[[ -f '/root/.ssh/authorized_keys' ]] && { sed -i -re \"/${label}/d;/^s*$/d\" /root/.ssh/authorized_keys; chmod 0400 /root/.ssh/authorized_keys 2>>"$JEM_CALLS_LOG"; }"
+    $VZCTL exec $CTID "echo -e \"\n${pubkey}\n\" >> /root/.ssh/authorized_keys"
+    $VZCTL exec $CTID "sed -i -re 's/#?[Ss][Tt][Rr][Ii][Cc][Tt][Mm][Oo][Dd][Ee][Ss]\s+[Yy][Ee][Ss]/StrictModes no/g' /etc/ssh/sshd_config"
+    $VZCTL exec $CTID "service sshd reload >/dev/null 2>&1"
+    echo "{\"result\":\"0\",\"message\":\"$(cat ${tmpfile})\"}"
+    rm "${tmpfile}"
+    rm "${tmpfile}.pub"
+    return 0;
+}
+
+function __processVDS(){
+    local envid=$1
+    CTID=$(grep "$1" /vz/private/*/.vza/eid.conf |  sed -re 's;/vz/private/([0-9]+)/.*;\1;')
+    inject doAdd 3i "return 0;"
+    inject getAppUserInfo 3i "return 0;"
+    inject doAdd 3i "__injected $CTID;"
+    return 0
+}
+
+function preAddCallback(){
+	log "$@";
+	if [ "x${COMPUTE_TYPE}" == "xgate" ] ;then
+		log "Compute Type = gate. Params: $@.";
+		options=`getopt -o n,u -l uid:,new -- "$@"`;
+		while [ $# -gt 0 ]
+		do
+	    	case $1 in
+	        	# for options with required arguments, an additional shift is required
+		        -u|--uid)  
+	                [[ -z "$(sed -rne '/[0-9]+/p' <<< $2)" ]] && {  writeJSONResponceErr "result=>4035" "message=>Wrong UID!"; die -q; }
+			        _USER_NAME="$2"; shift ;;
+		        (--) shift; break;;
+	    	esac
+	    	shift
+		done
+		# _USER_NAME == Jelastic UID, min=1
+		let "_UID=${_USER_NAME}+10000000";
+		#_GUID - system guid ssh-user. for gateway
+		groupId "${_SSH_ACCESS_GROUP}" ;
+		_GUID=${_response_GUID};
+		_USERADD_OPT=" -s ${_JELASTIC_SHELL}"
+	else
+		options=`getopt -o n,u,e -l uid:,new,eid -- "$@"`;
+		while [ $# -gt 0 ]
+		do
+		    	case $1 in
+				# for options with required arguments, an additional shift is required
+				-n|--new) _REGENERATE_KEY="yes";;
+				(--) shift; break;;
+				-e|--eid)
+				    __processVDS $2
+				    _UID=0
+				    _GUID=0
+				    shift;shift;break;;
+		    	esac
+	        	shift
+		done
+
+		log "Compute Type not gate."
+		_USERADD_OPT=" -M ";
+		_SUPPLEMENTARY_GROUPS="$_SSH_ACCESS_GROUP";
+	fi
+	isFunction "getAppUserInfo" && { log "Call getAppUserInfo"; "getAppUserInfo" "${_USER_NAME}"; } || {  writeJSONResponceErr "result=>4545" "message=>Can not get user info!"; die -q; };
+	[ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponceErr "result=>4036" "message=>Can not get UID!"; die -q; };	
+}
+
+function doAdd() {
+	log "detected user id $_UID";
+	log "detected group id $_GUID";
+	#check jelastic-ssh group and add if not exists
+	
+	[ -z "${_UID}" ]  && { log "Can not get UID"; writeJSONResponceErr "result=>4036" "message=>Can not get UID!"; die -q; };
+	[ -z "${_GUID}" ]  && { log "Can not get GUID";  writeJSONResponceErr "result=>4036" "message=>Can not get GUID!"; die -q; };
+	[ -z "${_homedir}" ] && { log "Can not get homedir";  writeJSONResponceErr "result=>4036" "message=>Can not get homedir!"; die -q; };
+	[ -z "${_USER_NAME}" ] && { log "Can not get user name";  writeJSONResponceErr "result=>4036" "message=>Can not get user name!"; die -q; };
+
+	checkUserExists "${_USER_NAME}";
+	[ ${_USER_EXISTS} -ne 0 ] && { 
+		[ ! -z "${_SUPPLEMENTARY_GROUPS}" ] && {
+			local tmpgroup=$(sed 's/\,/ /g' <<< $_SUPPLEMENTARY_GROUPS);
+			for group in $tmpgroup
+			do
+				log "$group";
+				checkGroupExists "${group}";
+				[ "$_GROUP_EXISTS" -ne 0 ] && {
+					log "Adding group ${group}";
+					$GROUPADD "${group}" 2>&1 | $GRAB_OUTPUT ;
+					result=$?;
+					[ "$result" -ne 0 ] && { writeJSONResponceErr "result=>4036" "message=>ERROR adding group!"; die -q; };
+				}
+			done
+			_SUPPLEMENTARY_GROUPS=" -G "${_SUPPLEMENTARY_GROUPS};
+		}
+		$USERADD -ou ${_UID} ${_USERADD_OPT} -g ${_GUID} -d ${_homedir} ${_SUPPLEMENTARY_GROUPS} ${_USER_NAME}  2>&1 | $GRAB_OUTPUT; 
+		checkUserExists ${_USER_NAME};
+		[ ${_USER_EXISTS} -ne 0 ] && { writeJSONResponceErr "result=>4036" "message=>ERROR adding user!"; die -q; };
+	}
+	ExtendPerm ;
+	if isFunction "postAddReform"; then 
+		"postAddReform" "${_USER_NAME}";
+		result_code=$?;
+		if [ "$result_code" -eq 0 ]; then
+			#writeJSONResponceOut "result=>0" "message=>${_SSH_PRIVATE_KEY}"
+			echo "{\"result\":\"0\",\"message\":\"${_SSH_PRIVATE_KEY}\"}"
+		else
+			writeJSONResponceErr "result=>4037" "message=>${_REFORM_MESSAGE}"
+		fi
+	else
+		forceLog "No postAddReform" ;
+		writeJSONResponceOut "result=>0" "message=>OK";
+	fi
+}
+
+function doAccess(){
+        options=`getopt -o t:,a: -l type:,action: -- "$@"`;
+        while [ $# -gt 0 ]
+        do
+                case $1 in
+                        -t|--type)
+                            _ACCESS_TYPE=$2; shift ;;
+                        -a|--action)
+                            _ACCESS_ACTION=$2; shift ;;
+                        (--) shift; break;;
+                esac
+                shift
+        done
+        if [ "x${_ACCESS_TYPE}" == "xpwd" -a "x${_ACCESS_ACTION}" == "xdisable" ]
+        then
+            sshfile="/etc/ssh/sshd_config";
+            if $GREP -qE "^PasswordAuthentication.*$" "${sshfile}"; then
+                    $SED -i 's/^PasswordAuthentication.*$/PasswordAuthentication no/g' "${sshfile}"
+            else
+                if $GREP -qE "^\#PasswordAuthentication.*$" "${sshfile}"; then
+                    $SED -i 's/^\#PasswordAuthentication.*$/PasswordAuthentication no/g' "${sshfile}"
+                else
+                    echo "PasswordAuthentication no" >> ${sshfile};
+                fi
+            fi
+          	reloadServiceSilent sshd
+            writeJSONResponceOut "result=>0" "message=>Ok";
+        else
+            writeJSONResponceOut "result=>0" "message=>Not implemented";
+        fi
+}
+
+function describeAdd() {
+	echo "Add Jelastic user for GW" ;
+}
+
+function describeAccess() {
+	echo "Enable/disabe ssh access" ;
+}
+
+function describeAddParameters() {
+    echo "-e|--eid <environment id> -n|--new -u|--uid <user id>";
+}
+
+function describeAddOptions() {
+	echo "-e|--eid: environment id";
+	echo "-n|--new: regenerate keys";
+	echo "-u|--uid: user id";
+}
+
+function describeAccessParameters() {
+    echo "-t|--type <pwd> -a|--action <disable>";
+}
+
+function describeAccessOptions() {
+	echo "-t|--type: access type";
+	echo "-a|--action: action (enable|disable)";
+}

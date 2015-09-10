@@ -1,0 +1,159 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+[ -n "${RUBYCOMMONENGINELIB_VERSION:-}" ] && return 0;
+RUBYCOMMONENGINELIB_VERSION="0.1";
+
+$PROGRAM 'chown';
+$PROGRAM 'find';
+$PROGRAM 'grep';
+
+[ -z "${RVM_PATH}" ] && RVM_PATH="/usr/lib/rvm";
+
+[ -e "${MANAGE_CORE_PATH}/${COMPUTE_TYPE}"-engine.lib ] && { include ${COMPUTE_TYPE}-engine; }
+
+inherit ruby-common;
+
+function switchEngine(){
+    	local param=$1;
+        local version;
+        case $1 in
+        "ruby1.9.2")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "1.9.2");
+            small_version="1.9.2";
+        ;;
+        "ruby1.9.3")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "1.9.3");
+            small_version="1.9.3";
+        ;;
+        "ruby2.0.0")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.0.0");
+            small_version="2.0.0";
+        ;;
+        "ruby2.1.5")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.1.5");
+            small_version="2.1.5";
+        ;;
+        "ruby2.2.0")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.2.0");
+            small_version="2.2.0";
+        ;;
+        "ruby2.2.2")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.2.2");
+            small_version="2.2.2";
+        ;;
+        *)
+        return 4023
+        esac
+
+	[ -z "$full_version" ] && return 1;
+        if ! /usr/lib/rvm/bin/rvm list | grep -q "$full_version" ; then
+	    return 1;
+        fi
+
+        if [ -d "${WEBROOT}/ROOT/vendor" ] ; then
+                rm -rf "${WEBROOT}/ROOT/vendor"
+        fi
+        if [ -f "${WEBROOT}/ROOT/Gemfile.lock" ] ; then
+                rm -rf "${WEBROOT}/ROOT/Gemfile.lock"
+        fi
+
+	export rvm_bin_path=/usr/lib/rvm/bin
+	export GEM_HOME=/usr/lib/rvm/gems/${full_version}
+	export IRBRC=/usr/lib/rvm/rubies/${full_version}/.irbrc
+	export MY_RUBY_HOME=/usr/lib/rvm/rubies/${full_version}
+	export rvm_path=/usr/lib/rvm
+	export rvm_prefix=/usr/lib
+	export PATH=/usr/lib/rvm/gems/${full_version}/bin:/usr/lib/rvm/gems/${full_version}@global/bin:/usr/lib/rvm/rubies/${full_version}/bin:/usr/lib/rvm/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin
+# The following code loads RVM as user or system install:
+[[ -s "$rvm_path/scripts/rvm" ]] && . "$rvm_path/scripts/rvm"
+
+/bin/cat > /etc/profile.d/rvm_jelastic.sh <<END_OF_RVMENV
+# The following code loads RVM as user or system install:
+[[ -s "$rvm_path/scripts/rvm" ]] && . "$rvm_path/scripts/rvm"
+export rvm_bin_path=/usr/lib/rvm/bin
+export GEM_HOME=/usr/lib/rvm/gems/${full_version}
+export IRBRC=/usr/lib/rvm/rubies/${full_version}/.irbrc
+export MY_RUBY_HOME=/usr/lib/rvm/rubies/${full_version}
+export rvm_path=/usr/lib/rvm
+export rvm_prefix=/usr/lib
+export PATH=/usr/lib/rvm/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin
+export GEM_PATH=/usr/lib/rvm/gems/${full_version}:/usr/lib/rvm/gems/${full_version}@global
+source /usr/lib/rvm/environments/base
+END_OF_RVMENV
+
+
+
+/bin/chmod 777 /etc/profile.d/rvm_jelastic.sh 2>>"$JEM_CALLS_LOG"
+
+/bin/cat >  /etc/environment <<END_OF_RVMEEE
+# The following code loads RVM as user or system install:
+[[ -s "$rvm_path/scripts/rvm" ]] && . "$rvm_path/scripts/rvm"
+export rvm_bin_path=/usr/lib/rvm/bin
+export GEM_HOME=/usr/lib/rvm/gems/${full_version}
+export IRBRC=/usr/lib/rvm/rubies/${full_version}/.irbrc
+export MY_RUBY_HOME=/usr/lib/rvm/rubies/${full_version}
+export rvm_path=/usr/lib/rvm
+export rvm_prefix=/usr/lib
+export PATH=/usr/lib/rvm/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin
+export GEM_PATH=/usr/lib/rvm/gems/${full_version}:/usr/lib/rvm/gems/${full_version}@global
+source /usr/lib/rvm/environments/default
+END_OF_RVMEEE
+
+	rvmbin="/usr/lib/rvm/bin/rvm"
+	
+	RUBY_BIN_SOURCE=/usr/lib/rvm/rubies/${full_version}/bin/ruby
+
+	# The following code loads RVM as user or system install:
+
+	[[ -s "$rvm_path/scripts/rvm" ]] && . "$rvm_path/scripts/rvm"
+	export rvm_path=/usr/lib/rvm && ${rvmbin} alias delete base  1>>$ACTIONS_LOG 2>&1
+	export rvm_path=/usr/lib/rvm && ${rvmbin} alias delete default 1>>$ACTIONS_LOG 2>&1
+	export rvm_path=/usr/lib/rvm && ${rvmbin} alias create base ${small_version}  1>>$ACTIONS_LOG 2>&1
+	source /usr/lib/rvm/environments/base  1>>$ACTIONS_LOG 2>&1
+	export rvm_path=/usr/lib/rvm && rvm use ${full_version} 1>>$ACTIONS_LOG 2>&1
+	export rvm_path=/usr/lib/rvm && rvm --default use ${full_version} 1>>$ACTIONS_LOG 2>&1
+        export rvm_path=/usr/lib/rvm && gem update --system 1>>$ACTIONS_LOG  2>&1
+	isFunction "postSwitchEngine" && {
+		postSwitchEngine 
+	}
+# common part
+
+	if [ -L "${RVM_PATH}/gems/current-gems" -o -f "${RVM_PATH}/gems/current-gems" ]
+	then
+		rm -f "${RVM_PATH}/gems/current-gems";
+	fi
+	ln -s "${RVM_PATH}/gems/${full_version}" "${RVM_PATH}/gems/current-gems" 1>>$ACTIONS_LOG 2>&1;
+	
+	curent_passenger_version="${RVM_PATH}/gems/${full_version}/gems/passenger-version"
+	if [ -L "${curent_passenger_version}" -o -f "${curent_passenger_version}" ]
+	then
+		rm -f "${curent_passenger_version}";
+	fi
+        ln -s "${RVM_PATH}/gems/${full_version}/gems/passenger-`passenger-config --version | $SED 's/Phusion Passenger //'`" "${curent_passenger_version}" 1>>$ACTIONS_LOG 2>&1;
+
+	export rvm_path=${RVM_PATH} && ${rvmbin} alias delete current-wrapper 1>>$ACTIONS_LOG 2>&1
+	export rvm_path=${RVM_PATH} && ${rvmbin} alias create current-wrapper ${small_version} 1>>$ACTIONS_LOG 2>&1
+
+	source /etc/environment
+	bundleInstall ;
+}
+
+function describeSetVersion(){
+	echo "\n\t<version>\test ruby version";
+}

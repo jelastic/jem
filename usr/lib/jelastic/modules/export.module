@@ -1,0 +1,216 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default exceptor os envinfo user-common;
+inherit extendperm;
+
+VERSION="1";
+DEFAULT_ACTION="Usage";
+DESCRIPTION="Module for import and export data and configs";
+
+INCLUDE_LIST_FILE="/etc/jelastic/export.conf";
+DESTINATION="/var/lib/jelastic/backup/export/";
+EXPORT_CONFIGS="no";
+EXPORT_DATA="no";
+VCS_CONFIG_DIR="/var/lib/jelastic/vcs";
+SSL_CONFIG_DIR="/var/lib/jelastic/SSL";
+HTTP_SERVICE="simplehttpd";
+EXCLUDE_LIST="*.bak
+*.log
+*.swp
+*~
+.bash_history
+.bash_profile
+/usr/java/*
+/var/lib/jelastic/backup/*";
+EX_PORT=7979;
+SIMPLEHTTP_CONF="/usr/local/etc/simplehttp.ini"
+$PROGRAM 'tar';
+
+function doUsage() {
+    showUsageMessage;
+}
+
+
+
+function onModLoadCallback(){
+    local temp=`getopt -o c,d,e:,f:,p: -l configs,data,exportlist:,filename:,port: -- "$@" 2>>"$JEM_CALLS_LOG"`
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp"
+    while true ; do
+        case "${1}" in
+            -c|--configs)
+                EXPORT_CONFIGS="yes"; 
+                shift
+                ;;
+            -d|--data)
+                EXPORT_DATA="yes";
+                shift
+                ;;
+            -e|--exportlist)
+                EX_LIST_CMD="$2";
+                shift 2;
+                ;;
+            -f|--filename)
+                EX_FILENAME="$2";
+                shift 2;
+                ;;
+            -p|--port)
+                EX_PORT="$2";
+                shift 2;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+    done;
+    echo -e "[simplehttp]\nPORT=${EX_PORT}" > ${SIMPLEHTTP_CONF} ;
+}
+
+function describeRunParameters(){
+    echo "\n\t-e\t\t list of items for export";
+    echo "\t-c|--configs\t export config files";
+    echo "\t-d|--data\t export data files";
+    echo "\t-f|--filename\t file name";
+    echo "\t-p|--port\t port";
+}
+
+function doRun() {
+    if [ ! -z "$EX_FILENAME" ] ; then
+	ARCH_FILE_NAME="${EX_FILENAME}.tar.gz";
+    else
+	ARCH_FILE_NAME="`uuidgen`.tar.gz";
+    fi
+    ARCH_FILE="${DESTINATION}/${ARCH_FILE_NAME}";
+    if [ "x$EXPORT_CONFIGS" == "xyes" ] ; then
+	INCLUDE_LIST="";
+	if [ "x$COMPUTE_TYPE" == "xcartridge" ] ; then 
+		INCLUDE_LIST=`find /opt/repo/ -name "*.xml" -o -name "*.cfg" -o -name "*.yaml" -o -name "*.yml" -o -name "*.conf" 2>/dev/null`
+	else
+		[ -f "$INCLUDE_LIST_FILE" ] && {
+		    INCLUDE_LIST=`$GREP "${COMPUTE_TYPE} " "$INCLUDE_LIST_FILE"  | $AWK '{print $2}' | $SED 's/\;/\n/g'` ;
+		}
+		[ -d "$VCS_CONFIG_DIR" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${VCS_CONFIG_DIR}"; }
+		[ -d "$SSL_CONFIG_DIR" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${SSL_CONFIG_DIR}"; }
+	fi
+    fi
+    if [ ! -z "$EX_LIST_CMD" ] ; then
+	OLDIFS=$IFS
+	IFS=";"
+	for el in $EX_LIST_CMD
+	do
+	    INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${el}";
+	done
+	IFS=$OLDIFS
+    fi
+    getAppUserInfo ;
+    if [ "x$EXPORT_DATA" == "xyes" ]; then
+	[ ! -z "$DB_DATA_DIR" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${DB_DATA_DIR}"; }
+	[ ! -z "$WEBROOT" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${WEBROOT}"; }
+        [ -d "$VCS_CONFIG_DIR" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${VCS_CONFIG_DIR}"; }
+	INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${_homedir}";
+    fi
+    [ -z "$INCLUDE_LIST" ] && { 
+	echo "Empty export list" >> $ACTIONS_LOG; 
+	writeJSONResponceErr "result=>4040" "message=>Export failed" ;
+	return 1; 
+    }
+
+    INCLUDE_LIST="`echo "$INCLUDE_LIST"|sort|uniq`";
+    PID=$$;
+    EXPORT_LIST_FILE=`mktemp /tmp/export3.${PID}XXXX 2>/dev/null`; 
+    exresult=$?; 
+
+    EXCLUDE_LIST_FILE=`mktemp /tmp/exclude3.${PID}XXXX 2>/dev/null`; 
+    excluderesult=$?;
+
+    INCLUDE_LIST1="$INCLUDE_LIST";
+
+    while read line
+    do
+        line=$(sed 's/\//\\\//g' <<< $line);
+        [ "x$line" == "x" ] && continue ;
+        INCLUDE_LIST1=$(sed "/^$line.\+/d" <<< "$INCLUDE_LIST1");
+    done <<< "$INCLUDE_LIST"
+
+    echo "$INCLUDE_LIST1" >> "$EXPORT_LIST_FILE";
+    echo "$EXCLUDE_LIST" >> "$EXCLUDE_LIST_FILE";
+
+    [ ! -d "$DESTINATION" ] && { $MKDIR -p "$DESTINATION";  }
+    TAR_OPTS=" --warning=none -P --ignore-failed-read"
+
+    stopService ${SERVICE} > /dev/null 2>&1;
+
+    $TAR ${TAR_OPTS} -zcvf "$ARCH_FILE" -T "$EXPORT_LIST_FILE" -X "$EXCLUDE_LIST_FILE" >/dev/null 2>>$ACTIONS_LOG
+    arcresult=$?;
+
+    startServiceSilent ${SERVICE} ;
+
+    [ -f "$EXCLUDE_LIST_FILE" ] && rm -f "$EXCLUDE_LIST_FILE";
+    [ -f "$EXPORT_LIST_FILE" ] && rm -f "$EXPORT_LIST_FILE";
+    if [ $arcresult -eq 0 ] ; then 
+	if [ `$TAR -P -tf "$ARCH_FILE" | wc -l` -eq 0 ] ; then
+	    echo "Empty archive created" >> $ACTIONS_LOG ;
+	    writeJSONResponceErr "result=>4040" "message=>Export failed" ;
+	else
+	    $CHOWN ${_UID}:${_GUID} -R "${DESTINATION}" 2>>"$JEM_CALLS_LOG";
+	    restartServiceSilent ${HTTP_SERVICE} ;
+	    enableService ${HTTP_SERVICE} > /dev/null 2>&1;
+    	    writeJSONResponceOut "result=>0" "message=>Exported successfully" "name=>${ARCH_FILE_NAME}" ;
+    	fi
+    else
+	writeJSONResponceErr "result=>4040" "message=>Export failed" ;
+	return $arcresult ;
+    fi
+    return 0 ;
+}
+
+function describeRun() {
+    echo "Run data export" ;
+}
+
+function postRunCallback(){
+    ExtendPerm ;
+}
+
+function doRemove() {
+    if [ ! -z "$EX_FILENAME" ] ; then
+	ARCH_FILE_NAME="${EX_FILENAME}";
+    else
+	writeJSONResponceErr "result=>4038" "message=>Filename is required" ;
+	return 4038;
+    fi
+    ARCH_FILE="${DESTINATION}/${ARCH_FILE_NAME}";
+    if [ -f "$ARCH_FILE" ] ; then
+	rm -rf "$ARCH_FILE";
+	writeJSONResponceOut "result=>0" "message=>Successfully" ;
+    else
+	writeJSONResponceErr "result=>4039" "message=>File not found" ;
+	return 4039;
+    fi
+}
+
+function describeRemove() {
+    echo "Remove exported file" ;
+}
+
+function describeRemoveParameters(){
+    echo "\n\t-f|--filename\t file name";
+}
+

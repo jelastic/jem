@@ -1,0 +1,69 @@
+#!/bin/bash 
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+[ -n "${RUBYCOMMONLIB_VERSION:-}" ] && return 0;
+RUBYCOMMONLIB_VERSION="0.1";
+
+[ -e "${MANAGE_CORE_PATH}/${COMPUTE_TYPE}"-deploy.lib ] && { include ${COMPUTE_TYPE}-deploy; }
+include log ;
+
+function bundleInstall(){
+    [ -f "/var/lib/jelastic/env" ] && {
+    bundle_type=$(cat /var/lib/jelastic/env)
+    export rvm_path=/usr/lib/rvm
+    bundle="`/usr/lib/rvm/bin/rvm gemdir`/bin/bundle"
+    source /usr/local/rvm/environments/base
+#    echo "${bundle_type}" > /var/lib/jelastic/env
+    setEnvApp ${bundle_type} ;
+    [ -z "${APPWEBROOT}" ] && { APPWEBROOT="/var/www/webroot/ROOT"; }  
+    # restartServiceSilent $SERVICE;    <---- need to check is OK to remove this line
+    if  [ -f "${APPWEBROOT}/Gemfile" ] ; then  
+        bundle_date=`date +%D.%k:%M:%S.%N`
+        echo "[ ${bundle_date} ] Building bundle for env type: ${bundle_type} . Do it"  >> ${BUNDLE_INSTALL_LOG};
+        envs="development production test";
+        [[ -n $bundle_type && $envs =~ $bundle_type ]] && { 
+    	    VERBOSE=1;
+            log "${bundle} install --deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) " ;
+            cd ${APPWEBROOT} && ${bundle} install --deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG ;
+            resultcode=$? ;
+            if [ "${resultcode}" -eq 16 ] ; then
+                log "${bundle} install --no-deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) " ;
+                cd ${APPWEBROOT} && ${bundle} install --no-deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} &&
+                ${bundle} install --deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} ;
+                cd ${APPWEBROOT} && ${bundle} clean >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG ;
+            fi
+            shopt -s dotglob;
+            chown -hR ${DATA_OWNER} "${APPWEBROOT}" 2>>"$JEM_CALLS_LOG";
+            shopt -u dotglob;
+            $SED -i /PATHVENDOR/d /etc/environment
+            tmp_version=`ls "${APPWEBROOT}/vendor/bundle/ruby/" 2>/dev/null`;
+            if [ -d "${APPWEBROOT}/vendor/bundle/ruby/$tmp_version/bin" ] ; then
+                echo "
+PATHVENDOR=${APPWEBROOT}/vendor/bundle/ruby/$tmp_version/bin
+export PATH=$PATH:\$PATHVENDOR
+" >> /etc/environment
+            fi
+
+        }
+    else
+        startServiceSilent ${SERVICE} ;
+        echo "Gemfile not found" >> $ACTIONS_LOG
+    fi    
+    }
+    return 0;
+}

@@ -1,0 +1,147 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+VERBOSE=2;
+inherit default exceptor ;
+inherit os envinfo ;
+inherit extendperm;
+
+VERSION="1";
+DEFAULT_ACTION="Usage";
+DESCRIPTION="Module for import and export data and configs";
+DOWNLOADS="/var/cache/unpack/";
+DESTINATION="/";
+
+CURL_OPTIONS=" -L -kfsS "
+
+function doUsage() {
+    showUsageMessage;
+}
+
+$PROGRAM 'tar';
+
+function onModLoadCallback(){
+    local temp=`getopt -o a:,d: -l archive:,destination: -- "$@" 2>>"$JEM_CALLS_LOG"`
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp"
+    while true ; do
+        case "${1}" in
+            -a|--archive)
+                ARCHIVE_URL="$2";
+                shift 2;
+                ;;
+            -d|--destination)
+                DESTINATION="$2";
+                shift 2;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+    done;
+}
+
+
+function doArchive() {
+    [ -z "$ARCHIVE_URL" ] && { 
+	writeJSONResponceErr "result=>4040" "message=> failed" ; 
+        return 1;
+    }
+    [ ! -d "$DOWNLOADS" ] && { mkdir -p "$DOWNLOADS"; }
+
+    shopt -s dotglob; 
+    rm -Rf "$DOWNLOADS"/*;
+    shopt -u dotglob; 
+
+    if grep -qE "^file:" <<< ${ARCHIVE_URL} ; then
+	#local file
+	package_name=$(sed 's/file:\/\///' <<< ${ARCHIVE_URL});
+    else
+	cd $DOWNLOADS
+	$CURL ${CURL_OPTIONS} -O ${ARCHIVE_URL} >> $ACTIONS_LOG 2>&1;
+        [ $? -gt 0 ] && { 
+            	cd $DOWNLOADS
+		http_url=$($SED 's/^https/http/' <<< ${ARCHIVE_URL})
+		$CURL ${CURL_OPTIONS} -O ${http_url} >> $ACTIONS_LOG 2>&1;
+		[ $? -gt 0 ] && {
+			writeJSONResponceErr "result=>4078" "message=>Error loading file from URL" ; die -q; 
+		}
+	};
+	cd /
+        package_name="$DOWNLOADS/"`ls $DOWNLOADS`;
+    fi
+
+    ARC_UTILITY="";ARCH_OPT="";ARCH_DEST="";
+    if [[ ${package_url} =~ .zip$ ]] || [[ ${package_name} =~ .zip$ ]]
+    then
+        ARC_UTILITY="$UNZIP" ;
+        ARCH_OPT=" -o ";
+        ARCH_DEST_OPT=" -d ";
+    fi
+    if [[ ${package_url} =~ .tar$ ]] || [[ ${package_name} =~ .tar$ ]]
+    then
+       ARC_UTILITY="$TAR";
+       ARCH_OPT=" --overwrite -xpf ";
+       ARCH_DEST_OPT=" -C ";
+    fi
+    if [[ ${package_url} =~ .tar.gz$ ]] || [[ ${package_name} =~ .tar.gz$ ]]
+    then
+       ARC_UTILITY="$TAR" ;
+       ARCH_OPT=" --overwrite -xpzf ";
+       ARCH_DEST_OPT=" -C ";
+    fi
+    if [[ ${package_url} =~ .tar.bz2$ ]] || [[ ${package_name} =~ .tar.bz2$ ]]
+    then
+	ARC_UTILITY="$TAR";
+	ARCH_OPT=" --overwrite -xpjf ";
+	ARCH_DEST_OPT=" -C ";
+    fi    
+
+    [ ! -d "$DESTINATION" ] && { mkdir "$DESTINATION"; }
+    stopService ${SERVICE} > /dev/null 2>&1;
+
+    [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" ] && [[ -d /var/www/webroot/ROOT/ && ! -h /var/www/webroot/ROOT ]] && rm -rf /var/www/webroot/ROOT/;
+    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && [[ -d /opt/repo/ROOT/ && ! -h /opt/repo/ROOT ]] && rm -rf /opt/repo/ROOT/;
+
+    ${ARC_UTILITY} ${ARCH_OPT} "$package_name" ${ARCH_DEST_OPT} "$DESTINATION" >> $ACTIONS_LOG 2>&1;
+    result=$?;
+
+    startService ${SERVICE} >> $ACTIONS_LOG 2>&1;	
+    # writeJSONResponceErr "result=>4052" "message=>Context does not exist";
+    writeJSONResponceOut "result=>0" "message=>Unpacked succesfuly";
+    return 0;
+}
+
+function describeArchive() {
+    echo "Unpack file" ;
+    return 0;
+}
+
+function postArchiveCallback(){
+    ExtendPerm ;
+}
+
+function describeArchiveOptions() {
+    echo "-a|--archive: archive to unpack";
+    echo "-d|--destination: destination path (default /)";
+}
+
+function describeArchiveParameters() {
+    echo "-a|--archive <archive name> [-d|--destination <destination path>]";
+}

@@ -1,0 +1,350 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default os envinfo output exceptor;
+VERSION="1";
+DEFAULT_ACTION="Usage";
+DESCRIPTION="Compute node operations";
+
+inherit "$deploy_module_inherit";
+include "$replication_module_inherit";
+include cartridge-common;
+
+DOWNLOADS='/var/cache/downloads';
+TMPCONF="/tmp/tmp.conf.$$";
+
+$PROGRAM 'wget';
+$PROGRAM 'unzip';
+$PROGRAM 'tar';
+$PROGRAM 'chown';  # Is it really necessary? //Andrey
+
+
+[ "x${COMPUTE_TYPE}" == "xcartridge" ] && restoreEnvironmentVariables && {
+    [ -f "${CARTRIDGE_HOME}/jelastic/scripts/deploy.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/deploy.sh";
+    WEBROOT="${Webroot_Path}";
+}
+
+[[ -n "${WEBROOT}" ]] && [ ! -d "$WEBROOT" ] && mkdir -p "$WEBROOT";
+
+
+function doUsage() {
+    showUsageMessage;
+}
+
+function doDeploy(){
+    ensureDiskSpaceIsOK;
+    local temp=$(getopt -o u:,c:,e:,a:  -- $@);
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp";
+    while [ $# -gt 0 ]
+    do
+        case "$1" in
+            -u)
+                package_url=$2;
+                shift;
+                ;;
+            -c)
+                context=$2;
+                [ "x$context" == "xroot" ]  && context='ROOT';
+                [ "x$context" == "x/" ]  && context='ROOT';
+                shift;
+                ;;
+	    -a)
+                atomic_deploy=$2;
+                shift;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+        shift;
+    done;
+
+	if [[ -z "$package_url" ]]
+	then
+		writeJSONResponceErr "result=>4999" "message=>Wrong arguments for deploy" ; 
+		exit 1
+	fi
+
+    # Contexts validation
+
+    [ ! -z "$Context_Regex" ] && context_regex="/${Context_Regex}/p";
+
+    [ "x${COMPUTE_TYPE}" ==  "xtomcat" ]  && {  
+         [ "x${COMPUTE_TYPE_VERSION}" == "x7" ]  && context_regex='/^((([a-zA-Z0-9])+((-|_|\.|#{1})?([a-zA-Z0-9])+)+(#{2}[0-9]+)?)|([a-zA-Z0-9]+))$/p;' || context_regex='/^((([a-zA-Z0-9])+((-|_|\.|#{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
+    }
+    [ "x${COMPUTE_TYPE}" ==  "xjetty" ] && context_regex='/^((([a-zA-Z0-9])+((-|_{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
+    [ "x${COMPUTE_TYPE}" ==  "xglassfish" ] && context_regex='/^((([a-zA-Z0-9])+((-|_|\.{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
+    [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && context_regex='/^(production|development|test)$/p;';
+    
+    [ -z "$context_regex" ] && context_regex='/^((([a-zA-Z0-9])+(-{1}([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;'
+
+    if [[ -z $($SED  -nre  "$context_regex" <<< $context ) ]]
+    then
+        writeJSONResponceErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
+    fi
+
+    [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && {
+        if ! $GREP -q ${context} <<< "development production test" ; then
+            writeJSONResponceErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
+        fi
+    }
+
+    local vcs_project_properties="/var/lib/jelastic/vcs/${context}.properties";
+    [ -f "$vcs_project_properties" ] && rm -f "$vcs_project_properties";
+
+    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
+          deploy "$package_url" "$context" "$ext" >> "$ACTIONS_LOG"  2>&1 &&  service cartridge build >>  "$ACTIONS_LOG"  2>&1  && service cartridge deploy >> "$ACTIONS_LOG"  2>&1 && { writeJSONResponceOut "result=>0" "message=>Application deployed successfully"; return 0 ; } || { writeJSONResponceErr "result=>4060" "message=>Deploy failed"; return 4060; } ;
+    }
+
+    deploy "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" && writeJSONResponceOut "result=>0" "message=>Application deployed successfully" || {
+	result=$?;
+	[ $result -eq 156 ] && result=4078;
+	[ $result -eq 56  ] && result=4071;
+	[ -z "$result" ] && [ $result -lt 4000 ] && result=4060; 
+	writeJSONResponceErr "result=>$result" "message=>Deploy failed" ; 
+    };
+}
+
+function doUndeploy(){
+    ensureDiskSpaceIsOK;
+	local temp=$(getopt -o c: -- $@);
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp";
+    while [ $# -gt 0 ]
+    do
+        case "$1" in
+            -c)
+                context=$2;
+                [ "x$context" == "xroot" ]  && context='ROOT';
+                [ "x$context" == "x/" ]  && context='ROOT';
+                shift;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+        shift;
+    done;
+    undeploy "$context" &&  writeJSONResponceOut "result=>0" "message=>Application removed sussesfully" || writeJSONResponceErr "result=>4061" "message=>Undeploy failed" ;
+}
+
+function doRenameContext(){
+    ensureDiskSpaceIsOK;
+    local temp=$(getopt -o e:,n:,o: -- $@);
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp";
+    while [ $# -gt 0 ]
+    do
+        case "$1" in
+            -n|--newContext)
+                newContext=$2;
+                [ "x$newcontext" == "xroot" ]  && newcontext='ROOT';
+                shift;
+                ;;
+            -o|--oldContext)
+                oldContext=$2;
+                [ "x$oldcontext" == "xroot" ]  && oldcontext='ROOT';
+                shift;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+        shift;
+    done;
+    if [ "x$newContext" == "x$oldContext" ]; then
+        writeJSONResponceOut "result=>0" "message=>Context renamed succesfully";
+    else
+        renameContext "$newContext" "$oldContext" && writeJSONResponceOut "result=>0" "message=>Context renamed succesfully" || writeJSONResponceErr "result=>4062" "message=>Context rename failed";
+    fi
+}
+
+function doEnableReplication(){
+    while [ $# -gt 0 ]
+    do
+        case "$1" in
+            -h)
+                local host=$2;
+                shift;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+        shift;
+    done;
+    [ "x${COMPUTE_TYPE}" == "xapache-ruby" ] && {
+        return 0;
+    }
+     enableReplication "$host";
+}
+
+
+function doDisableReplication(){
+    [ "x${COMPUTE_TYPE}" == "xapache-ruby" ] && {
+        return 0;
+    }
+        disableReplication;
+}
+
+function doAddToCluster(){
+    while [ $# -gt 0 ]
+    do
+        case "$1" in
+            -p)
+                node_password=$2;
+                shift;
+                ;;
+            -i)
+                node_ip_address=$2;
+                shift;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+        shift;
+    done;
+
+    echo "$node_ip_address $node_password" >> "$password_storage";
+}
+
+function doCleanUpCluster(){
+    #~ $glassfish_tools -m cleanup;
+    rm -f "$password_storage";
+    restartServiceSilent iptables ;
+}
+
+function doBuildCluster(){
+    $glassfish_tools -m build;
+    restartServiceSilent iptables ;
+}
+
+function doSetAdminPassword(){
+    local password=$1;
+    doAction passwd set "$password";
+}
+function doInternalCall(){
+	$glassfish_tools $@ ;
+}
+
+function doCleanUp(){
+	$glassfish_tools -m cleanup >> "$JEM_CALLS_LOG" && writeJSONResponceOut "result=>0" "message=>Сleanup sussesfully" || writeJSONResponceErr "result=>4070" "message=>Сleanup failed" ;
+}
+
+function describeAddToCluster() {
+    echo "Add node to cluster";
+}
+
+function describeAddToClusterParameters() {
+    echo "-p <node password> -i <node_ip_address>";
+}
+
+function describeAddToClusterOptions() {
+    echo "-p: node password for admin user";
+    echo "-i: node ip address";
+}
+
+function describeBuildCluster() {
+    echo "Build cluster";
+}
+
+function describeCleanUp() {
+    echo "Сleanup configuration";
+}
+
+function describeCleanUpCluster() {
+    echo "Cleanup password storage";
+}
+
+function describeDeploy() {
+    echo "Deploy application";
+}
+
+function describeDeployParameters() {
+    echo "-u <url> -c <context> -a <true|false>";
+}
+
+function describeDeployOptions() {
+    echo "-u: url for  application deploy ";
+    echo "-c: context name to act with";
+    echo "-a: use atomic deploy or not<true|false>";
+}
+
+function describeDisableReplication() {
+    echo "Disable nodes replication";
+}
+
+function describeEnableReplication() {
+    echo "Enable nodes replication";
+}
+
+function describeEnableReplicationParameters() {
+    echo "-h <host>";
+}
+
+function describeEnableReplicationOptions() {
+    echo "-h: balancer node ip";
+}
+
+function describeInternalCall() {
+    echo "For JEM internal use";
+}
+
+function describeRenameContext() {
+    echo "Rename deployed context";
+}
+
+function describeRenameContextParameters() {
+    echo "-n|--newContext <new context> -o|--oldContext <old context>";
+}
+
+function describeRenameContextOptions() {
+    echo "-n|--newContext: new context name";
+    echo "-o|--oldContext: old context name";
+}
+
+function describeSetAdminPassword() {
+    echo "Set password for adminstrator user";
+}
+
+function describeSetAdminPasswordParameters() {
+    echo "<password>";
+}
+
+function describeSetAdminPasswordOptions() {
+    echo "<password>: user password";
+}
+
+function describeUndeploy() {
+    echo "Undeploy deployed application";
+}
+
+function describeUndeployParameters() {
+    echo "-c <context>";
+}
+
+function describeUndeployOptions() {
+    echo "-c: context name to act with";
+}

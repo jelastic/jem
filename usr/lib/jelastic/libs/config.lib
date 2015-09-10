@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${CONFIGLIB_VERSION:-}" ] && return 0;
+CONFIGLIB_VERSION="0.1";
+
+function __storeConfigHeader() {
+    local configfile=${1};
+    echo "# Configuration file for manage utility" > ${configfile};
+    echo "# This file has been automatically generated." >> ${configfile};
+    #echo "[general]" >> ${configfile};
+}
+
+function storeConfig() {
+    [[ ${#@} -ge 2 ]] || die;
+    local configfile=${1} key=${2} value content vars line="" changed=0;
+    shift 2;
+    value=${@};
+
+    [[ ! -e ${configfile} ]] && { mkdir -p ${configfile%/*} || die -q  "Couldn't create directory ${configfile%/*}: $?"; }
+    [[ ! -f ${configfile} ]] && {
+        __storeConfigHeader ${configfile};
+        echo "${key}=\"${value}\"" >> ${configfile};
+        return;
+    }
+
+    content=$(<${configfile})
+
+    [[ -z ${content} ]] && {
+        __storeConfigHeader ${configfile};
+        echo "${key}=\"${value}\"" >> ${configfile}
+        return;
+    }
+    (
+        local ifs_save=${IFS-$' \t\n'}
+        IFS=$'\n'
+        for line in ${content} ; do
+            [[ ${line/=/} != ${line} ]] || continue;
+            line=${line/=*/};
+            local ${line}="";
+            vars=(${vars[@]} ${line});
+        done
+        IFS=${ifs_save};
+
+        source ${configfile} 2>&1 > /dev/null || die "Failed to source ${configfile}."
+        __storeConfigHeader ${configfile};
+        for var in ${vars[@]} ; do
+            [[ ${var} == ${key} ]] && {
+                echo "${var}=\"${value}\"" >> ${configfile};
+                changed=1;
+            } || {
+                echo "${var}=\"${!var}\""  >> ${configfile};
+            }
+        done
+        [[ ${changed} == 1 ]] || echo "${key}=\"${value}\"" >> ${configfile};
+    )
+}
+
+function loadConfig() {
+    [[ ${#@} -eq 2 ]] || die;
+    local configfile key value
+
+    configfile=${1}
+    key=${2}
+    [[ ! -e ${configfile} ]] && return 1;
+    value=$(unset ${key}; source ${configfile} 1>&2 > /dev/null || die "Failed to source ${configfile}.";echo "${!key}");
+    echo "${value}";
+}
+
+function loadINISection() {
+    local inifile=${1} section=${2} ini
+    ini="$(<$inifile)";
+    ini="${ini//[/\[}";
+    ini="${ini//]/\]}";
+    OIFS=${IFS};
+    IFS=$'\n' && ini=( ${ini} );
+    ini=( ${ini[*]//;*/} );
+    ini=( ${ini[*]/\    =/=} );
+    ini=( ${ini[*]/=\   /=} );
+    ini=( ${ini[*]/\ =\ /=} );
+    ini=( ${ini[*]/#\\[/\}$'\n'config.section.} );
+    ini=( ${ini[*]/%\\]/ \(} );
+    ini=( ${ini[*]/=/=\( } );
+    ini=( ${ini[*]/%/ \)} );
+    ini=( ${ini[*]/%\\ \)/ \\} );
+    ini=( ${ini[*]/%\( \)/\(\) \{} );
+    ini=( ${ini[*]/%\} \)/\}} );
+    ini[0]="";
+    ini[${#ini[*]} + 1]='}';
+    eval "$(echo "${ini[*]}")";
+    IFS=${OIFS};
+    config.section.${section}
+}
+
+function appendConfig() {
+    [[ ${#@} -gt 2 ]] || die
+    local configfile=${1} key=${2} item oldvalue newvalue
+    shift 2
+    item="$@"
+    oldvalue=$(load_config ${configfile} ${key})
+    if ! has ${item} ${oldvalue[@]} ; then
+        newvalue=( ${oldvalue[@]} ${item} )
+        storeConfig ${configfile} ${key} ${newvalue[@]}
+    fi
+}

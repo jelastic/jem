@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+[ -n "${USERGATELIB_VERSION:-}" ] && return 0;
+USERGATELIB_VERSION="0.1";
+
+# _getAppUserID
+#       return uid, guid, home_dir of user defined in DATA_OWNER in envinfo.lib (DATA_OWNER=user:group)
+# result:
+#       _UID  user id
+#       _GUID  group id 
+#		_homedir  homedir
+function getAppUserInfo(){
+	# return 0;
+	# [ ! -z "DATA_OWNER" ] && {
+	# 	local _appuser=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
+	# 	local _appgroup=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
+	# 	_homedir=$( getent passwd "${_appuser}" | cut -d: -f6 );
+	# 	_UID=$($ID -u $_appuser);
+	# 	_GUID=$($ID -g $_appgroup);
+	# 	#check if not empty
+	# }
+	local _username=${1};
+
+	[ ! -z "${_username}" ] && {
+		HOME="/home" ;
+		[ -f /etc/default/useradd ] && . /etc/default/useradd
+		_homedir="${HOME}/${_username}"
+	}
+	# || retern error
+}

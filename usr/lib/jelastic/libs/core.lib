@@ -1,0 +1,307 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${CORELIB_VERSION:-}" ] && return 0;
+CORELIB_VERSION="0.1";
+            
+OVERRIDE_DIR="/var/lib/jelastic/overrides/"
+
+DEBUG=${DEBUG:=0};
+PROGRAM='searchProg';
+declare -a __CORE_INCLUDE_LIST;
+
+# checkDo
+# 	check if the function is exists and run it
+# params:
+#	$1 - function name
+#	$@ - function params
+function checkDo() {
+    local function="${1}";
+    shift;
+    if isFunction "${function}" ; then
+        ${function} "$@";
+    else
+        die "No function ${function}";
+    fi;
+}
+
+# defineBigInline
+# Example of usage:
+#       defineBigInline myVar <<'EOF'
+#               FirstLine '"1234"'
+#               secondline @2
+#               $(this never be executed)
+#               bla-bla-bla
+#       EOF
+function defineBigInline() {
+    IFS='\n' read -r -d '' ${1} || true;
+}
+
+# indexOf
+#       return an index of specified element in given array
+# params:
+#       $1 - source array
+#       $2 - value to search
+# result:
+#       item position
+#       return code is 0 if success 1 othervise
+function indexOf() {
+    local array=(${1}) value=${2};
+    local index=0;
+    while [ "${index}" -lt "${#array[@]}" ]; do
+        [[ "${array[${index}]}" = "${value}" ]] && { echo ${index}; return 0; }
+        let "index++";
+    done;
+    echo "";
+    return 1;
+}
+
+# removeValueFromArray
+#       remove array element by it's value
+# params:
+#       $1 - source array
+#       $2 - value to remove
+# result:
+#       stdout - modified array
+function removeValueFromArray() {
+    : ${1:?"Missing param: array"};
+    : ${2:?"Missing param: value to remove"};
+    local array=(${1}) value=${2};
+    local index=$(indexOf "${array[*]}" "$value");
+    if [[ ! -z ${index} ]] ; then
+        array[$index]='';
+        array=(${array[*]})
+    fi
+    echo "${array[*]}"
+}
+
+# removeIdxFromArray
+#       remove array element by it's position
+# params:
+#       $1 - source array
+#       $2 - item position
+# result:
+#       stdout - modified array
+function removeIdxFromArray() {
+    : ${1:?"Missing param: array"};
+    : ${2:?"Missing param: item position"};
+    local array=(${1}) index=${2};
+    array[$index]='';
+    echo "${array[*]}"
+}
+
+# searchProg
+#       searches for a full name of given program
+# params:
+#       $1 - program to find
+# result:
+#       function exports an environment variable. Name of variable is uppercased program name.
+#       The value of variable is the full path to
+function searchProg() {
+        : ${1:?"Missing param: program name"};
+#        include exceptor;
+#        ensureDiskSpaceIsOK;
+        local prgName=${1};
+        local cmdVar=$(sed -re "s/(.*)/\U\1/;s/-/_/g" <<< $prgName);
+        declare -p $cmdVar >/dev/null 2>&1 && { log "ERROR: Trying to redeclare $cmdVar"; return 1; }
+        eval "command -v $prgName >/dev/null 2>&1 && $cmdVar=\$(which $prgName) || $cmdVar='die \"$prgName not found\"';";
+        declare -r ${cmdVar};
+        return 0;
+}
+
+# die
+#	exits from the script
+function die() {
+    local item funcname="" sourcefile="" lineno="" n e s="yes";
+
+    if isFunction "writeErrorMsg" ; then
+        e="writeErrorMsg"
+    else
+        e="echo"
+    fi
+
+    [[ ${1} == "-q" ]] && {
+        s="";
+        shift;
+    }
+
+    [ ! -n "${@}" ] && ${e} "${@}"
+
+
+    [[ -n "${s}" ]] && {
+        ${e} "Call stack:"
+        printStack;
+    }
+
+    kill ${MANAGE_KILL_TARGET} 2>/dev/null;
+    exit 249
+}
+
+function printStack() {
+  for i in $(seq 0 $((${#FUNCNAME[@]} - 2))); do
+    echo "${FUNCNAME[$i]} called from ${BASH_SOURCE[$i+1]} line ${BASH_LINENO[$i]}: ";
+    sed -n "${BASH_LINENO[$i]}{s/^/    /;p}" "${BASH_SOURCE[$i+1]}"
+  done
+}
+
+function startJemThreadQueueManager(){
+    include exceptor;
+#    local jempidfile="/var/run/jem.pid";
+    jempidfile="/var/run/jem.pid";
+    local sleep_period="1s"
+    ensureDiskSpaceIsOK;
+
+    if [ "x$action" == "xvcs" -a "x$1" == "xautoupdate" ] ; then
+	[[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]] && {
+	    echo "$(date +%D.%k:%M:%S.%N): $1 - other process is running" >> $JEM_CALLS_LOG
+ 		writeJSONResponceOut "result=>0" "message=>$1: other process is running"
+		exit 0;
+	}
+    fi
+    if [ "x$action" == "xdocker" -o "x$action" == "xcommand" ] ; then
+        while [ "$1" != "" ]
+        do
+        case "$1" in
+        --ctid)
+            TQctid=$2;
+            break
+        ;;
+        'getpcstemplate')
+            setgetTPL=$1;
+        ;;
+        --name)
+            nameTPL=$2;
+            ;;
+        --version)
+            versionTPL=$2;
+            ;;
+        esac
+        shift;
+        done
+        [ -z "$TQctid" ]  && TQctid="${$}$action";
+        [ ! -z "$setgetTPL" ] && {
+            [ ! -z "$nameTPL" -o ! -z "$versionTPL" ] && TQctid=$(md5sum <<< "${nameTPL}${versionTPL}X" | awk '{print $1}' )
+        }
+        jempidfile="/var/run/jem.${TQctid}.pid";
+    fi
+    [ -f $jempidfile ] && {
+          while [[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]]; do
+                sleep $sleep_period;
+          done
+    }
+
+    echo "$$" > $jempidfile;
+}
+
+function stopJemThreadQueueManager(){
+    [ -f $jempidfile ] && {
+          rm -f $jempidfile
+    }
+}
+
+function doAction() {
+    local action="${1##--}" modfile="" subaction="${2##--}" ;
+    [[ -z ${action} ]] && die "Usage: doAction <action> <args>";
+    shift; shift;
+
+    MANAGE_MODULE_NAME="${action}";
+    MANAGE_COMMAND="${MANAGE_PROGRAM_NAME} ${MANAGE_MODULE_NAME}";
+
+    [[ ${MANAGE_BINARY_NAME##*/} != ${MANAGE_PROGRAM_NAME} ]] && {
+        MANAGE_COMMAND="${MANAGE_BINARY_NAME##*/}";
+    }
+    declare -x result;
+    modfile=$(_manageFindModule "${action}");
+    (
+
+        source "$MANAGE_DEFAULT_ACTIONS" 2>/dev/null || die "Couldn't source ${MANAGE_DEFAULT_ACTIONS}";
+        source "${modfile}" 2>/dev/null || die "Couldn't source ${modfile}";
+
+        isFunction "onModLoadCallback" && "onModLoadCallback" "$@";
+
+        [[ -z ${subaction} ]] && {
+            checkDo "do${DEFAULT_ACTION:-usage}" "$@";
+        } || {
+            isFunction "do${subaction}" || subaction=$(sed 's/\([a-zA-Z0-9]\)\([a-zA-Z0-9]*\)/\u\1\2/g' <<< ${subaction});
+            isFunction "do${subaction}" || subaction=$(declare -F | grep -iom 1 "${subaction}");
+            [[ -z ${subaction} ]] && die -q "Action ${subaction} unknown";
+            # [[ "$@" == "help" ]] && { "showActionHelp" "$subaction"; return 0; }
+            [[ "$@" == "help" ]] && { isFunction "showActionHelp" && "showActionHelp" "$subaction"; return 0; }
+            [ -d "$OVERRIDE_DIR" ] && [  $(ls -1 ${OVERRIDE_DIR}/*.lib 2>/dev/null | wc -l ) -gt 0 ] && {
+                # [  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -eq 0 ] && return 0;
+                for override_lib in $(ls ${OVERRIDE_DIR}/*.lib)
+                do
+                    source $override_lib;
+                done
+            }
+            isFunction "pre${subaction}Callback" && "pre${subaction}Callback" "$@";
+            checkDo "do${subaction}" "$@";
+            result=$?;
+            if [[ $result -eq 0 ]] ; then
+                if isFunction "post${subaction}Callback" ; then
+                    "post${subaction}Callback" "$@" ;
+                    result=$?;
+                fi
+            fi
+            return $result
+        }
+    );
+    actionResult=${?};
+    [[ $actionResult -gt 0 ]] && {
+        # stopJemThreadQueueManager;
+        # [[ $actionResult -gt 5000 ]] && _manageDoHelp;
+        return ${actionResult};
+    };
+    return 0; ## For cases if no other problems occured in doAction subshell
+}
+
+function inherit() {
+    local x e;
+    for x in "$@"; do
+        [[ -e "${MANAGE_CORE_PATH}/${x}.lib" ]] || die "Couldn't find ${x}.lib";
+        include ${x};
+    done
+}
+
+function include() {
+    local x e;
+
+    for x in "$@"; do
+        [[ -n "$(indexOf "${__CORE_INCLUDE_LIST[*]}" ${x})" ]] && continue;
+        [[ -e "${MANAGE_CORE_PATH}/${x}.lib" ]] && { source "${MANAGE_CORE_PATH}/${x}.lib" || die "Couldn't source ${x}.lib"; }
+        __CORE_INCLUDE_LIST=(${__CORE_INCLUDE_LIST[@]} ${x});
+    done
+}
+
+function inject() {
+        local fn=$1
+        local address=$2
+        local code=$3
+        eval "$(declare -f "$fn" | sed -re "${address}${code}" )"
+}
+
+
+function trapError () {
+    local err=$1 # error status
+    local line=$2 # LINENO
+    local linecallfunc=$3
+    local command="$4"
+    local funcstack="$5"
+    echo "<---"
+    echo "ERROR: line $line - command '$command' exited with status: $err"
+    echo
+    echo "--->"
+}

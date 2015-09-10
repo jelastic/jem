@@ -1,0 +1,97 @@
+#!/bin/bash
+export LC_ALL=en_US.UTF-8
+MANAGE_VERSION="1";
+MANAGE_PROGRAM_NAME="jem";
+MANAGE_BINARY_NAME="$0";
+MANAGE_KILL_TARGET="$$";
+
+MANAGE_DATA_PATH="${MANAGE_DATA_PATH:="/usr/lib/jelastic"}";
+MANAGE_DEFAULT_MODULES_PATH="${MANAGE_DATA_PATH}/modules";
+MANAGE_MODULES_PATH=($MANAGE_DEFAULT_MODULES_PATH);
+MANAGE_CORE_PATH="${MANAGE_CORE_PATH:="/usr/lib/jelastic/libs"}";
+MANAGE_DEFAULT_ACTIONS="${MANAGE_CORE_PATH}/default.lib";
+MANAGE_APP_TEMPLATES="${MANAGE_APP_TEMPLATES:="/usr/lib/jelastic/tpls"}";
+
+DEBUG=${DEBUG:="0"};
+
+
+META_FILE="/etc/jelastic/metainf.conf";
+JEM_CALLS_LOG="${JEM_CALLS_LOG:="/var/log/jem.log"}";
+
+FIRST_RUN_SCENARIO="/var/lib/jelastic/firstrun";
+PATH="/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin";
+
+echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
+echo ": $@" >> ${JEM_CALLS_LOG} 2>&1;
+
+"unalias" -a;
+unset -f rm;
+unset CDPATH GLOBIGNORE;
+IFS=$' \t\n';
+
+shopt -s extglob;
+shopt -s expand_aliases;
+
+source "${MANAGE_CORE_PATH}/core.lib" || exit 255;
+inherit output path-manip tests;
+trap '{ stopJemThreadQueueManager ; exit 250; }' 15;
+trap '{ exit 0; } ' USR1;
+
+function _manageDoUsage() {
+        echo "Usage: jem <global options> <module name> <module options>";
+}
+
+function _manageDoHelp() {
+        setOutputMode default;
+        _manageDoUsage;
+        echo "Options are:";
+        _manageDoListOptions;
+        echo "Modules are:";
+        _manageDoListModules;
+        echo
+}
+
+function _manageFindModule() {
+        local modname="$1" modpath="" modfile="";
+        [[ -z ${modname} ]] && die "Usage: ${FUNCNAME} <module>";
+        for modpath in "${MANAGE_MODULES_PATH[@]}"; do
+                [[ -f ${modpath}/${modname}.module ]] && break;
+        done
+
+        modfile="${modpath}/${modname}.module"
+        [[ -r ${modfile} ]] || die -q "Can't load module ${modname}";
+        echo ${modfile}
+}
+
+function _manageDoListOptions() {
+	echo "Global options:";
+	echo -e "\t--brief\t\tMake output shorter\n";
+}
+
+function _manageDoListModules() {
+	doAction modules List "$@";
+}
+
+function executeFirstRunScenario() {
+    [ -f $FIRST_RUN_SCENARIO ]  && bash $FIRST_RUN_SCENARIO > /dev/null 2>&1 && rm -f $FIRST_RUN_SCENARIO;
+}
+
+action=$1;
+
+startJemThreadQueueManager "$@";
+executeFirstRunScenario;
+if [[ -n ${action} ]] ; then 
+    if isFunction "_manageDo${action//-/_}"; then
+        [[ $# -gt 0 ]] && die -q "Too many parameters";
+        _manageDo${action//-/_};
+    else
+        doAction "${action}" "$@"
+    fi
+#else
+#        [[ $? -gt 5000 ]] && _manageDoHelp;
+fi
+
+result=$?
+stopJemThreadQueueManager;
+exit $result;
+

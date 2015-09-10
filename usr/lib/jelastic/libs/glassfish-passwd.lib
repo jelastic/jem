@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${GLASSFISHPASSWDLIB_VERSION:-}" ] && return 0;
+GLASSFISHPASSWDLIB_VERSION="0.1";
+include os output;
+
+AS_ADMIN="/opt/glassfish3/bin/asadmin";
+EMPTY_PASS='admin;{SSHA256}DdW1VfFCD0AqbQFzsu6Swqel1g1gZZ6f1m87JX6FQYSpu1X/BxTX5A==;asadmin';
+
+function setPassword() {
+	while [ "$1" != "" ]; 
+	do
+	  case $1 in
+		-u )       shift
+		  local user=$1
+		  ;;
+		-p )       shift
+		  local password=$1
+		  ;;
+	  esac
+	  shift
+	done
+
+    local domain="domain1";
+
+	[ -z "$password" ] && {
+		writeJSONResponceErr "result=>4063" "message=>Password did not set";
+	}
+
+	admin_key_file="/opt/glassfish3/glassfish/domains/$domain/config/admin-keyfile";
+	
+	sed -i "/admin.*asadmin/d" $admin_key_file;
+	echo $EMPTY_PASS >> $admin_key_file;
+
+	echo -e "AS_ADMIN_PASSWORD=\nAS_ADMIN_NEWPASSWORD=$password" >> "/tmp/$$";
+	$AS_ADMIN -u admin -W "/tmp/$$" change-admin-password > /dev/null 2>&1;
+	rm "/tmp/$$" 2>&1;
+}

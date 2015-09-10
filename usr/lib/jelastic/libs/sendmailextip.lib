@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+[ -n "${SENDMAILEXTIPLIB_VERSION:-}" ] && return 0;
+SENDMAILEXTIPLIB_VERSION="0.1";
+
+include os net;
+SENDMAIL_CONF='/etc/mail/sendmail.cf';
+$PROGRAM 'sed';
+
+function SendmailExtIp() {
+   if [ -f /usr/sbin/sendmail.sendmail ]; then
+     myip=$(ip route get 1 | awk '{print $NF;exit}')
+     if isLANIP $myip ; then
+         /sbin/chkconfig sendmail off 2>/dev/null 1>/dev/null;
+         [ -f /var/run/sendmail.pid ] && stopServiceSilent sendmail ;
+     else
+         $SED -i 's/#O Timeout.initial=5m/O Timeout.ident=0s/' $SENDMAIL_CONF;
+         enableService sendmail 1>/dev/null 2>/dev/null;
+         [ -f /var/run/sendmail.pid ] || startServiceSilent sendmail ;
+     fi;
+   fi;
+}
+

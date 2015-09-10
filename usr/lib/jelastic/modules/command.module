@@ -1,0 +1,103 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+inherit default config vzexec;
+include os output;
+
+DESCRIPTION="Description goes here";
+VERSION="1"
+DEFAULT_ACTION="Usage";
+
+$PROGRAM 'base64';
+
+function doUsage() {
+        showUsageMessage;
+}
+
+function onModLoadCallback() {
+    log "Preload callback";
+    local shortopts="c:,b:,n:"
+    local longopts="ctid:,cmd:,cmdbase64:"
+
+    local temp=$(getopt -o $shortopts -l $longopts -- params "$@" 2>/dev/null);
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp";
+
+    while true ; do
+        case "$1" in
+            -n   | --cmd )
+                shift;
+                cmd=$1;
+                shift;
+                ;;
+            -c   | --ctid )
+                shift;
+                ctid=$1;
+                shift;
+                ;;
+            -b   | --cmdbase64 )
+                shift;
+                cmdbase64=$1;
+                shift;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+    done;
+}
+
+function doExec() {
+    if [ -z "$ctid" ] ; then
+        writeJSONResponceErr "result=>99" "message=>ctid required"
+        log "ctid required"
+        return 99;
+    fi
+
+    if [ ! -z "$cmdbase64" ] ; then
+        cmd="$(echo $cmdbase64 | $BASE64 -d)"
+    fi
+
+    if [ -z "$cmd" ] ; then
+        writeJSONResponceErr "result=>99" "message=>cmd or cmdbase64 required"
+        log "command required"
+        return 99;
+    fi
+
+    vzexecSetCTID "$ctid"
+    if vzexecRun "$cmd" ; then
+        writeJSONResponceOut "result=>0" "message=>$(vzexecGetLastStdOut)"
+    else
+        writeJSONResponceErr "result=>99" "message=>$(vzexecGetLastStdErr)"
+    fi
+    return 0;
+}
+
+function describeExec() {
+    echo "Execute command";
+}
+
+function describeExecParameters() {
+    echo "-c|--ctid <ct id> -n|--cmd <cmd> | -b|--cmdbase64 <cmd base64>";
+}
+
+function describeExecOptions() {
+    echo "-c|--ctid: container id";
+    echo "-n|--cmd: command to execute";
+    echo "-b|--cmdbase64: command to execute base64 encoded";
+}

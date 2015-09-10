@@ -1,0 +1,123 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${MYSQLPASSWDLIB_VERSION:-}" ] && return 0;
+MYSQLPASSWDLIB_VERSION="0.1";
+
+include log;
+include output;
+
+LOG_FILE=/var/log/msqlresetpas.log;
+$PROGRAM 'mysqld_safe';
+$PROGRAM 'mysql';
+$PROGRAM 'chkconfig';
+
+function setPassword() {
+
+		while [ "$1" != "" ]; 
+		do
+		  case $1 in
+		    -u )       shift
+		      local user=$1
+		      ;;
+		    -p )       shift
+		      local password=$1
+		      ;;
+		  esac
+		  shift
+		done
+
+		local tries=200
+		local tries2=200
+		local pid="/var/lib/mysql/mysqld.pid"
+		local db='mysql'	
+		echo $(date)  >> $LOG_FILE
+		if [ "x$SERVICE" == "xmysql" -a ! -f /etc/init.d/mysql ]
+		then
+        	[ -f /etc/init.d/mysqld ] && SERVICE="mysqld"
+		fi
+		echo "Using service $SERVICE"  >> $LOG_FILE
+		stopService ${SERVICE} >> $LOG_FILE 2>&1
+        [ -f "/var/lib/mysql/auto.cnf" ] && rm "/var/lib/mysql/auto.cnf";
+
+		while [ "$tries" -gt 0 ]
+		do
+			if ! ps aux | grep -v grep | grep -q  mysql ; 
+			then
+				break;
+			fi
+			sleep 1
+			tries=$(($tries-1))
+			stopService ${SERVICE} >> $LOG_FILE 2>&1
+		done
+
+		echo "Mysql stopped" >> $LOG_FILE
+
+		if ps aux | grep -v grep | grep -q  mysqld ;  then /usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1; fi
+		${SERVICE_CMD} ${SERVICE} regenerate-config  >> $LOG_FILE 2>&1
+		eval $MYSQLD_SAFE --skip-grant-tables --user=mysql  --pid-file=$pid >> $LOG_FILE 2>&1 &
+		
+		sleep 5;
+		while [ ! -e $pid ] 
+		do
+		    sleep 1
+		    tries2=$(($tries2-1))
+			if [ "$tries2" -lt 0  ] 	
+			then 
+				echo "Time for wait mysqld-safe expired. result 4051" >> $LOG_FILE
+				/usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1;
+				startService ${SERVICE} >>$LOG_FILE 2>&1
+				writeJSONResponceErr "result=>4051" "message=>Could not set password!"; 
+				die -q
+			fi
+		done
+		sleep 2
+		val=$(sed 's/\.//' <<< $COMPUTE_TYPE_FULL_VERSION )
+		[ -z "$val" ] && val=0 ;
+               if [ "x$COMPUTE_TYPE" == "xmysql" -a $val -ge 57  ] ; then
+                       $MYSQL $db --execute="UPDATE user SET authentication_string=PASSWORD('${password}') WHERE user='${user}';"
+               else
+                       $MYSQL $db --execute="UPDATE user SET password=PASSWORD('${password}') WHERE user='${user}';"
+               fi
+		$MYSQL $db --execute="DELETE FROM user WHERE user = '';"
+		$MYSQL $db --execute="FLUSH PRIVILEGES;"
+		
+		sleep 2
+		/usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1;
+		
+		tries=200
+		echo "Stopping Mysql after set password " >> $LOG_FILE
+		while [ "$tries" -gt 0 ]
+		do
+			if ! ps aux | grep -v grep | grep -q mysql ;
+			then
+				break;
+			fi
+			sleep 1
+			tries=$(($tries-1))
+			stopService ${SERVICE} >> $LOG_FILE 2>&1
+		done
+		
+		startService ${SERVICE}  >>$LOG_FILE 2>&1
+		if ! ps aux | grep -v grep | grep -q  mysql ;
+		then
+			sleep 2
+			startService ${SERVICE}  >>$LOG_FILE 2>&1
+		
+		fi
+		echo "Password updated" >> $LOG_FILE
+		$CHKCONFIG --level 3 ${SERVICE} on >>$LOG_FILE 2>&1
+}

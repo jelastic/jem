@@ -1,0 +1,232 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${NETLIB_VERSION:-}" ] && return 0;
+NETLIB_VERSION="0.1";
+
+inherit os log core;
+
+__FD_TCP_DOWNLOAD=5;
+
+__URL_HOSTNAME=0;
+__URL_PORT=1;
+__URL_URI=2;
+
+_TMP_DIR='/tmp/';
+
+#detect wget
+_HAS_WGET=1; command -v wget >/dev/null 2>&1 || __HAS_WGET=0;
+$PROGRAM 'sendmail';
+ 
+# sendErrorMail
+#       $1 - body
+#       $2 - subject (optional)
+#       $3 - mailto (optional)
+#       $4 - mailfrom (optional)
+function sendErrorMail(){
+    : ${1:?"Missing param: email body"};
+    [[ -z $SENDMAIL ]] && return 0;
+    getInfraAddresses;
+    __NET_MAIL_SUBJECT="[JEM] Error message";
+    __NET_MAIL_MAILFROM="jem@${FQDN}";
+    [ -z "$PLATFORM_TECHMAIL_RECEPIENT" ] &&  __NET_MAIL_MAILTO="dev@jelastic.com" || __NET_MAIL_MAILTO=$PLATFORM_TECHMAIL_RECEPIENT;    
+    local msg=${1} body;
+    local subject=${2:-${__NET_MAIL_SUBJECT}};
+    local mailto=${3:-${__NET_MAIL_MAILTO}};
+    local mailfrom=${4:-${__NET_MAIL_MAILFROM}};
+    log "Mail: ${msg}";
+    msg="${msg} on `hostname`"
+    body=`printf "To: ${mailto}\nFrom: ${mailfrom}\nSubject: ${subject}\nContent-Type: text/plain; charset=UTF-8\n
+    ${msg} \n\n The stack is:\n$(printStack)"`;
+    [[ "${DEBUG}" -ne "0" ]] && echo ${body} || { echo ${body} | ${SENDMAIL} -i -f ${mailfrom} ${mailto}; }
+    return ${?};
+}
+
+# isLANIP
+#       Determinate which IP belongs to LAN
+#       $1 - ip address to check
+#  returns:
+#       0 - lan ip
+#       1 - wan ip
+isLANIP() {
+    : ${1:?"Missing param: IP"};
+    local ip
+    local pip=${1}
+    log "isLANIP ${pip}"
+
+    if ! isValidIP ${pip} ; then
+        log "Invalid IP - isLANIP ${pip}";
+        return 1;
+    fi
+
+    OIFS=$IFS;IFS='.';ip=(${pip});IFS=$OIFS
+    [[ ${ip[0]} -eq 172 && ${ip[1]} -ge 16 && ${ip[1]} -le 31 ]] && return 0;
+    [[ ${ip[0]} -eq 192 && ${ip[1]} -eq 168 ]] && return 0;
+    [[ ${ip[0]} -eq 100 && ${ip[1]} -ge 64 && ${ip[1]} -le 127 ]] && return 0;
+    [[ ${ip[0]} -eq 10 ]] && return 0;
+    return 1
+}
+
+# isValidURL()
+#       param: 1 - URL to check
+#       returns: 0 = URL is valid, 1 = URL is not valid
+function isValidURL() {
+    local url=${1} 
+    #regex='[(https?|ftp|file|git|svn)://]?[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]';
+    regex='^((git|https?|ftps?|ssh|rsync|svn|\/):\/\/)?([-a-zA-Z0-9\.]*[-_\:\/\~a-z0-9A-Z\/\.]*)$';
+    [[ ${url} =~ ${regex} ]] && return 0 || return 1;
+}
+
+# validIP $ip
+#       Checks if given IP is valid
+#       $ip - IP to check
+#
+# returns 0 if IP is valid and 1 otherwise
+function isValidIP() {
+    local ip=${1} stat=1;
+
+    [[ "${ip}" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] && {
+        OIFS=${IFS};
+        IFS='.';
+        ip=(${ip});
+        IFS=${OIFS};
+        [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]];
+        stat=$?;
+    }
+    return ${stat};
+}
+
+# __getHostName()
+#       param: source URL
+#       returns: request hostname
+function __getHostName() {
+    local url=${1} result;
+    result=$(sed -re "s/(.*)\/\/([^\/]*)\/(.*)/\2/" <<< ${url});
+    echo ${result};
+}
+
+# __getURIPath()
+#       param: source URL
+#       returns: request URI path
+function __getURIPath() {
+    local url=${1} result;
+    result=$(sed -re "s/(.*)\/\/([^\/]*)\/(.*)/\/\3/" <<< ${url});
+    echo ${result};
+}
+
+# __getPort()
+#       param: source URL
+#       returns: request port
+function __getPort() {
+    local url=${1} result;
+    #result=$(sed -re "s/(.*)\/\/([^\/]*)\/(.*)/\2\3/" <<< ${url});
+    echo ${result:-80};
+}
+
+# _parseURL() {
+#       param: source URL
+#       returns: array (0=hostname, 1=port, 2=URI)
+function _parseURL() {
+    local url=$1 result=() functions=('__getHostName' '__getPort' '__getURIPath');
+    typeset -i c;
+    c=0;
+
+    for i in ${functions[*]} ; do
+        result[${c}]=$(${i} ${url});
+        c=${c}+1;
+    done
+    echo ${result[*]};
+}
+
+# getFile()
+#       param: $1 - URL to download, $2 - destination directory, $3 - filename
+function getFile() {
+    : ${1:?"Missing param: URL"};
+    local url=${1}; dest_dir=${2:-${_TMP_DIR}} tempfile=$(mktemp) destfile=${3};
+    local purl=($(_parseURL ${url}));
+
+    eval "exec ${__FD_TCP_DOWNLOAD}<>'/dev/tcp/${purl[__URL_HOSTNAME]}/${purl[__URL_PORT]}'";
+    echo -e "GET ${purl[__URL_URI]} HTTP/1.1\r\nHost: ${purl[__URL_HOSTNAME]}\r\nUser-Agent: bash/${BASH_VERSION}\r\n\r\n" >&${__FD_TCP_DOWNLOAD};
+    content=$(cat <&${__FD_TCP_DOWNLOAD} | tee >(sed -e '1,/^.$/d' > "${tempfile}") >&1);
+    [[ -z "${destfile}" ]] && destfile=$(sed -ne '/.*filename="\([^"]\+\)".*/{s/.*filename="\([^"]\+\)".*/\1/i;p;};h;' <<< $content);
+    size=$(sed -ne '/.*Content-Length:\s\+[0-9]\+.*/{s/.*Content-Length:\s\+\([0-9]\+\).*/\1/i;p;};h;' <<< $content);
+    mv "${tempfile}" "${dest_dir}${destfile}"
+    closeFD ${__FD_TCP_DOWNLOAD};
+    return 0;
+}
+
+function getPage() {
+   : ${1:?"Missing param: URL"};
+   local htmltempfile=$(mktemp) url=${1};
+   echo $url
+   downloadFile ${url} ${htmltempfile};
+   cat "${htmltempfile}";
+}
+
+
+# downloadFile()
+#       param: $1 - URL to download, $2 - destination directory
+function wgetFile() {
+    local url=${1} dest_dir=${2:-${_TMP_DIR}};
+
+    [[ ${__HAS_WGET} -ne 0 ]] && {
+        wget -q -nc ${url} -P ${dest_dir} || die "Could not download file ${url}: ${!}";
+        return 0;
+    }
+    getFile ${*};
+    return ${?};
+}
+
+function getNSAddr() {
+    echo $(sed -rne 's/nameserver\s+(.*)/\1/;/(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/p' /etc/resolv.conf);
+    return 0;
+}
+
+function getLocalNSAddr() {
+    local NS=($(getNSAddr)) locNS=();
+    for i in ${NS[@]} ; do
+        isLANIP $i && locNS=(${locNS[@]} $i);
+    done;
+    [ -n "${locNS}" ] && { echo "${locNS[@]}" | sed -re 's/\s+/\n/g' | uniq ; return 0; };
+    return 1;
+}
+
+function getInfraAddresses() {
+#    : ${1:?"Missing param: arrInfraAddr"};
+#    local arrResult=$1;
+    NSIP=$(getLocalNSAddr | tail -n 1);
+
+    [[ -z "${NSIP}" ]] && {
+        warn "Couldn't determine local nameservers"
+        return 1;
+    }
+
+    domain=$(host ${NSIP} | sed -re '/NXDOMAIN/d;s/.*\s+(rslv[0-9]{0,1}|resolver)\.(\S+)\.$/\2/g;/arpa/d');
+    [ -z "${domain}" ] && return 1;
+
+    ## TODO: Need to replace to the v4 code {{{
+    RSLV_ADDR="$(getHostIP "rslv.${domain}")";
+    RSLV_ADDR=${RSLV_ADDR:=${NSIP}};
+    CORE_ADDR="$(getHostIP "core.${domain}")";
+    APP_ADDR="$(getHostIP "app.${domain}")";
+    DB_ADDR="$(getHostIP "db.${domain}")";
+    GATE_ADDR="$(getHostIP "gate.${domain}")";
+    FQDN="$(hostname | awk -F "." '{print $1}').${domain}";
+    ## }}}
+
+    return 0;
+}
+

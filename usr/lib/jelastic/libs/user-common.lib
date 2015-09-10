@@ -1,0 +1,187 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+[ -n "${USERCOMMONLIB_VERSION:-}" ] && return 0;
+USERCOMMONLIB_VERSION="0.1";
+
+$PROGRAM 'id';
+$PROGRAM 'awk';
+$PROGRAM 'chmod';
+$PROGRAM 'chown';
+$PROGRAM 'mv';
+$PROGRAM 'ssh-keygen';
+$PROGRAM 'mkdir';
+$PROGRAM 'chattr';
+
+function fixRights(){
+    $CHOWN root:root -R /usr/lib/jelastic 2>>"$JEM_CALLS_LOG";
+#    $CHOWN root:root -R /var/lib/jelastic ;
+    $CHMOD 400 /usr/lib/jelastic/libs/* 2>>"$JEM_CALLS_LOG";
+    $CHMOD 400 /usr/lib/jelastic/modules/* 2>>"$JEM_CALLS_LOG";
+    $CHMOD 400 /usr/lib/jelastic/tpls/* 2>>"$JEM_CALLS_LOG";
+    $CHMOD 500 /usr/lib/jelastic/libs 2>>"$JEM_CALLS_LOG";
+    $CHMOD 500 /usr/lib/jelastic/modules 2>>"$JEM_CALLS_LOG";
+    $CHMOD 500 /usr/lib/jelastic/tpls 2>>"$JEM_CALLS_LOG";
+    $CHMOD 511 /usr/bin/jem 2>>"$JEM_CALLS_LOG";
+    $CHOWN root:root /usr/bin/jem 2>>"$JEM_CALLS_LOG";
+    $CHMOD 755 /var/lib/jelastic/libs 2>>"$JEM_CALLS_LOG";
+    $CHMOD 644 /var/lib/jelastic/libs/* 2>>"$JEM_CALLS_LOG";    
+    [ -f /var/lib/jelastic/libs/gitssh.sh ] && { chmod a+x /var/lib/jelastic/libs/gitssh.sh 2>>"$JEM_CALLS_LOG"; }
+}
+
+# _getAppUserID
+#       return uid, guid, home_dir of user defined in DATA_OWNER in envinfo.lib (DATA_OWNER=user:group)
+# result:
+#       _UID  user id
+#       _GUID  group id 
+#		_homedir  homedir
+function bashRestricts(){
+        bashrcvar="export PS1='\[\033[01;32m\]\u@\h\[\033[01;34m\] \w \$\[\033[00m\] '
+shopt -s histappend
+readonly PROMPT_COMMAND=\"history -a\"
+readonly HISTFILE
+readonly HISTFILESIZE 
+readonly HISTSIZE 
+readonly HISTCMD 
+readonly HISTCONTROL 
+readonly HISTIGNORE
+[[ -f ~/.profile ]] && . ~/.profile
+[[ -f ~/.bashrc ]] && . ~/.bashrc"
+
+        fl=".bash_history";
+
+        for filename in ${fl}
+        do
+                [ ! -f "${_homedir}/${filename}" ] && {
+                        touch "${_homedir}/${filename}"
+                        $CHOWN ${DATA_OWNER} "${_homedir}/${filename}"
+                }
+
+                $CHATTR -f +a "${_homedir}/${filename}" 
+
+        done
+        OIFS="${IFS}"
+        NIFS=$'\n'
+
+        IFS="${NIFS}"
+        USER_BASHRC="${_homedir}/.bash_profile"
+        [ -f "${USER_BASHRC}" ] && { $CHATTR -a "${USER_BASHRC}"; }
+
+        for variable in $bashrcvar
+        do
+                IFS="${OIFS}"
+	        if ! $GREP -q "${variable}" "${USER_BASHRC}" 2>/dev/null; then
+    		   echo  "${variable}" >> "${USER_BASHRC}";
+	        fi
+                IFS="${NIFS}"
+        done
+        IFS="${OIFS}"
+        $CHOWN ${DATA_OWNER} "${USER_BASHRC}"
+        $CHATTR -f +a "${USER_BASHRC}"
+}
+
+function getAppUserInfo(){
+	# return 0;
+        [ ! -z "${DATA_OWNER}" ] && {
+		local _appuser=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
+		local _appgroup=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
+		_UID=$($ID -u $_appuser);
+        _GUID=$($ID -g $_appgroup);
+        case ${COMPUTE_TYPE} in
+            memcached )
+                $MKDIR -p "/home/memcached";
+                _homedir="/home/memcached";
+                $CHOWN ${_UID}:${_GUID} ${_homedir}
+            ;;
+            maven)
+                $MKDIR -p "/opt/maven/";
+                _homedir="/opt/maven/";
+                $CHOWN ${_UID}:${_GUID} ${_homedir}
+	    ;;
+            glassfish)
+                [ -d /var/lib/jelastic/glalssfish ] && {
+                    chmod -R 700 /var/lib/jelastic/glalssfish 2>&1 >/dev/null;
+                }
+                _homedir=$( getent passwd "${_appuser}" | cut -d: -f6 )
+            ;;
+            *)
+                _homedir=$( getent passwd "${_appuser}" | cut -d: -f6 )
+            ;;
+        esac
+        bashRestricts;
+		#check if not empty
+	}
+	# || retern error
+}
+
+# postAddReform
+# 		make all you need after add user
+# 		 Check key - if not exists enerete new key 
+# 		 add pub to authorized_keys, return private (put it to _SSH_PRIVATE_KEY)
+# return:
+#		return code is 0 if success 1 othervise
+#		_REFORM_MESSAGE - message
+function postAddReform(){
+    fixRights ;
+    local username=${1};
+    local _AuthorizedKeysDir="/root/.ssh"
+    local _AuthorizedKeysFile="${_AuthorizedKeysDir}/authorized_keys" ;
+    local _User_AuthorizedKeysDir="$_homedir/.ssh";
+    local _User_AuthorizedKeysFile="$_User_AuthorizedKeysDir/authorized_keys";
+    local keyfile="/root/.ssh/id_rsa" ;
+    log "User key file ${keyfile}";
+    [[ "x${_REGENERATE_KEY}" == "xyes" ]] && {
+            if [ -f "${keyfile}" ] ; then
+                    tmpauthkey=$($SSH_KEYGEN -y -f $keyfile | $SED 's/\//\\\//g');
+                    [ -f "$_User_AuthorizedKeysFile" ] && { $SED -i /"$tmpauthkey"/d "$_User_AuthorizedKeysFile"; }
+                    [ -f "$_AuthorizedKeysFile" ] && { $SED -i /"$tmpauthkey"/d "$_AuthorizedKeysFile"; }
+
+                    rm -rf ${keyfile};
+            fi
+
+    }
+    [ ! -f "${keyfile}" ] && {
+            response=$(${SSH_KEYGEN} -P "" -q -f $keyfile 2>&1);
+            result=$?;
+            log "ssh-keygen response ${response}";
+            [ "$result" -ne 0 ] && { _REFORM_MESSAGE="Error generate key"; return 3; }
+    }
+    [ ! -d "$_User_AuthorizedKeysDir" ] && {
+            mkdir -p "$_User_AuthorizedKeysDir"
+    }
+
+    if [ -f "${keyfile}" ] ; then
+            _SSH_PRIVATE_KEY=$(cat ${keyfile});
+            [ -f "${keyfile}.pub" ] && {
+                    $MV "${keyfile}.pub"  "${_AuthorizedKeysFile}" ;
+                    cat "$_AuthorizedKeysFile" >> "$_User_AuthorizedKeysFile"
+            } || {
+                    authkey=$($SSH_KEYGEN -y -f $keyfile);
+                    echo "${authkey} $(whoami)@$(hostname)" > ${_AuthorizedKeysFile} ;
+                    cat "$_AuthorizedKeysFile" >> "$_User_AuthorizedKeysFile"
+            }
+
+            $CHOWN -fR root:root "${_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
+            $CHMOD -f 600 "${_AuthorizedKeysFile}" 2>>"$JEM_CALLS_LOG";
+            $CHMOD -f 700 "${_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
+
+            $CHOWN -fR $DATA_OWNER "${_User_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
+            $CHMOD -f 600 "${_User_AuthorizedKeysFile}" 2>>"$JEM_CALLS_LOG";
+            $CHMOD -f 700 "${_User_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
+    fi
+
+}

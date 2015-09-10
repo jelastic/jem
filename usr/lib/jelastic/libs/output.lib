@@ -1,0 +1,210 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+[ -n "${OUTPUTLIB_VERSION:-}" ] && return 0;
+OUTPUTLIB_VERSION="0.1";
+
+include log;
+
+ACTIONS_LOG="/var/log/actions$$.log";
+
+function setOutputMode() {
+    MANAGE_OUTPUT_MODE=${1};
+}
+
+function isOutputMode() {
+    [[ ${MANAGE_OUTPUT_MODE} = ${1} ]]
+}
+
+function highlight() {
+    echo -n "%%%HI%%%${*}%%%RE%%%";
+}
+
+function writeErrorMsg() {
+    echo -e "!!! Error: ${*}" 1>&2;
+    runIfExists log "!!!ERROR: " ${*};
+}
+
+function writeWarningMsg() {
+    echo -e "!!! Warning: ${*}" 1>&2;
+    runIfExists log "!!!WARNING: " ${*};
+}
+
+function cleanActionsLog() {
+    if [ -f $ACTIONS_LOG ]
+    then
+        rm $ACTIONS_LOG;
+    fi
+}
+
+#### Usage:  writeJSONResponceOut "key1=>value1" "key2=>value2" "key3=>value3"
+function writeJSONResponceOut(){
+    local args="\"$1\"";
+    shift;
+    while (( "$#" )); do
+        args="$args,\"$1\"";
+        shift
+        done
+    [ -f "$ACTIONS_LOG" ] && sed -i -e 's/["'\'']\|“\|”\|:\|=>//g' "$ACTIONS_LOG";
+    [ -f "$ACTIONS_LOG" ] && {
+        local actions_log="\"log=>$(cat $ACTIONS_LOG | tr -d '\r')\"";
+        local json_resp_full=$(echo {${args}",$actions_log"} | sed 's/\=>/\":\"/g');
+    } || {
+        local json_resp_full=$(echo {$args} | sed 's/\=>/\":\"/g');
+    }
+
+    set -f;  # do not expand filepath on output // added by Andrey
+    json_resp_full=$(echo $json_resp_full | sed "s/}\s*]\s*\"/}]/g" | sed -r 's/"\[\{/\[{/g');
+    echo "$json_resp_full";
+    set +f;
+    cleanActionsLog ;
+}
+
+#### Usage:  writeJSONResponceErr "key1=>value1" "key2=>value2" "key3=>value3"
+function writeJSONResponceErr(){
+    echo "$(writeJSONResponceOut "$@")" 1>&2;
+}
+
+function _space() {
+    local n ret="";
+    for (( n = 1 ; n <= ${1} ; ++n )) ; do
+        ret="${ret} ";
+    done;
+    echo -n "${ret}";
+}
+
+function colours() {
+    COLOUR_NORMAL=$(tput sgr0);
+    COLOUR_BOLD=$(tput bold);
+    COLOUR_HI=$(tput setaf 4)${COLOUR_BOLD};
+    COLOUR_WARN=$(tput setaf 1)${COLOUR_BOLD};
+    COLOUR_ERROR=${COLOUR_WARN};
+    COLOUR_LIST_HEADER=$(tput setaf 2)${COLOUR_BOLD};
+    COLOUR_LIST_LEFT=${COLOUR_BOLD};
+    COLOUR_LIST_RIGHT=${COLOUR_NORMAL};
+}
+
+function applyTxtEffects() {
+    local restore=${1:-${COLOUR_NORMAL}} text=${2};
+    text="${text//?%%HI%%%/${COLOUR_HI}}";
+    text="${text//?%%WA%%%/${COLOUR_WARN}}";
+    text="${text//?%%RE%%%/${restore}}";
+    echo -n "${text}";
+}
+
+
+function writeListEntry() {
+    local n txt key val li ri oifs=${IFS};
+    local l=${COLOUR_LIST_LEFT} r=${COLOUR_LIST_RIGHT};
+    local normal=${COLOUR_NORMAL};
+
+    IFS=$' \t\n';
+
+    [[ ${1} == "-p" ]] && { l=; r=; normal=; shift; }
+
+    li=${1%%[^[:space:]]*};ri=${2%%[^[:space:]]*};
+    key=${1##*([[:space:]])};val=${2##*([[:space:]])};
+
+    echo -ne "  ${li}${l}";
+    echo -ne "$(applyTxtEffects "${l}" "${key}")";
+    echo -ne "${normal}";
+
+    txt=${key//\%%%??%%%/};
+    n=$((28+${#ri}-${#li}-${#txt}));
+
+    [[ ${n} -le 0 ]] && { echo; n=$((30 + ${#ri})); }
+
+    _space ${n};
+    echo -ne "${r}";
+    n=$((30 + ${#ri}));
+
+    local c=${COLUMNS:-100};
+    local cw=$(applyTxtEffects "${r}" "${val}");
+
+    txt=${val//\%%%??%%%/};
+
+    if [[ $((${n} + ${#txt})) -ge ${c} ]] ; then
+        local i=0 spc="";
+        ri=$(_space ${n});
+        cw=(${cw});
+        for txt in ${val} ; do
+            txt=${txt//\%%%??%%%/};
+            if [[ $((${n}+${#spc}+${#txt})) -lt ${c} ]] ; then
+                echo -ne "${spc}${cw[i]}";
+                n=$((${n}+${#spc}+${#txt}));
+            else
+                echo -ne "\n${ri}${cw[i]}";
+                n=$((${#ri} + ${#txt}));
+            fi
+            i=$((${i} + 1));
+            spc=" ";
+        done
+    else
+        echo -ne "${cw}";
+    fi
+    echo -e "${normal}";
+    IFS=${oifs};
+}
+
+function writeNumberedListEntry() {
+    local left=${COLOUR_LIST_LEFT} right=${COLOUR_LIST_RIGHT}
+    local normal=${COLOUR_NORMAL}
+
+    if [[ $1 == "-p" ]]; then
+        left=; right=; normal=
+        shift
+    fi
+
+    if ! isOutputMode brief; then
+        echo -n -e "  ${left}"
+        echo -n -e "[$(applyTxtEffects "${left}" "$1")]"
+        echo -n -e "${normal}"
+        _space $(( 4 - ${#1} ))
+    fi
+
+    echo -n -e "${right}"
+    echo -n -e "$(applyTxtEffects "${right}" "$2")"
+    echo -e "${normal}"
+}
+
+function writeNumberedList() {
+    local n=1 m p
+    while [[ $1 == -* ]]; do
+        case $1 in
+            "-m") shift; m=$1 ;;
+            "-p") p="-p" ;;
+            "--") shift; break ;;
+        esac
+        shift
+    done
+
+    if [[ $# -eq 0 && -n ${m} ]] && ! isOutputMode brief; then
+        writeListEntry ${p} "${m}" ""
+    fi
+
+    while [[ $# -gt 0 ]]; do
+        item=$1
+        shift
+        if [[ ${item##*\\} == "" ]]; then
+            item="${item%\\} $1"
+            shift
+        fi
+        writeNumberedListEntry ${p} "${n}" "${item}"
+        n=$(( ${n} + 1 ))
+    done
+}

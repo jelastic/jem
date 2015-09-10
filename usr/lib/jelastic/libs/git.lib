@@ -1,0 +1,177 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${GITLIB_VERSION:-}" ] && return 0;
+GITLIB_VERSION="0.1";
+
+inherit os;
+include output uninterract;
+
+function doCheckout(){
+    rm -Rf "${WEBROOT}/${PROJECT_NAME}";
+
+    if [[ "$LOGIN" != "__GUEST__"  ]] ; then
+        local repo_proto=$(echo $URL | sed -nre 's/(.*):\/\/(.*)/\1/p');
+        local host_and_uri=$(echo $URL | sed -re 's/(.*:\/\/)(.*)/\2/');
+
+        AUTH=$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
+                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
+                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
+
+        [ ! -z "$PASSWORD" ] && {
+        AUTH=${AUTH}:$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
+                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
+                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");
+        }
+
+        [ ! -z "$repo_proto" ] && {
+            preparedUrl="$repo_proto://${AUTH}@${host_and_uri}";
+        } || {
+            preparedUrl="${AUTH}@${host_and_uri}";
+        }
+        runNonInterractive "$GIT clone ${preparedUrl} ${WEBROOT}/${PROJECT_NAME}" >> $JEM_CALLS_LOG 2>&1;
+        result=$?; [ $result -ne 0 ] && return $result;
+	[ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
+            echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
+            cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
+	}
+        [ ! -z $BRANCH ] && cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1 && cd - >> $JEM_CALLS_LOG 2>&1;       ###### we removed --git-dir directive because of bug in GIT
+        cd "${WEBROOT}/${PROJECT_NAME}" && runNonInterractive "$GIT submodule update --init --recursive" >> $JEM_CALLS_LOG 2>&1 ; result=$? && cd - > /dev/null 2>&1;
+        [ $result -ne 0 ] && return $result;
+    else
+        if [ "x$NO_EXPECT" == "xtrue" ] ; then
+            $GIT clone "$URL" "${WEBROOT}/${PROJECT_NAME}" >> "$VCS_UPDATE_LOG"  2>&1;
+        else
+            runNonInterractive "$GIT clone $URL ${WEBROOT}/${PROJECT_NAME}" > /dev/null 2>&1;
+            result=$?; [ $result -ne 0 ] && return $result;
+        fi
+        cd "${WEBROOT}/${PROJECT_NAME}" && {
+    	    runNonInterractive "$GIT  submodule update --init --recursive" > /dev/null 2>&1;
+    	    result=$?; [ $result -ne 0 ] && return $result;
+    	}
+	[ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
+            echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
+    	    cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD  >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
+	}
+        [ ! -z $BRANCH ] && cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1 && cd - > /dev/null 2>&1;      ###### we removed --git-dir directive because of bug in GIT
+        [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
+            inherit ruby-common;
+            bundleInstall;
+        } || return 0;
+    fi
+    return 0;
+}
+
+
+function _doUpdate(){
+    [ -d "${WEBROOT}/${PROJECT_NAME}" ] && cd "${WEBROOT}/${PROJECT_NAME}";
+    [ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
+            echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
+	       $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD  >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG};
+    }
+    echo -n $(date +%D.%k:%M:%S.%N) >> "$VCS_UPDATE_LOG" 2>&1;
+    runNonInterractive "$GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git pull"  > /dev/null 2>&1;
+    result=$?; [ $result -ne 0 ] && return $result;
+    cd "${WEBROOT}/${PROJECT_NAME}" && runNonInterractive  "$GIT  submodule update --init --recursive" > /dev/null 2>&1;
+    result=$?; [ $result -ne 0 ] && return $result;
+    cd "${WEBROOT}/${PROJECT_NAME}" && runNonInterractive  "$GIT  gc" > /dev/null 2>&1;
+    result=$?; [ $result -ne 0 ] && return $result;
+    [ ! -z "$BRANCH" ] && [ "$($GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" branch | grep "$BRANCH" | cut -d" " -f1)" != "*" ] && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" checkout "$BRANCH"  >> "$VCS_UPDATE_LOG" 2>&1;
+
+    [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
+        [ -f "${WEBROOT}/ROOT/Gemfile" ] &&  {
+                inherit ruby-common;
+                bundleInstall;
+        }
+    }
+    return 0;
+}
+
+
+function getLastRepoCommit(){
+    [ -e ${WEBROOT}/${PROJECT_NAME}/.git ] && local last_repo_commit=$($GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git rev-parse HEAD)
+    [ -z $last_repo_commit ] && LAST_DEPLOYED_COMMIT="00000000000";
+    echo $last_repo_commit;
+}
+
+
+function getLastRemoteCommit(){
+    readProjectConfig;
+    preparedUrl="${URL}";
+    
+    if [[ "$LOGIN" != "__GUEST__"  ]] ; then
+        local repo_proto=$(echo $URL | sed -nre 's/(.*):\/\/(.*)/\1/p');
+        local host_and_uri=$(echo $URL | sed -re 's/(.*:\/\/)(.*)/\2/');
+
+        AUTH=$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
+                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
+                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
+
+        [ ! -z "$PASSWORD" ] && {
+                 AUTH=${AUTH}:$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
+                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
+                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");
+        }
+
+        [ ! -z "$repo_proto" ] && {
+            preparedUrl="$repo_proto://${AUTH}@${host_and_uri}";
+        } || {
+            preparedUrl="${AUTH}@${host_and_uri}";
+        }
+    fi
+
+    if [ "x${LOGIN}" == "xgit" ]; then
+        last_remote_commit=$(git ls-remote git@$URL $BRANCH 2>/dev/null | awk '{print $1}');
+    else
+        last_remote_commit=$(git ls-remote $preparedUrl $BRANCH | awk '{print $1}');
+    fi
+        [ -z $last_remote_commit ] && last_remote_commit="00000000000";
+        echo $last_remote_commit;
+}
+
+function vcsChangeUrl(){
+    if [[ "$LOGIN" != "__GUEST__"  ]] ; then
+        local repo_proto=$(echo $URL | sed -nre 's/(.*):\/\/(.*)/\1/p') ;
+        local host_and_uri=$(echo $URL | sed -re 's/(.*:\/\/)(.*)/\2/') ;
+        AUTH=$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
+                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
+                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
+
+        [ ! -z "$PASSWORD" ] && {
+                 AUTH=${AUTH}:$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
+                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
+                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");
+        }
+
+        [ ! -z "$repo_proto" ] && {
+            preparedUrl="$repo_proto://${AUTH}@${host_and_uri}";
+        } || {
+            preparedUrl="${AUTH}@${host_and_uri}";
+        }
+    else
+        preparedUrl=$NEWURL ;
+    fi
+    $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" remote set-url origin "$preparedUrl" >> "$VCS_UPDATE_LOG"  2>&1;
+    result=$?;
+    return $result;
+}
+

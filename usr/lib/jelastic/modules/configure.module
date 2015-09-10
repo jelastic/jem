@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default os envinfo;
+include output net;
+
+$PROGRAM 'sed';
+$PROGRAM 'grep';
+
+
+DESCRIPTION="Jem configuration module";
+VERSION="1";
+DEFAULT_ACTION="usage";
+
+function doUsage() {
+    showUsageMessage;
+}
+
+function doSetTechEmail(){
+        local techemail="${1}";
+        [[ -n "${META_FILE}" ]] && [[ -e "${META_FILE}" ]] && {
+        if $GREP -q "PLATFORM_TECHMAIL_RECEPIENT=$techemail" ${META_FILE} ; then
+            $SED -c -i "s/\(PLATFORM_TECHMAIL_RECEPIENT *= *\).*/\1$PLATFORM_TECHMAIL_RECEPIENT/" ${META_FILE};
+        else
+            echo -e "\nPLATFORM_TECHMAIL_RECEPIENT=$PLATFORM_TECHMAIL_RECEPIENT" >> ${META_FILE};
+            $SED -i -re '/^$/d' ${META_FILE};
+        fi;
+        }
+}
+
+function doExtIpChanged(){
+    inherit $extipchange_module_inherit ;
+    inherit sendmailextip ; SendmailExtIp ;
+    ipChanged ;
+}
+
+function describeExtIpChanged() {
+    echo "Configure after add/remove external IP";
+}
+
+function describeSetTechEmail() {
+    echo "Set email recipient";
+}
+
+function describeSetTechEmailParameters() {
+    echo "<email>";
+}
+
+function describeSetTechEmailOptions() {
+    echo "<email>: email address of technical recipient";
+}

@@ -1,0 +1,280 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+[ -n "${OSLIB_VERSION:-}" ] && return 0;
+OSLIB_VERSION="0.1";
+
+include math;
+inherit tests output net;
+
+__FALSE=1;
+__TRUE=0;
+
+__NEED_REBOOT=0;
+
+$PROGRAM 'service';
+
+# workaround variables inside the envinfo.lib {{{
+SERVICE_CMD="${SERVICE}";
+declare +r SERVICE;
+# }}}
+
+$PROGRAM 'ps';
+#$PROGRAM 'grep';
+#$PROGRAM 'sed';
+$PROGRAM 'base64';
+$PROGRAM 'chkconfig';
+$PROGRAM 'ip';
+
+_FD_STDIN=0;
+_FD_STDOUT=1;
+_FD_STDERR=2;
+
+__AUNITS=(b kb mb gb tb);
+
+
+# $1 - array to encode
+# example call:
+#       funcname $(encodeArr arrayName);
+function encodeArr() {
+    echo "$(${BASE64} -w 0 <<< $(declare -p $1))";
+}
+
+# $1 - base64 to decode
+# example call:
+#       eval $(decodeArr $1 varname);
+function decodeArr() {
+    echo "$(${BASE64} -d -i <<< $1 | sed -re "s/(^declare\s+-a\s)([^=]+)=(.*)/\1$2=\3/")";
+}
+
+# $1 value
+# $2 from
+# $3 to
+function convertUnits() {
+    local value=${1:-0} op ifrom=$(indexOf "${__AUNITS[*]}" $(${SED} -e 's/\(.*\)/\L\1/' <<< ${2})) ito=$(indexOf "${__AUNITS[*]}" $(${SED} -e 's/\(.*\)/\L\1/' <<< ${3}));
+    local result=${value};
+
+    [[ ${ifrom} < ${ito} ]] && { op='/'; } || {
+        op='*';
+        ifrom=$(( ${ifrom}-${ito} ));
+        ito=$(( ${ito} + ${ifrom} ));
+        ifrom=$(( ${ito} - ${ifrom} ));
+    }
+
+    while [ "${ifrom}" -lt "${ito}" ] ; do
+        isFunction floatEval &&  result=$(floatEval "${result} ${op} 1024") || eval "result=$(( ${result} ${op} 1024 ))";
+        ifrom=$((${ifrom} + 1));
+    done
+    echo ${result};
+}
+
+function enableService() {
+    local name=${1} level=${2:-3} doStart=${3:-${__TRUE}};
+    [[ ${doStart} == ${__TRUE} ]] && startService ${name};
+    ${CHKCONFIG} --level ${level} ${name} on;
+    return ${?};
+}
+
+
+# $1 - service name
+function startService() {
+    local name=${1};
+    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
+    ${SERVICE_CMD} ${name} start;
+    sleep 1;
+    return ${?};
+}
+
+# $1 - service name
+function startServiceSilent() {
+    local name=${1};
+    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
+    ${SERVICE_CMD} ${name} start > /dev/null 2>&1;
+    sleep 1;
+    return ${?};
+}
+
+
+function stopService() {
+    local name=${1};
+    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
+    ${SERVICE_CMD} ${name} stop;
+    sleep 1;
+    return ${?};
+};
+
+# $1 - service name
+function stopServiceSilent() {
+    local name=${1};
+    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
+    ${SERVICE_CMD} ${name} stop > /dev/null 2>&1;
+    sleep 1;
+    return ${?};
+}
+
+function reloadService() {
+    local name=${1};
+    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
+    ${SERVICE_CMD} ${name} reload;
+    return ${?};
+}
+
+function reloadServiceSilent() {
+    local name=${1};
+    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
+    ${SERVICE_CMD} ${name} reload > /dev/null 2>&1;
+    return ${?};
+}
+
+function restartServiceSilent() {
+    local name=${1};
+    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
+    ${SERVICE_CMD} ${name} restart > /dev/null 2>&1;
+    return ${?};
+}
+
+# $1 - process name
+function getPID() {
+    local procname=${1};
+    echo $(${PS} ax | ${GREP} ${procname} | ${GREP} -v grep | ${SED} -e 's/\([0-9]\+\).*/\1/');
+}
+
+function getMemory() {
+    local memtype=${1:-MemTotal} units=${2:-kb} result;
+    result=$(${SED} -ne "/${memtype}:/{s/${memtype}:\s\+\([0-9]\+\).*/\1/i;p};h" /proc/meminfo );
+    echo $(convertUnits ${result} kb ${units} );
+}
+
+# listFDs()
+#       print list of opened file discriptors
+function listFDs() {
+    local label=${1:-'Opened fds:'}
+    local pid=${2:-$$}
+    echo $(ls /proc/$$/fd | sort -n | awk 'BEGIN{printf("%s ", "'"${label}"'")} {printf("%s ", $1)}');
+}
+
+# closeFD()
+#       param: 1 - file descriptor to close
+function closeFD() {
+    local fd=$1;
+    eval "exec ${fd}>&-;exec ${fd}<&-";
+}
+
+function editConfigProperty() {
+    local file=${1} propertyName=${2} propertyValue=${3:-""};
+    [[ -a "${file}" ]] && ${GREP} -Pq '^${propertyName}\s*=.*' ${file} && { addProperty ${file} ${propertyName} ${propertyValue}; return $?; };
+    ${SED} -rie "s/(^${propertyName}\s*=\"?)([^\"]+)(\"?)$/\1${propertyValue}\3/" ${file};
+    return ${?};
+}
+
+function addConfigProperty() {
+    local file=${1} propertyName=${2} propertyValue=${3:-""};
+    [[ -a "${file}" ]] && ${GREP} -Pq '^${propertyName}\s*=.*' ${file} && { editProperty ${file} ${propertyName} ${propertyValue}; return $?; };
+    echo "${propertyName}=\"${propertyValue}\"" >> ${file};
+    return ${?};
+}
+
+function getConfigProperty() {
+    local file=${1} propertyName=${2};
+    echo $(${SED} -rne "/^${propertyName}\s*=/{s/^${propertyName}\s*=\"?([^\"]+)\"?/\1/;p};" ${file});
+}
+
+function disableSelinux() {
+    local file='/etc/sysconfig/selinux';
+    local state=$(getConfigProperty ${file} 'SELINUX');
+    [[ ${state} != 'disabled' ]] && editConfigProperty ${file} 'SELINUX' 'disabled' && editConfigProperty ${file} 'SELINUXTYPE' 'targeted' && __NEED_REBOOT=${__TRUE}
+    return ${?};
+}
+
+function enableSelinux() {
+    local file='/etc/sysconfig/selinux';
+    local state=$(getConfigProperty ${file} 'SELINUX');
+    [[ ${state} == 'disabled' ]] && editConfigProperty ${file} 'SELINUX' 'permissive' && editConfigProperty ${file} 'SELINUXTYPE' 'targeted' && __NEED_REBOOT=${__TRUE};
+    return ${?};
+}
+
+function needReboot() {
+    return ${__NEED_REBOOT};
+}
+
+function __getAddr() {
+    : ${1:?"Missing param: interface"};
+    : ${2:?"Missing param: variable name"};
+    : ${3:-"-4"};
+    local dev=$1 name=$2 af=$3 alist;
+    alist=$($IP $af addr show dev $dev 2>/dev/null | sed -rne '/inet/{s/.*inet6* //;s/\/.*//;s/peer.*//;p}');
+    [ -z "$alist" ] && {
+        eval "$name=''";
+        return 1;
+    }
+    eval "${name}_list=\"$alist\"";
+    return $?;
+}
+
+function __getNet() {
+    local dev=$1 name=$2 af=$3 alist;
+    alist=$($IP route list dev $dev | sed 's/ .*//;/default/d');
+    [ -z "$alist" ] && {
+        eval "$name=''"
+        return $?;
+    }
+    eval "${name}_list=\"$alist\"";
+    return $?;
+}
+
+function getIfaceWild() {
+    : ${1:?"Missing param: wildcard"};
+    local mask=$1;
+    echo $($IP link show | sed -rne "/^[0-9]+:\s+${mask}:/{s/.*:\s+(\S+):.*/\1/g;p}");
+    return $?
+}
+
+function getAddr() {
+    __getAddr $1 $2 "-4";
+}
+
+function getAddr6() {
+    __getAddr $1 $2 "-6";
+}
+
+function getNet() {
+    __getNet $1 $2 "-4";
+}
+
+function getNet6() {
+    __getNet $1 $2 "-6";
+}
+
+#function getNSAddr() {
+#    echo $(sed -rne 's/nameserver\s+(.*)/\1/;/(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/p' /etc/resolv.conf);
+#    return 0;
+#}
+
+#function getLocalNSAddr() {
+#    local NS=($(getNSAddr)) locNS=();
+#    for i in ${NS[@]} ; do
+#        isLANIP $i && locNS=(${locNS[@]} $i);
+#    done;
+#    [ -n "${locNS}" ] && { echo "${locNS[@]}" | sed -re 's/\s+/\n/g' | uniq ; return 0; };
+#    return 1;
+#}
+
+function getHostIP() {
+    : ${1:?"Missing param: hostname"};
+    echo $(host ${1} | sed '/alias for/d' | sed -re '/NXDOMAIN/d;s/.+\s+(([0-9]{1,3}\.){3}[0-9]{1,3})/\1/' | head -n 1);
+}

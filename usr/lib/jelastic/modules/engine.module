@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default os envinfo;
+inherit ${engine_module_inherit};
+inherit extendperm;
+
+DESCRIPTION="Switch engine version";
+VERSION="1";
+DEFAULT_ACTION="Usage";
+GF_PASS_FILE="/var/lib/jelastic/glalssfish/gfpass";
+
+function doUsage() {
+    showUsageMessage;
+}
+
+function defaultSwitch(){
+	stopServiceSilent ${SERVICE};
+	[ "x${COMPUTE_TYPE}" == "xcartridge" -o "x${COMPUTE_TYPE}" == "xgate" ] && cartEngineSelector;
+	switchEngine "$version" && writeJSONResponceOut "result=>0" "message=>Engine switched succesfuly" ||  writeJSONResponceErr "result=>4031" "message=>Error occured while switching engine" ;
+	startServiceSilent "$SERVICE";
+}
+
+function doSetVersion(){
+	if [ ! -n "$1" ]
+	then
+		[ "x${COMPUTE_TYPE}" == "xnodejs" ] && return 0;
+		echo "Give me please version!";
+		exit;
+	fi
+	local version=$1;
+
+case ${COMPUTE_TYPE} in
+	glassfish)
+		[ ! -f "$GF_PASS_FILE" ] && { switchEngine "$version" && writeJSONResponceOut "result=>0" "message=>Engine switched succesfuly" ||  writeJSONResponceErr "result=>4031" "message=>Error occured while switching engine" ; } || {
+		    defaultSwitch; 
+		};
+	;;
+	*)
+		defaultSwitch;
+	;;
+esac
+}
+
+function postSetVersionCallback(){
+    ExtendPerm ;
+}
+
+function describeSetVersion() {
+    echo "Set engine version";
+}
+
+function describeSetVersionParameters() {
+    echo "<version>";
+}
+
+function describeSetVersionOptions() {
+    echo "<version>: switch to version";
+}

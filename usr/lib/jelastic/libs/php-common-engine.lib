@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+[ -n "${PHPCOMMONENGINELIB_VERSION:-}" ] && return 0;
+PHPCOMMONENGINELIB_VERSION="0.1";
+
+JELASTIC_PHP_EXTENSIONS_DIR='/usr/lib64/jelastic_php';
+DEFAULT_PHP_EXTENSIONS_DIR='/usr/lib64/php';
+
+JELASTIC_PHP_BIN_DIR='/usr/lib64/jelastic_php/bin';
+PHP_PEAR_BIN='/usr/bin/pear';
+PHP_PECL_BIN='/usr/bin/pecl';
+PHP_PHPIZE_BIN='/usr/bin/phpize';
+
+JELASTIC_PHP_BIN_DIR='/usr/lib64/jelastic_php/bin';
+DEFAULT_PHP_PEAR_DIR='/usr/share/pear';
+PHP_PHPCONFIG_BIN='/usr/bin/php-config';
+DEFAULT_PHP_BUILD_DIR='/usr/lib64/build';
+DEFAULT_PHP_INCLUDE_DIR='/usr/include/php';
+
+function phpExtensionsManagers(){
+
+       if [[ -f "$JELASTIC_PHP_BIN_DIR/pear.$version" ]]
+        then
+            rm -f "${PHP_PEAR_BIN}";
+            ln -s "$JELASTIC_PHP_BIN_DIR/pear.$version" "$PHP_PEAR_BIN";
+        fi
+        if [[ -f "$JELASTIC_PHP_BIN_DIR/pecl.$version" ]]
+        then
+            rm -f "${PHP_PECL_BIN}";
+            ln -s "$JELASTIC_PHP_BIN_DIR/pecl.$version" "$PHP_PECL_BIN";
+        fi
+        if [[ -f "$JELASTIC_PHP_BIN_DIR/phpize.$version" ]]
+        then
+            rm -f "${PHP_PHPIZE_BIN}";
+            ln -s "$JELASTIC_PHP_BIN_DIR/phpize.$version" "${PHP_PHPIZE_BIN}" ;
+        fi
+
+        if [[ -d "$JELASTIC_PHP_EXTENSIONS_DIR/php$version/share/pear" ]]
+        then
+            rm -f "${DEFAULT_PHP_PEAR_DIR}";
+            ln -s "${JELASTIC_PHP_EXTENSIONS_DIR}/php$version/share/pear/" "${DEFAULT_PHP_PEAR_DIR}";
+        fi
+
+        if [[ -f "$JELASTIC_PHP_BIN_DIR/php-config.$version" ]]
+        then
+            rm -f "${PHP_PHPCONFIG_BIN}";
+            ln -s "$JELASTIC_PHP_BIN_DIR/php-config.$version" "${PHP_PHPCONFIG_BIN}" ;
+        fi
+
+        if [[ -d "$JELASTIC_PHP_EXTENSIONS_DIR/php$version/lib64/build" ]]
+        then
+            rm -f "${DEFAULT_PHP_BUILD_DIR}";
+            ln -s "${JELASTIC_PHP_EXTENSIONS_DIR}/php$version/lib64/build/" "${DEFAULT_PHP_BUILD_DIR}";
+        fi
+
+        if [[ -d "$JELASTIC_PHP_EXTENSIONS_DIR/php$version/include/php" ]]
+        then
+            rm -f "${DEFAULT_PHP_INCLUDE_DIR}";
+            ln -s "${JELASTIC_PHP_EXTENSIONS_DIR}/php$version/include/php/" "${DEFAULT_PHP_INCLUDE_DIR}";
+        fi
+
+
+}

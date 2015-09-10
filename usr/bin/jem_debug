@@ -1,0 +1,14 @@
+#!/bin/bash
+set -o errtrace
+
+declare -x MANAGE_BINARY_PATH="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )";
+declare -x MANAGE_DATA_PATH="$MANAGE_BINARY_PATH";
+declare -x MANAGE_DEFAULT_MODULES_PATH="${MANAGE_DATA_PATH}/modules";
+declare -x MANAGE_MODULES_PATH=($MANAGE_DEFAULT_MODULES_PATH);
+declare -x MANAGE_CORE_PATH="${MANAGE_BINARY_PATH}/libs";
+declare -x MANAGE_DEFAULT_ACTIONS="${MANAGE_CORE_PATH}/default.lib";
+declare -x MANAGE_APP_TEMPLATES="${MANAGE_BINARY_PATH}/tpls"
+declare -x JEM_CALLS_LOG="${MANAGE_BINARY_PATH}/jem.log";
+declare -x DEBUG=2;
+
+bash ${MANAGE_BINARY_PATH}/jem ${*};

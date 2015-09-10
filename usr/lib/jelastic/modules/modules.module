@@ -1,0 +1,78 @@
+#!/bin/bash
+
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit config
+
+DESCRIPTION="Query manage modules"
+DEFAULT_ACTION="List"
+
+function describeList() {
+    echo "List all available modules";
+}
+
+function doList() {
+    [[ $# -gt 0 ]] && die -q "Too many parameters"
+    local path file module name desc;
+    local -a extra_modules;
+
+    for path in "${MANAGE_MODULES_PATH[@]}" ; do
+        [[ -d ${path} ]] || continue;
+        for file in "${path}"/*.module ; do
+            [[ -f ${file} ]] || continue;
+            extra_modules=( "${extra_modules[@]}" "${file}" );
+        done;
+    done;
+
+    if isOutputMode brief; then
+        echo -e "help\nusage\nversion"
+        for module in "${extra_modules[@]}" ; do
+            name=${module##*/};
+            echo "${name%%.module}"
+        done;
+    else
+        echo -e "\tBuilt-in modules:";
+        echo -e "\t\thelp\t\t\tDisplay a help message";
+        echo -e "\t\tusage\t\t\tDisplay a usage message";
+        echo -e "\t\tversion\t\t\tDisplay version information";
+
+        if [[ ${#extra_modules[@]} -gt 0 ]] ; then
+            echo -e "\tExtra modules:";
+            tabs 14
+            for module in "${extra_modules[@]}" ; do
+                name=${module##*/};
+                name=${name%%.module};
+                desc=$(MANAGE_MODULE_NAME=${name} loadConfig "${module}" DESCRIPTION)
+                desc=${desc:-No description available}
+                echo -e "\t${name} \t\t${desc}"
+            done
+            tabs -8
+        fi
+    fi
+}
+
+function doHas() {
+    [[ -z $1 ]] && die -q "Required option (module name) missing";
+    [[ $# -gt 1 ]] && die -q "Too many parameters";
+
+    local modname=$1 modpath;
+    for modpath in "${ESELECT_MODULES_PATH[@]}" ; do
+        [[ -f ${modpath}/${modname}.module ]] && return 0;
+    done;
+    return 1;
+}

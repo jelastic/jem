@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+[ -n "${POSTGRESPASSWDLIB_VERSION:-}" ] && return 0;
+POSTGRESPASSWDLIB_VERSION="0.1";
+
+include log;
+include output;
+
+DBMSConfigPath="/var/lib/pgsql/data/postgresql.conf";
+DBMSInitScript='postgresql';
+POSTGRESSysCtl="/etc/sysconfig/pgsql/postgresql";
+LOG_FILE="/var/log/postgresreset.log";
+VERBOSE=0;
+POSTGRES_CONF='/var/lib/pgsql/data/pg_hba.conf';
+$PROGRAM 'sed';
+$PROGRAM 'psql';
+$PROGRAM 'grep';
+$PROGRAM 'chkconfig';
+ADMINDB='postgres';
+BREAKCOUNT=5;
+
+function setPassword() {
+
+	local user='postgres';
+
+		while [ "$1" != "" ]; 
+		do
+		  case $1 in
+		    -u )       shift
+		      local user=$1
+		      ;;
+		    -p )       shift
+		      local password=$1
+		      ;;
+		  esac
+		  shift
+		done
+
+
+	INITD=/etc/rc.d/init.d
+	. $INITD/functions
+	PGPORT=$($GREP PGPORT= $INITD/${SERVICE} | awk -F= {'print $2'});
+	PGVERSION=$($GREP PGVERSION= $INITD/${SERVICE} | awk -F= {'print $2'});
+	PGMAJORVERSION=$(echo "$PGVERSION" | sed 's/^\([0-9]*\.[0-9]*\).*$/\1/')
+	[ -f $POSTGRESSysCtl ] && . $POSTGRESSysCtl || pidfile=$( ls  /var/run/postmaster-* | head -n 1);
+	[ -z $pidfile ] && pidfile="/var/run/postmaster-${PGMAJORVERSION}.${PGPORT}.pid";
+	
+	stopService ${SERVICE} >> $LOG_FILE 2>&1;
+	
+    local error=0;
+    local count=0;
+    local tobreak=0;
+    while  [ "$count" -eq 0 ]
+    do
+	sleep 2;
+        stopService ${SERVICE} >> $LOG_FILE 2>&1;
+        status -p $pidfile > /dev/null 2>&1;
+        count=$?;
+        ((tobreak++))
+ 	[ "$tobreak" -eq "$BREAKCOUNT" ] && { error=1 ;break;} ;
+
+    done
+	if [ "$error" -eq 1 ] 
+	then
+		echo "Error stopping" > /dev/null 2>&1
+		exit
+	fi
+	
+	$SED -i '/local/s/md5/trust/' $POSTGRES_CONF
+	startService ${SERVICE} >> $LOG_FILE 2>&1;
+
+	count=1
+	error=0
+	tobreak=0
+	while  [ "$count" -ne 0 ]
+	do
+		sleep 2
+        	status -p $pidfile > /dev/null 2>&1
+		count=$?
+		((tobreak++))
+		[ "$tobreak" -eq "$BREAKCOUNT" ] && { error=1 ;break;} 
+	done
+	if [ "$error" -eq 1 ] 
+	then
+		echo "Error starting" >> $LOG_FILE
+	else
+		sleep 2;
+		error=0;
+		count=1;
+	    tobreak=0;
+        while  [ "$count" -ne 0 ]
+        do	
+                sleep 2
+		$PSQL  -U $ADMINDB -c "ALTER USER $user WITH PASSWORD '$password'" > /dev/null 2>&1
+                count=$?
+		((tobreak++))
+	        [ "$tobreak" -eq "$BREAKCOUNT" ] && { error=1 ;break;}
+        done 
+	fi
+
+	stopService ${SERVICE} >> $LOG_FILE 2>&1;
+	$SED -i '/local/s/trust/md5/' $POSTGRES_CONF;
+	startService ${SERVICE} >> $LOG_FILE 2>&1;
+
+}
+

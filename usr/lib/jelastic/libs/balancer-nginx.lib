@@ -1,0 +1,467 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${BALLIB_VERSION:-}" ] && return 0;
+BALLIB_VERSION="0.1";
+VERBOSE=0
+
+NGINX_CONFIG='/etc/nginx/nginx-jelastic.conf';					# main nginx config file
+DHCPD_CONFIG='/etc/dhcp/dhcpd.conf';
+NGINX_TCPMAP_CONFIG='/etc/nginx/tcpmaps/mappings.xml';
+NGINX_TCPMAP_TEMPLATE='/etc/nginx/templates/nginx.tcp.conf.tpl';
+NGINX_CONFIG_TEMPLATE='/etc/nginx/templates/nginx.conf.tpl' ;            # template of nginx configuration
+DHCPD_CONFIG_TEMPLATE='/etc/dhcp/dhcpd.tpl';
+UPSTREAMS_LOCATION_PATH='/etc/nginx/upstreams';				# upstream configs location
+UPSTREAM_COMMON_CONFIG=$UPSTREAMS_LOCATION_PATH/common	;		# common upstream hosts
+FLUSH_LEASES_COMMAND="echo > /var/lib/dhcpd/dhcpd.leases";
+LEASES_FILE="/var/lib/dhcpd/dhcpd.leases";
+TMP_CONFIG="/tmp/$$.tmp.conf";
+TMP_TEMPLATE="/tmp/$$.tmp.template.conf";
+SUBNET_STEP=32;
+AMOUNT_OF_DHCPD_LEASES=0;
+DEBUG_LOGFILE="/var/log/build_groups.log";
+DEBUG_IS_ENABLED="yes";
+NB_PATH="/etc/nginx/neighbors/common";
+EXTRA_CONF="${UPSTREAMS_LOCATION_PATH}/extra-conf"
+
+[ ! -f "$UPSTREAM_COMMON_CONFIG" ] && touch "$UPSTREAM_COMMON_CONFIG"
+
+############ SERVICE FUNCTIONS ###########
+
+writeActionLog=1
+
+function toActionLog(){
+  local message=$1
+  if [ "$writeActionLog" -eq 1 ] ;then
+    echo "$message" >> $ACTIONS_LOG
+  fi
+  log "$message"
+}
+
+function getSubnetById(){
+  CURRENT_GROUP=1
+  GROUP_ID=$1
+  for NET in 10.{0..255}
+  do  
+    for SUBNET in $NET.{0..255}
+    do
+      ### for IP in $SUBNET.{1..255..$SUBNET_STEP} - new construction not working in old bash3
+      for ((IP=1;IP<=255;IP+=$SUBNET_STEP)) ### so old stupid way is used ...
+      do
+        if [ $CURRENT_GROUP -eq $GROUP_ID ]
+        then
+          echo $SUBNET.$IP
+          return 0;
+        else  
+          CURRENT_GROUP=$[CURRENT_GROUP+1]
+        fi
+      done
+    done
+  done
+}
+
+function generate_map_regex_from_ip(){
+  echo "~"$( sed -e 's/\./\\\\\\./g' <<< $1 )"\\\\\\:80$"
+}
+
+function reloadConfigs(){
+    cat "$NGINX_CONFIG_TEMPLATE" > "$NGINX_CONFIG"
+    cat "$DHCPD_CONFIG_TEMPLATE" > "$DHCPD_CONFIG"
+    if [ -e "$LEASES_FILE" ]; then
+    	rm -f "$LEASES_FILE";
+    fi
+    toActionLog "- Templates are reloaded"
+    return 0;
+}
+
+function clearHosts(){
+  rm -Rf "$UPSTREAMS_LOCATION_PATH"/group*
+  echo '' > "$UPSTREAMS_LOCATION_PATH"/common
+  toActionLog "- Upstreams cleaned!"
+  return 0;
+}
+
+function removeDublicates(){
+  OLDIFS=$IFS
+  IFS=$'\n'
+  nginx_config=( $(cat "$NGINX_CONFIG") )
+
+  for ((i=0; i < "${#nginx_config[@]}"; i++))
+  do 
+		if [ "${nginx_config[${i}]}" != "${nginx_config[${i}+1]}" ] 
+		then	
+	 		echo "${nginx_config[${i}]}" >> $TMP_CONFIG
+		fi
+  done
+  mv "$TMP_CONFIG" "$NGINX_CONFIG"
+  IFS=$OLDIFS
+}
+
+function getAmountOfDhcpdLeases(){
+  [  -f "$LEASES_FILE" ] && {
+    AMOUNT_OF_DHCPD_LEASES=$(grep -c "lease 10" $LEASES_FILE );
+    echo $AMOUNT_OF_DHCPD_LEASES;
+  } || { echo 0; }
+}
+
+function makeSureNodesReceivedIpsFromDhcpd(){
+  let local accepted_result=$AMOUNT_OF_DHCPD_LEASES+2;
+  for check in {1..15}
+  do
+    current_result=$(getAmountOfDhcpdLeases); 
+    [ $current_result == $accepted_result ] && { break; } || { 
+      sleep 3s;
+      [ $check == 15 ] && { toActionLog "- Cound not make sure that DHCP works corectly now"; };
+    } 
+  done
+}
+
+######## MAIN FUNCTIONS #########
+
+function addRangeToDhcpdConfig(){
+  GROUP_CONFIG=$UPSTREAMS_LOCATION_PATH/$1
+  if [ -e "$GROUP_CONFIG" ]; then
+    AMOUNT_OF_HOSTS=$( wc -l < $GROUP_CONFIG )
+    RANGE=$(createDhcpdRange $AMOUNT_OF_HOSTS)
+    insertDhcpdRangeIntoConfig "$RANGE #$1"
+    toActionLog "- DHCP range $RANGE is added to config";
+  else	
+    toActionLog "- ${GROUP_CONFIG} not exists" 
+    return 11;
+  fi
+  return 0;
+}
+
+function generateUpstreams(){
+  GROUP_CONFIG=$UPSTREAMS_LOCATION_PATH/$1
+  extraConfContent=''
+  if [ -e "$GROUP_CONFIG" ]; then
+    count=1
+    OLD_IFS=$IFS; IFS=$'\n';
+    for i in  $( sort ${GROUP_CONFIG} | uniq )
+    do
+      local ip=$( sed -nre 's/^([a-z0-9\.\-]{1,})([_| ](([a-z=0-9\ _]{1,})*))?/\1/p' <<< ${i} )
+      local weight=$( sed -nre 's/([a-z0-9\.\-]{1,})[_| ](([weight=[0-9]{1,}_?)*)/\3/p' <<< ${i} )
+      [ "$2" == "tcp" ] && upstreams[$count]="server ${ip}:BPORT ;" || upstreams[$count]="server ${ip} ${weight};"
+      ((count++))
+    done
+    IFS=$OLD_IFS
+    upcount=${#upstreams[@]}
+    if [ -f "$NB_PATH" ]; then
+      balancers=($(cat ${NB_PATH} | tr ',' ' ') )
+      count=${#balancers[@]}
+      for i in $(seq 0 $((${#balancers[@]} - 1))); do
+        backups[$i]="server ${balancers[$i]} backup;"
+      done
+    fi
+
+    if [ "$2" == "tcp" ]; then
+      echo "${upstreams[@]} ### UPSTREAMPROTO for $1 ###"
+    else
+      [ -f "$EXTRA_CONF" ] && extraConfContent=$( <${EXTRA_CONF} );
+      echo "upstream $1 {${backups[@]}  ${upstreams[@]} $extraConfContent sticky path=/; } ### UPSTREAMPROTO for $1 ###"  
+    fi
+  else  
+    toActionLog "- ${GROUP_CONFIG} not exists" ;
+    return 11; 
+  fi
+  toActionLog "- upstreams generated"
+
+return 0;
+}
+
+function generateDefaultUpstreamLine(){
+  GROUP_CONFIG=$UPSTREAMS_LOCATION_PATH/$1
+  if [ -e "$GROUP_CONFIG" ]; then
+   
+    count=0
+    OLD_IFS=$IFS; IFS=$'\n';
+    for i in  $(sort ${GROUP_CONFIG} | uniq )
+    do
+      upstreams[$count]="server $( sed -nre 's/^([a-z0-9\.\-]{1,})([_| ](([a-z=0-9\ _]{1,})*))?/\1/p' <<< ${i});"
+      ((count++))
+    done
+    IFS=$OLD_IFS
+
+    if [ -f "$NB_PATH" ]; then
+      balancers=( $(cat ${NB_PATH} | tr ',' ' ') )
+      count=${#balancers[@]}
+      for i in $(seq 0 $((${#balancers[@]} - 1))); do
+        backups[$i]="server ${balancers[$i]} backup;"
+      done
+    fi
+
+    echo "${upstreams[@]} ${backups[@]} ### DEFUPPROTO for $1 ###"
+  else
+    toActionLog "- ${GROUP_CONFIG} not exists" ;
+    return 11;
+  fi
+}
+
+function createDhcpdRange(){
+  #argument is hosts amount in subnet
+  AMOUNT_OF_HOSTS=$1
+  SUBNET_ID=$( grep -n NEXT_SUBNET_ID $DHCPD_CONFIG | tail -n 1 | awk '{print $3}' )
+  NEXT_SUBNET_START=$(getSubnetById $SUBNET_ID)
+  ((SUBNET_ID++))
+  sed -i "7 c ### NEXT_SUBNET_ID $SUBNET_ID" $DHCPD_CONFIG 
+  LAST_SUBNET_IP=$(echo $NEXT_SUBNET_START | awk -F "." {'print $4'})
+  let "LAST_SUBNET_IP +=$AMOUNT_OF_HOSTS-1"
+  NEXT_SUBNET_END="$(echo $NEXT_SUBNET_START | awk -F "." '{print $1"."$2"."$3"."}')$LAST_SUBNET_IP"
+  echo "range $NEXT_SUBNET_START $NEXT_SUBNET_END;"
+}
+
+function updateUpstreamSection(){
+  UPSTREAM_LINE=$(echo -e "\\x09 $1")
+  CHECK_LINE=$( grep UPSTREAMPROTO ${NGINX_CONFIG} | grep -w $2 | tail -n 1)
+  if [[ $CHECK_LINE == *$2* ]]; then
+    LINE=( $(grep -n UPSTREAMPROTO ${NGINX_CONFIG} | grep -w $2 | tail -n 1 | awk -F: '{print $1}') )
+    sed -i  "$LINE c $UPSTREAM_LINE" $NGINX_CONFIG
+  elif [[ $UPSTREAM_LINE == *.* ]]; then
+    LINE=( $( grep -n UPSTREAMPROTO $NGINX_CONFIG | tail -n 1 | awk -F: '{print $1}' ) )
+    sed -i "$LINE a $UPSTREAM_LINE" $NGINX_CONFIG
+  fi
+}
+
+function updateMappingsSection(){
+  MAPPING_LINE=$(echo -e "\\x09 $1")
+  CHECK_LINE=$( grep MAPPROTO ${NGINX_CONFIG} | grep -w $2 | tail -n 1)
+  if [[ $CHECK_LINE == *$2* ]]; then
+  	LINE=( $( grep -n MAPPROTO ${NGINX_CONFIG} | grep -w $2 | tail -n 1 | awk -F: '{print $1}') )
+    sed -i "$LINE c $MAPPING_LINE" $NGINX_CONFIG 
+  elif [[ $MAPPING_LINE == *.* ]]; then
+  	LINE=( $( grep -n MAPPROTO $NGINX_CONFIG | tail -n 1 | awk -F: '{print $1}') )
+    sed -i "$LINE a $MAPPING_LINE" $NGINX_CONFIG 
+  fi
+}
+
+function updateDefaultUpstreamSection(){
+  UPSTREAM_LINE=$(echo -e "\\x09 $1")
+  CHECK_LINE=$( grep DEFUPPROTO $NGINX_CONFIG | grep -w $2 | tail -n 1)
+  if [[ $CHECK_LINE == *$2* ]]; then
+    LINE=( $( grep -n DEFUPPROTO ${NGINX_CONFIG} | grep -w $2 | tail -n 1 | awk -F: '{print $1}') ) 
+    sed -i "$LINE c $UPSTREAM_LINE" $NGINX_CONFIG 
+  elif [[ $UPSTREAM_LINE == *.* ]]; then
+    LINE=( $( grep -n DEFUPPROTO $NGINX_CONFIG | tail -n 1 | awk -F: '{print $1}') )
+    sed -i "$LINE a $UPSTREAM_LINE" $NGINX_CONFIG 
+  fi
+}
+
+function insertDhcpdRangeIntoConfig(){
+  LINE=( $( grep -n range $DHCPD_CONFIG | tail -n 1 | awk -F: '{print $1}') )
+  RANGE_LINE=$(echo -e "\\x09 $1")
+  if [[ $RANGE_LINE == *.* ]]; then
+    sed -i "$LINE a $RANGE_LINE" $DHCPD_CONFIG
+  fi
+}
+
+function clearGroupFromNginxConfig(){
+  grep -v -E "UPSTREAMPROTO.*$1|MAPPROTO.*$1|DEFUPPROTO.*$1" $NGINX_CONFIG  >  $TMP_CONFIG
+  mv $TMP_CONFIG $NGINX_CONFIG
+  toActionLog "- Group $1 is removed from config"
+  return 0;
+}
+
+function removeRangeFromDhcpd(){
+  grep -v $1 $DHCPD_CONFIG  >  $TMP_CONFIG
+  mv $TMP_CONFIG $DHCPD_CONFIG
+  toActionLog "- DHCP range $1 is removed from config"
+  return 0;
+}
+
+function addGroupToUpsreamCommon(){
+  UPSTREAMS=$(generateUpstreams common)
+  updateUpstreamSection "$UPSTREAMS" common
+  toActionLog "- Updated common upstream section with $UPSTREAMS"
+  return 0;
+}
+
+function addGroupToUpsreamSection(){
+  UPSTREAMS=$(generateUpstreams $1)
+  updateUpstreamSection "$UPSTREAMS" $1
+  toActionLog "- Updated group upstream section with $UPSTREAMS"
+  return 0;
+}
+
+function addGroupToDefaultUpsreamSection(){
+  UPSTREAMS=$(generateDefaultUpstreamLine $1)
+  updateDefaultUpstreamSection "$UPSTREAMS" $1
+  toActionLog "- Updated default upstream section with $UPSTREAMS"
+  return 0;
+}
+
+function addGroupToMappingsSection(){
+  MAPPINGS=$(generateMapRegexLine $1)
+  updateMappingsSection "$MAPPINGS" $1
+  toActionLog "- Updated group mappings section with $UPSTREAMS"
+  return 0;
+}
+
+function generateMapRegexLine(){
+  GROUP_CONFIG=$UPSTREAMS_LOCATION_PATH/$1
+  if [ -e ${GROUP_CONFIG} ]; then
+    count=0
+    OLD_IFS=$IFS; IFS=$'\n';
+    for i in  $(sort ${GROUP_CONFIG} | uniq )
+    do
+      local ip=$( sed -nre 's/^([a-z0-9\.\-]{1,})([_| ](([a-z=0-9\ _]{1,})*))?/\1/p' <<< ${i} )
+      regex_line=$(generate_map_regex_from_ip ${ip})
+      mappings[$count]="$regex_line $1;"
+      ((count++))
+    done
+    IFS=$OLD_IFS   
+
+    echo "${mappings[@]} ### MAPPROTO for $1 ###"
+  else 
+    toActionLog "- ${GROUP_CONFIG} not exists"
+    return 11;
+  fi
+}
+
+
+function moveIpsFromGroupToCommon(){
+  GROUP_CONFIG=$UPSTREAMS_LOCATION_PATH/$1
+  if [ -e "$GROUP_CONFIG" ]; then
+  	exec 9<$GROUP_CONFIG
+  	while read -u9 line
+  	do
+    		echo $line >> $UPSTREAM_COMMON_CONFIG
+  	done
+   else	
+    toActionLog "- ${GROUP_CONFIG} not exists"
+    return 11;
+  fi
+}
+
+function removeGroupIpsFromCommon(){
+  GROUP_CONFIG=$UPSTREAMS_LOCATION_PATH/$1
+  if [ -e "$GROUP_CONFIG" ]; then
+  	exec 9<$GROUP_CONFIG
+  	while read -u9 line
+  	do
+    		grep -v '$line' $UPSTREAM_COMMON_CONFIG  >  $TMP_CONFIG
+    		mv $TMP_CONFIG $UPSTREAM_COMMON_CONFIG
+  	done
+  else	
+    toActionLog "- ${GROUP_CONFIG} not exists" 
+    return 11;
+  fi
+}
+
+############ TCP Balancing functions ############# 
+
+function updateTcpUpstreamSection(){
+  fend_port=$1
+  bend_port=$2
+  TCP_UPSTREAM=$(generateUpstreams common tcp)
+  sed -i -e  "s/UPSTREAMPROTO/$TCP_UPSTREAM/g" -e "s/FPORT/$fend_port/g" -e "s/BPORT/$bend_port/g" $TMP_TEMPLATE;
+}
+
+function updateMainNginxConfig(){
+  cat $TMP_TEMPLATE >> $NGINX_CONFIG;
+  [ -e "$TMP_TEMPLATE" ] && rm $TMP_TEMPLATE;
+}
+
+function addTCPPortMappings(){
+  if [ -e "$NGINX_TCPMAP_CONFIG" ]
+  then
+  	cat $NGINX_TCPMAP_TEMPLATE > $TMP_TEMPLATE;
+  	OLDIFS=$IFS
+  	IFS=$'\n'	
+  	for line in $( grep pair $NGINX_TCPMAP_CONFIG )
+  	do
+	    cat $NGINX_TCPMAP_TEMPLATE > $TMP_TEMPLATE;
+	    fend_port=$(grep "frontend_port=" <<<  $line | cut -d\" -f2)
+	    bend_port=$(grep "backend_port=" <<< $line | cut -d\" -f4)
+	    IFS=$OLDIFS
+	    updateTcpUpstreamSection "$fend_port" "$bend_port"
+      updateMainNginxConfig
+  	done
+  	IFS=$OLDIFS
+  else
+  	toActionLog "- mappings.xml not found"
+  fi
+}
+
+function clearTCPPortMappings(){
+  sed -i '1,/TCP SECTION/!d' $NGINX_CONFIG
+}
+
+function addCommonHostConfig(){
+  echo "$1" >> "$UPSTREAM_COMMON_CONFIG" ;
+}
+
+function removeCommonHostConfig	(){
+  sed -i "/$1/d"  "$UPSTREAM_COMMON_CONFIG" ;
+}
+
+function rebuildCommon(){
+  clearGroupFromNginxConfig common && \
+  clearTCPPortMappings && \
+  addGroupToUpsreamCommon && \
+  addGroupToDefaultUpsreamSection common && \
+  addGroupToMappingsSection common && \
+  addTCPPortMappings && \
+  { reloadServiceSilent $SERVICE || restartServiceSilent $SERVICE; } && \
+  enableService $SERVICE > /dev/null 2>&1 && \
+  return 0 || return 1;
+}
+
+function addHostToGroup(){
+    toActionLog "- Add host $host to group $group";
+    echo "$host" >> "${UPSTREAMS_LOCATION_PATH}/${group}";
+}
+
+function buildCluster(){
+    local groupname="$1";
+    clearTCPPortMappings && \
+    addGroupToMappingsSection common && \
+    addGroupToUpsreamSection "$groupname" && \
+    addGroupToMappingsSection "$groupname" && \
+    addGroupToDefaultUpsreamSection "$groupname" && \
+    addRangeToDhcpdConfig "$groupname" && \
+    clearGroupFromNginxConfig common && \
+    removeGroupIpsFromCommon "$groupname" && \
+    result=0 || result=1 ;
+    if [ "$result" -eq 0 ] ; then  
+      toActionLog "- Group "$groupname" is added to cluster" 
+    else
+      toActionLog "- Error was while adding group"
+    fi
+    removeDublicates;
+    restartServiceSilent $SERVICE;
+    enableService $SERVICE > /dev/null 2>&1;
+    toActionLog "- amount of dhcp leases $(getAmountOfDhcpdLeases)";
+    restartServiceSilent dhcpd;
+    makeSureNodesReceivedIpsFromDhcpd;
+    return $result;
+}
+
+function unbuildCluster(){
+    local groupname="$1";
+    [ ! -f "$UPSTREAMS_LOCATION_PATH/$groupname" ] && { return 0; }
+    moveIpsFromGroupToCommon "$groupname" && \
+    clearGroupFromNginxConfig "$groupname" && \
+    removeRangeFromDhcpd "$groupname" && \
+    clearGroupFromNginxConfig common && \
+    rm "$UPSTREAMS_LOCATION_PATH/$groupname" && \
+    result=0 || result=1 ;
+    toActionLog "- Group $groupname is removed from cluster and added to common list"
+    removeDublicates;
+    reloadServiceSilent $SERVICE;
+    restartServiceSilent dhcpd;
+    return $result;
+}

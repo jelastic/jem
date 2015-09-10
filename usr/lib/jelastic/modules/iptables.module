@@ -1,0 +1,122 @@
+#!/bin/bash
+inherit default config;
+include os output;
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+DESCRIPTION="Manipulate iptables rules   <<<<--------------";
+VERSION="1"
+DEFAULT_ACTION="Usage";
+$PROGRAM 'iptables';
+$PROGRAM 'service';
+
+function doUsage() {
+    showUsageMessage
+}
+
+function __iptablesManip() {
+    local temp=`getopt -o l: -l add,remove -- $@` mode list ip items
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp"
+    while true ; do
+        case "$1" in
+            --add)
+                mode='-A';
+                shift;
+                ;;
+            --remove)
+                mode='-D';
+                shift;
+                ;;
+            -l)
+                oldifs=$IFS;
+                IFS=';';
+                list=(${2});
+                IFS=${oldifs};
+                shift 2;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+    done;
+    items=($(loadConfig iptables/hosts nodes))
+    for ip in ${list[@]} ; do
+        case $mode in
+            -A)
+                items=("${items[@]#$ip}");
+                items=("${items[@]}" "$ip")
+                if ! "${IPTABLES}" -L INPUT  -n | grep -q "${ip}"; then ${IPTABLES} ${mode} INPUT -s ${ip} -j ACCEPT;fi
+                ;;
+            -D)
+                items=(${items[@]/"$ip"});
+                $IPTABLES $mode INPUT -s $ip -j ACCEPT;
+                ;;
+        esac;
+#	$IPTABLES $mode INPUT -s $ip -j ACCEPT;
+
+    done
+    storeConfig iptables/hosts nodes ${items[@]};
+    $SERVICE iptables save > /dev/null 2>&1;
+}
+
+function describeAdd() {
+    echo "Add ip to allowed list";
+}
+
+function doAdd() {
+    __iptablesManip --add ${*} && writeJSONResponceOut "result=>0" "message=>Firewall rule added successfully" || writeJSONResponceErr "result=>4068" "message=>Firewall rule added with error" ;
+}
+
+function describeAddParameters() {
+    echo "-l <IPs>";
+}
+
+function describeAddOptions() {
+    echo "-l: range of IPs to act with";
+}
+    
+function describeRemove() {
+    echo "Remove ip from allowed list";
+}
+
+function describeRemoveParameters() {
+    echo "-l <IPs>";
+}
+
+function describeRemoveOptions() {
+    echo "-l: range of IPs to act with";
+}
+
+function doRemove() {
+    __iptablesManip --remove ${*} && writeJSONResponceOut "result=>0" "message=>Firewall rule removed successfully" || writeJSONResponceErr "result=>4068" "message=>Firewall rule removed with error" ;
+}
+
+function describeClean() {
+    echo "Remove ALL IPs from allowed list";
+}
+
+function doClean() {
+#    $IPTABLES -X INPUT;
+     $IPTABLES -F INPUT;
+     $IPTABLES -A INPUT -i lo -j ACCEPT;
+     $IPTABLES -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT;
+     $IPTABLES -A INPUT -s 0.0.0.0/0 -p tcp --dport 22 -j ACCEPT;
+     $IPTABLES -A INPUT -s 0.0.0.0/0 -p tcp --dport 7979 -j ACCEPT;
+     $IPTABLES -P INPUT DROP;
+}

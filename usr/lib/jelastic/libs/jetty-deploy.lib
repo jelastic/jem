@@ -1,0 +1,103 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${JETTYDEPLOYLIB_VERSION:-}" ] && return 0;
+JETTYDEPLOYLIB_VERSION="0.1";
+
+include os string;
+
+JETTY_HOME='/opt/jetty'
+APPS='webapps'
+TEMPLATES='templates'
+CONTEXT_CONF_DIR='contexts'
+WADI_TEMPLATE='replica.xml'
+TMP_TEMPLATE='/tmp/wadi$$$.xml'
+WORK_DIR="$JETTY_HOME/work"
+$PROGRAM 'wget';
+$PROGRAM 'basename';
+APPLICATION='jetty'
+
+function applyWadiSettings(){
+
+	local context=$1;
+	WADICONF=$($BASENAME ${context}.xml)
+
+	if [[ -s "$JETTY_HOME/$TEMPLATES/$WADI_TEMPLATE" ]]
+	then 
+		cp $JETTY_HOME/$TEMPLATES/$WADI_TEMPLATE $TMP_TEMPLATE
+		if [ "$context" == "root" ]
+		then 
+			sed -i "s/CONTEXTPATH//g" $TMP_TEMPLATE
+		else
+			sed -i "s/CONTEXTPATH/$context/g" $TMP_TEMPLATE
+		fi
+		RESBASE=$(echo ${APPS}/${context}.war | sed 's,/,\\/,g')
+		sed -i "s/RESOURCEBASE/$RESBASE/g" $TMP_TEMPLATE
+		mv $TMP_TEMPLATE ${JETTY_HOME}/${CONTEXT_CONF_DIR}/${WADICONF}
+		chown $DATA_OWNER ${JETTY_HOME}/${CONTEXT_CONF_DIR}/${WADICONF}	2>>"$JEM_CALLS_LOG"
+       	fi
+}
+
+function removeWadiSettings(){
+
+	local context=$1;
+	WADICONF=$($BASENAME ${context}.xml)
+	
+	if [ -f "$JETTY_HOME/$CONTEXT_CONF_DIR/$WADICONF" ]
+        then
+                rm -f $JETTY_HOME/$CONTEXT_CONF_DIR/$WADICONF
+        fi
+}
+
+function applyPreDeploy(){
+	[ "$context" == "ROOT" ]  && context='root';
+	if [[ -n $(find ${WEBROOT} -maxdepth 1 -iname ${context}.war) ]]
+	then 
+    	    rm -f ${WEBROOT}/${context}.war
+    	    rm -f ${WEBROOT}/$(toLowerCase ${context}.war)
+    	    rm -rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${context}.war*
+    	    rm -rf ${WORK_DIR}/Jetty_0_0_0_0_8080_$(toLowerCase ${context}).war*
+    	fi
+	return 0;
+}
+
+function applyPostDeploy(){
+	applyWadiSettings $context;
+}
+
+function applyPreUndeploy(){
+	[ "$context" == "ROOT" ]  && context='root';
+	return 0;
+}
+
+function applyPostUndeploy(){
+	rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${context}*
+        rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_*/webapp/${context}.war ;
+	removeWadiSettings $context;
+}
+
+function applyPreRename(){
+	[ "$oldContext" == "ROOT" ]  && oldContext='root';
+	[ "$newContext" == "ROOT" ]  && newContext='root';
+	return 0;
+}
+
+function applyPostRename(){
+	rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}.war*
+	rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}*
+	removeWadiSettings $oldContext;
+	applyWadiSettings $newContext;
+}

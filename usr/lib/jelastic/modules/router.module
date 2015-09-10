@@ -1,0 +1,197 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default os net;
+include log;
+
+DESCRIPTION="Manipulate DNAT iptables rules";
+VERSION="1.1"
+DEFAULT_ACTION="Usage";
+
+
+$PROGRAM 'iptables';
+$PROGRAM 'tail';
+$PROGRAM 'sort';
+
+FORWARD_RANGE_START=50000
+FORWARD_RANGE_END=55000
+
+function doUsage() {
+    showUsageMessage
+}
+
+
+function getUsedPorts() {
+    echo $($IPTABLES -L PREROUTING -t nat -n | $SED -nre '/REDIRECT/d; s/.*dpt:([0-9]{4,5}).*/\1/;/[0-9]+/p' | uniq -u)
+}
+
+function getPortByIP() {
+    : ${1? "Missing IP address" }
+    local _IP=${1}
+    local _port=${2}
+    
+    echo $($IPTABLES -L PREROUTING -t nat -n | $SED -nre "/:${_IP}:${_port}/{/$__PROTO/{s/.*dpt:([0-9]+).*/\1/;p}}")
+}
+
+function getDestinationPort() {
+	: ${1?"Missing port param"}
+	local _PORT=${1}
+	echo $($IPTABLES -L PREROUTING -t nat -n | sed -nre "/:${_PORT}\s/{s/.*:([0-9]+)\s*$/\1/;p}")
+}
+
+function getFreePort() {
+    [ ! -z "$__SPORT" ] && { echo $__SPORT ; return ; } 
+    local usedPorts=($(getUsedPorts))
+    eval "availablePorts=($(seq ${FORWARD_RANGE_START} ${FORWARD_RANGE_END}| $SED -re 's/([0-9]+)/[\1]="0"/g'))"
+    for port in "${!usedPorts[@]}"; do
+		availablePorts[${usedPorts[$port]}]=1
+    done;
+    freePorts=($(
+		for key in "${!availablePorts[@]}"; do 
+			[[ ${availablePorts["${key}"]} -eq 0 ]] &&  echo "$key"; done | $SORT -n
+	))
+    echo ${freePorts[0]}
+}
+
+function onModLoadCallback() {
+    local args=$(getopt -o i:p:s: -l "ip:,dport:,sport:,proto:" -- "$@");
+    [[ $? != 0 ]] && die -q "Terminating...";
+
+    eval set -- "${args}";
+
+    while true ; do
+        case "${1}" in
+            -i|--ip)
+                case "${2}" in
+                    "") die -q "Please specify IP address param." ;;
+                    *) __IP=${2}; shift 2 ;;
+                esac ;;
+            -p|--dport)
+                case "${2}" in
+                    "") die -q "Please specify destination port param." ;;
+                    *) __PORT=${2}; shift 2 ;;
+                esac ;;
+            -s|--sport)
+                case "${2}" in
+                    "") die -q "Please specify source port param." ;;
+                    *) __SPORT=${2}; shift 2 ;;
+                esac ;;
+            --proto)
+                case "${2}" in
+                    "") die -q "Please specify source port param." ;;
+                    *) __PROTO=`echo ${2} | tr A-Z a-z`; shift 2 ;;
+                esac ;;
+            --) shift ; break ;;
+            *) die -q "ROUTER.MODULE (onModLoadCallback) Internal error!";
+        esac;
+    done
+    [ -z "$__PROTO" ] && __PROTO=tcp ;
+}
+
+function describeForward() {
+    echo "Get and add free port for DNAT for specified local IP:Port";
+}
+
+function describeForwardParameters() {
+    echo "--ip <IP> --dport <Port> [--sport <Port>] [--proto <PROTOCOL>]";
+}
+
+function describeForwardOptions() {
+   echo "--ip: destination IP address";
+   echo "--dport: destination port";
+   echo "--sport: source port";
+   echo "--proto: protocol";
+}
+
+function doForward() {
+    : ${__IP? "Missing IP address" }
+    : ${__PORT? "Missing port" }
+
+
+    if ! isValidIP $__IP ; then
+		writeJSONResponceErr "result=>99" "message=>Invalid IP specified" ; exit 99;
+    fi
+
+	
+	# Check if binding already exists {{{
+#    local port=$($IPTABLES -L PREROUTING -t nat -vnx | $SED -nre "/($($SED -re 's/\./\\./g' <<< $__IP):[0-9]{4,5})/{/$__PROTO/{/:$__PORT\s*$/{s/.*dpt:([0-9]{4,5}).*/\1/;p}}}")
+     local port=$($IPTABLES -L PREROUTING -t nat -vnx | $SED -nre "/($__IP:[0-9]{4,5})/{/$__PROTO/{/:$__PORT\s*$/{s/.*dpt:([0-9]{4,5}).*/\1/;p}}}")
+
+    if [[ ! -z ${port} ]] ; then
+		writeJSONResponceErr "result=>4092" "message=>This pair IP:PORT already bind to port $port" "port=>$port"; exit 99;
+    fi
+	# }}}
+
+    local freeport=$(getFreePort)
+    if [[ -z ${freeport} ]] ; then
+		writeJSONResponceErr "result=>99" "message=>Unable to bind IP. There is no free ports"; exit 99;
+	fi
+
+    if $IPTABLES -t nat -A PREROUTING -p $__PROTO --dport ${freeport} -j DNAT --to-destination ${__IP}:${__PORT} ; then
+        /etc/init.d/iptables save | $GRAB_OUTPUT;
+        writeJSONResponceOut "result=>0" "message=>Port has been added" "port=>$freeport"; return 0 ;
+    fi
+}
+
+function describeUnbind() {
+    echo "Delete specified IP[:Port] binding for DNAT";
+}
+
+function describeUnbindParameters() {
+    echo "--ip <IP> [--dport <Port>]  [--proto <PROTOCOL>]";
+}
+
+function describeUnbindOptions {
+    echo "--ip: destination IP address";
+    echo "--dport: destination port";
+    echo "--proto: protocol";
+}
+
+function doUnbind() {
+	: ${__IP? "Missing IP address" }
+	: ${__PROTO? "Missing protocol" }
+    local _ports=($(getPortByIP ${__IP} $__PORT))
+
+	if [[ ! -z ${__PORT+x} ]] ; then 
+		#single port
+		#TODO: This comparation is buggy. Need to refactor it in future
+#		if ! grep -qP ${__PORT} <<< ${_ports[*]} ; then
+		if [[ -z ${_ports[0]} ]] ; then 
+			writeJSONResponceErr "result=>4091" "message=>there is no bindings for ${__IP}:${__PORT}"; exit 99;
+		fi
+		if $IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j DNAT --to-destination $__IP:$__PORT 2>/dev/null ; then
+			/etc/init.d/iptables save | $GRAB_OUTPUT;
+			writeJSONResponceOut "result=>0" "message=>Port binding has been removed"; return 0 ;
+		 else
+			writeJSONResponceOut "result=>4093" "message=>Port binding has not been removed"; return 1 ;
+		fi
+	else 
+		# multiple ports
+		msg=""
+		for port in "${_ports[@]}" ; do
+			destPort=$(getDestinationPort $port)
+			msg="$msg $destPort"
+		    $IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${port} -j DNAT --to-destination ${__IP}:${destPort} 
+		done
+    
+	    /etc/init.d/iptables save | $GRAB_OUTPUT;
+		writeJSONResponceOut "result=>0" "message=>Port bindings for ${__IP} has been removed (${msg} )"; return 0 ;
+	fi
+}
+
+# vim: syntax=sh

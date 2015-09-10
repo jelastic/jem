@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${DEFAULTLIB_VERSION:-}" ] && return 0;
+DEFAULTLIB_VERSION="0.1";
+
+set -o errtrace
+DESCRIPTION="No description available!";
+VERSION="1";
+DEFAULT_ACTION="usage";
+ACTIONS_LOG="/var/log/actions$$.log";
+
+function describeUsage() {
+    echo "Display usage information";
+}
+
+function describeHelp() {
+    echo "Display help text";
+}
+
+function doUsage() {
+    showUsageMessage;
+}
+
+function showUsageMessage() {
+    local action;
+
+    echo -e "Usage: ${MANAGE_COMMAND} <action> <options>\n";
+    echo "Standard actions:";
+    for action in help usage version; do
+        local desc=""
+        action=$(sed 's/\([a-zA-Z0-9]\)\([a-zA-Z0-9]*\)/\u\1\2/g' <<< ${action});
+        isFunction "describe${action}" && desc=$(describe${action});
+        echo -e "\t${action}\t\t${desc:-(no description)}";
+    done
+
+    echo -e "\nExtra actions:";
+
+    for action in $(set | sed -n -e '/^do\S\+ ()\s*$/s/^do\(\S\+\).*/\1/p' | grep -v 'Action' | sort); do
+        case "${action}" in
+            help|usage|version)
+                continue;
+                ;;
+            ?*)
+                local desc="" ifs_save="${IFS}" action_text line options
+
+                isFunction "describe${action}" && desc=$(describe${action});
+                writeListEntry "${action}" "${desc:-(no description)}";
+                if isFunction "describe${action}Parameters"; then
+                    writeListEntry "\t$(describe${action}Parameters)";
+                fi
+
+                ;;
+        esac;
+    done;
+    true;
+}
+
+function describeVersion() {
+    echo "Display version information";
+}
+
+function doVersion() {
+    [[ -n ${MANAGE_MODULE_NAME} && -n ${VERSION} ]] && echo "${MANAGE_MODULE_NAME}.module ${VERSION}";
+    echo "${MANAGE_PROGRAM_NAME} ${MANAGE_VERSION}";
+}
+
+function doHelp() {
+        setOutputMode default;
+        echo "${DESCRIPTION}";
+        showUsageMessage;
+        echo -e "\nActions options:";
+        local ifs_save="${IFS}" options
+        for action in $(set | sed -n -e '/^do\S\+ ()\s*$/s/^do\(\S\+\).*/\1/p' | grep -v 'Action' | sort); do
+            if isFunction "describe${action}Options"; then
+                options=$(echo "$options"; describe${action}Options);
+            fi
+        done
+        options="$(sort -u <<< "$options")"
+        IFS=$'\n'
+        for line in ${options}; do
+            writeListEntry -p "  ${line%%*( ):*}" "  ${line##+([^:]):*( )}";
+        done
+        IFS="${ifs_save}"
+        true; 
+}
+
+function showActionHelp() {
+    local subAction=$1
+
+    isFunction "describe${subAction}" && desc=$(describe${subAction});
+    writeListEntry "${subAction}" "${desc:-(no description)}";
+    if isFunction "describe${subAction}Parameters"; then
+        writeListEntry "\t$(describe${subAction}Parameters)";
+    fi
+    echo -e "Actions options:";
+    if isFunction "describe${subAction}Options"; then
+        local ifs_save="${IFS}" options ;
+        options=$(describe${subAction}Options) ;
+        IFS=$'\n'
+        for line in ${options}; do
+            writeListEntry -p "  ${line%%*( ):*}" "  ${line##+([^:]):*( )}";
+        done
+        IFS="${ifs_save}"
+    fi
+}

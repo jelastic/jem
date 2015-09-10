@@ -1,0 +1,581 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+DESCRIPTION="Firewall module";
+VERSION="1.1";
+DEFAULT_ACTION="Usage";
+
+inherit tests os envinfo log net config;
+include cartridge-common;
+
+$PROGRAM 'iptables';
+$PROGRAM 'find';
+$PROGRAM 'sort';
+$PROGRAM 'xargs';
+$PROGRAM 'netstat';
+$PROGRAM 'ip';
+$PROGRAM 'sort';
+$PROGRAM 'iptables-restore';
+
+SAVEFILE='/var/lib/jelastic/firewall';
+CUSTOM_RULES_FILE='/etc/sysconfig/iptables-custom';
+DMZ_PORTS="4000,5000,7755,7979,8743";
+
+declare PublicIP;
+declare FTPPort;
+declare RSLV_ADDR;
+declare CORE_ADDR;
+declare APP_ADDR;
+declare DB_ADDR;
+declare -a OPENPORTS;
+declare -a CLOSEDPORTS;
+
+declare -r ERR_NO_METADATA=4080;
+
+function _getbalancerRedirPorts() { return 0; }
+function _getapache_phpRedirPorts { return 0; }
+function _getnginx_phpRedirPorts { return 0; }
+function _getmavenRedirPorts { return 0; }
+function _getnginx_rubyRedirPorts { return 0; }
+
+function _getbalancerPorts() {
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
+        echo "$($FIND /etc/nginx/ -type f | $XARGS $SED -rne '/^\s*#/d;/listen[^0-9]+([0-9:\.\*]+);/{s/.*(:|\s+)([0-9]+);/\2/;/[^0-9]+/d;s/\s+//;p}' | $SORT -u) ${FTPPort}";
+    } || {
+        echo "80";
+    }
+    return 0;
+}
+
+function _getcartridgePorts() {
+    #restoreEnvironmentVariables;
+    echo $($SED -re 's/"//g'  <<<  $($SED -re 's/Private_Port=//g' <<< $(cat $MANIFEST_EXPORTED | grep "Private_Port=" ))| $SORT -u) ${FTPPort};
+    return 0;
+}
+
+function _getcartridgeRedirPorts () {
+    echo "PREROUTING:0.0.0.0/0:0.0.0.0/0:80:8080:REDIRECT";
+    return 0;
+}
+
+function _defaultComputeNodePorts() {
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
+        echo "${FTPPort} 80 443 1024-65535";
+    } || {
+        echo "80 8080";
+    }
+    return 0;
+}
+
+function _getglassfishPorts() {
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
+        echo "${FTPPort} 22 80 443 1024-65535";
+    } || {
+        echo "22 80 4848 8009 8080 24848 28080";
+    }
+    return 0;
+}
+
+function _gettomcatPorts() {
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
+        echo "${FTPPort} 22 80 443 1024-65535";
+    } || {
+        echo "22 80 8009 8080";
+    }
+    return 0;
+}
+
+function _gettomeePorts() {
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
+        echo "${FTPPort} 22 80 443 1024-65535";
+    } || {
+        echo "22 80 8009 8080";
+    }
+    return 0;
+}
+
+function _getjettyPorts() {
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
+        echo "${FTPPort} 22 80 443 1024-65535";
+    } || {
+        echo "22 80 8009 8080";
+    }
+    return 0;
+}
+
+function _getglassfishRedirPorts () {
+    echo "PREROUTING:0.0.0.0/0:0.0.0.0/0:80:28080:REDIRECT PREROUTING:0.0.0.0/0:0.0.0.0/0:443:8743:REDIRECT OUTPUT:0.0.0.0/0:127.0.0.0/8:80:28080:REDIRECT";
+    return 0;
+}
+
+function _defaultComputeNodeRedirPorts () {
+    echo "PREROUTING:0.0.0.0/0:0.0.0.0/0:80:8080:REDIRECT PREROUTING:0.0.0.0/0:0.0.0.0/0:443:8743:REDIRECT OUTPUT:0.0.0.0/0:127.0.0.0/8:80:8080:REDIRECT";
+    return 0;
+}
+
+function _getmariadbRedirPorts() { return 0; }
+
+function _getcouchdbRedirPorts() { return 0; }
+
+function _getmongodbRedirPorts() { return 0; }
+
+function _getapache_rubyRedirPorts() { return 0; }
+
+function _getmariadbPorts() {
+    local ports="80 3306";
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports";
+    echo "$ports"
+    return 0;
+}
+
+function _getapache_phpPorts() {
+    local ports="80 443 8080 8000";
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports 1024-65535";
+    echo "$ports"
+    return 0;
+}
+
+
+function _getapache_rubyPorts() {
+     local ports="80 443 8080 8000";
+     [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports 1024-65535";
+     echo "$ports"
+     return 0;
+}
+
+function _getmysqlRedirPorts() { return 0; }
+
+function _getmysqlPorts() {
+    _getmariadbPorts;
+    return $?;
+}
+
+function _getmongodbPorts() {
+    local ports="80 27017";
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports";
+    echo "$ports"
+    return 0;
+}
+
+function _getpostgresRedirPorts() { return 0; }
+
+function _getpostgresPorts() {
+    local ports="80 5432";
+    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports";
+    echo "$ports"
+    return 0;
+}
+
+function _isPublicIPv4() {
+    getAddr "venet0" "ipv4"
+    [[ "${#ipv4_list[@]}" -ne 0 ]] && {
+        for ip in ${ipv4_list[@]} ; do
+            [[ "${ip}" == "127.0.0.1" ]] && continue;
+            isLANIP "$ip" || return 0;
+        done;
+    }
+    return 1;
+}
+
+
+function __getAllIPs() {
+    echo $($IP a l | $SED -rne '/inet/{s/.*inet6.* //;s/\/.*//;s/peer.*//;s/in.*\s+(.*)/\1/; /(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/p}' | $SORT -u | $SED -re ':a;N;$!ba;s/\n/ /g;');
+}
+
+function getLANIPs() {
+    local IPS=$(__getAllIPs);
+    local res=();
+    for ip in ${IPS[@]} ; do
+        [[ "${ip}" == "127.0.0.1" ]] && continue;
+        isLANIP "${ip}" && res=(${res} ${ip});
+    done;
+    echo "${res[@]}";
+}
+
+function isRange() {
+    : ${1:?"Missing param: Port to test"};
+    $GREP -qP "[-|:]" <<< $1;
+    return $?;
+}
+
+function _setDefaultPolicy() {
+    local policy=${1:-"DROP"};
+    $IPTABLES -P INPUT ${policy};
+    $IPTABLES -P FORWARD ${policy};
+    $IPTABLES -P OUTPUT ACCEPT
+}
+
+function doUsage() {
+    showUsageMessage
+}
+
+function onModLoadCallback() {
+    log "Preload callback";
+    local __closedports __openports
+
+    #load ports lists from storage
+    OPENPORTS=($(loadConfig "${SAVEFILE}" OPENPORTS))
+    CLOSEDPORTS=($(loadConfig "${SAVEFILE}" CLOSEDPORTS))
+
+    _isPublicIPv4 && PublicIP=$__TRUE || publicIP=$__FALSE;
+    FTPPort=$($NETSTAT -tnlp | sed -n -re '/ftp/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}');
+
+    ## TODO: remove "params" garbarge option
+    local temp=`getopt -l cp:,op:,rp: -- params "$@" 2>/dev/null` oldifs;
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp";
+
+    while true ; do
+        case "$1" in
+            --cp)
+                # ports to close
+                [[ -z "$(sed -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
+                oldifs=$IFS;
+                IFS=',';
+                __closedports=(${2});
+                IFS=${oldifs};
+                shift 2;
+                ;;
+            --op)
+                # ports to open
+                [[ -z "$(sed -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
+                oldifs=$IFS;
+                IFS=',';
+                __openports=(${2});
+                IFS=${oldifs};
+                shift 2;
+                ;;
+            --rp)
+                # ports to remove from open ports list
+                [[ -z "$(sed -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
+                oldifs=$IFS;
+                IFS=',';
+                __removeports=(${2});
+                IFS=${oldifs};
+                shift 2;
+
+                for i in "${__removeports[@]}" ; do
+                    # remove the port to remove from stored list of open ports
+                    OPENPORTS=($(removeValueFromArray "${OPENPORTS[*]}" "${i}"));
+                done
+
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+    done;
+
+    # store given "closed" ports in list for loading
+    for i in "${__closedports[@]}" ; do
+        [[ -z $(indexOf "${CLOSEDPORTS[*]}" "$i") ]] && CLOSEDPORTS=($i ${CLOSEDPORTS[*]})
+        #remove "closed" port from open ports list
+        [[ ! -z "${OPENPORTS[*]}" ]] && OPENPORTS=($(removeValueFromArray "${OPENPORTS[*]}" "$i"))
+    done
+
+    # the same for the "open" ports
+    for i in "${__openports[@]}" ; do
+        [[ -z $(indexOf "${OPENPORTS[*]}" "$i") ]] && OPENPORTS=($i ${OPENPORTS[*]})
+        [[ ! -z "${CLOSEDPORTS[*]}" ]] && CLOSEDPORTS=($(removeValueFromArray "${CLOSEDPORTS[*]}" "$i"))
+    done
+
+    storeConfig "${SAVEFILE}" OPENPORTS ${OPENPORTS[@]}
+    storeConfig "${SAVEFILE}" CLOSEDPORTS ${CLOSEDPORTS[@]}
+}
+
+function describeStart() {
+    echo "start firewall and load rules";
+}
+
+function describeStartParameters() {
+    echo "--op [port1,[port2,[port3-port4]] --cp [port1,[port2,[port3-port4]] --rp [port1,[port2]]";
+}
+
+function describeStartOptions() {
+    echo "op: open port(s) list. A list of ports which have an 'ACCEPT' policy";
+    echo "cp: closed port(s) list. A list of ports which have a 'DROP' policy";
+    echo "rp: ports to remove from existing 'open' ports";
+}
+
+function doStart() {
+    declare -a ports;
+    log "Starting firewall";
+
+    local cartridge_config="/opt/repo/jelastic/jelastic.conf";
+    [ -f "$cartridge_config"  ] && Firewall_Enabled=$(grep Firewall_Enabled "$cartridge_config" | awk -F "=" '{ print $2 }')
+    [ ! -z "${Firewall_Enabled}" ] && FIREWALL_ENABLED=${Firewall_Enabled};  ### Override for cartridges
+    [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
+    [[ "${COMPUTE_TYPE}" == 'memcached' ]] && return 0;  # memcache has own firewall
+
+    $IPTABLES -F;
+    $IPTABLES -t nat -F;
+    _setDefaultPolicy;
+
+    $IPTABLES -A INPUT -i lo -j ACCEPT;
+    $IPTABLES -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT;
+    # for internal services:
+    intips=($(getLANIPs));
+    for ip in ${intips[@]} ; do
+        $IPTABLES -A INPUT -p tcp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
+        $IPTABLES -A INPUT -p udp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
+    done;
+
+    $IPTABLES -A INPUT -m state --state NEW -s 10.0.0.0/27 -j ACCEPT;
+    $IPTABLES -A INPUT -p icmp -j ACCEPT;
+
+    log "getting Infra adresses";
+    getInfraAddresses infraAddr;
+
+    isValidIP ${CORE_ADDR} && {
+        $IPTABLES -A INPUT -m state --state NEW -s ${CORE_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
+    } || {
+        $IPTABLES -A INPUT -m state --state NEW -s 0.0.0.0/0 -m tcp -p tcp --dport 22 -j ACCEPT;
+    }
+
+    [ ! -z "${CORE1_ADDR}" ] && isValidIP ${CORE1_ADDR} && $IPTABLES -A INPUT -m state --state NEW -s ${CORE1_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
+    [ ! -z "${CORE2_ADDR}" ] && isValidIP ${CORE2_ADDR} && $IPTABLES -A INPUT -m state --state NEW -s ${CORE2_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
+
+    isValidIP ${GATE_ADDR} && {
+        $IPTABLES -A INPUT -m state --state NEW -s ${GATE_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
+    } || {
+        $IPTABLES -A INPUT -m state --state NEW -s 0.0.0.0/0 -m tcp -p tcp --dport 22 -j ACCEPT;
+    }
+    redirPorts=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts; } || _defaultComputeNodeRedirPorts));
+    ports=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})Ports && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})Ports; } || _defaultComputeNodePorts));
+
+    # merge default ports list with the stored "open" ports
+    for i in "${OPENPORTS[@]}" ; do
+        [[ -z $(indexOf "${ports[*]}" "$i") ]] && ports=($i ${ports[*]})
+    done
+
+    # process input chain
+    # NOTE: the default INPUT & FORWARD policy is DROP
+    for port in ${ports[@]} ; do
+        isRange "$port" && {
+            local srange=$($SED -re 's/([0-9]+)(-|:)([0-9]+)/\1/' <<< ${port});
+            local erange=$($SED -re 's/([0-9]+)(-|:)([0-9]+)/\3/' <<< ${port});
+            $IPTABLES -A INPUT -m state --state NEW -m tcp -p tcp --dport ${srange}:${erange} -j ACCEPT;
+            $IPTABLES -A INPUT -m state --state NEW -m udp -p udp --dport ${srange}:${erange} -j ACCEPT;
+        } || {
+            $IPTABLES -A INPUT -m state --state NEW -m tcp -p tcp --dport ${port} -j ACCEPT;
+            $IPTABLES -A INPUT -m state --state NEW -m udp -p udp --dport ${port} -j ACCEPT;
+        }
+    done;
+
+    # enforce a rules for the "closed" ports to DROP
+    for port in ${CLOSEDPORTS[@]} ; do
+        isRange "$port" && {
+            local srange=$($SED -re 's/([0-9]+)(-|:)([0-9]+)/\1/' <<< ${port});
+            local erange=$($SED -re 's/([0-9]+)(-|:)([0-9]+)/\3/' <<< ${port});
+            $IPTABLES -A INPUT -m state --state NEW -m tcp -p tcp --dport ${srange}:${erange} -j DROP;
+            $IPTABLES -A INPUT -m state --state NEW -m udp -p udp --dport ${srange}:${erange} -j DROP;
+        } || {
+            $IPTABLES -A INPUT -m state --state NEW -m tcp -p tcp --dport ${port} -j DROP;
+            $IPTABLES -A INPUT -m state --state NEW -m udp -p udp --dport ${port} -j DROP;
+        }
+    done;
+
+    # process input chain NAT
+    for port in ${redirPorts[@]} ; do
+        local ruleParams=($($SED 's/:/ /g' <<< ${port}));
+        $IPTABLES -t nat -A ${ruleParams[0]} -s ${ruleParams[1]} -d ${ruleParams[2]} -m tcp -p tcp --dport ${ruleParams[3]} -j ${ruleParams[5]} --to-port ${ruleParams[4]};
+    done;
+
+    $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited;
+    [ ${COMPUTE_TYPE} == "cartridge" ] && {
+    [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh";
+    }
+
+    [ -f "${CUSTOM_RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${CUSTOM_RULES_FILE}" 2>>$ACTIONS_LOG ;
+	echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_RULES_FILE}" >> $JEM_CALLS_LOG ;
+    }
+    log "saving rules";
+    /sbin/service iptables save | $GRAB_OUTPUT;
+    return 0;
+}
+
+function describeFWStart() {
+    echo "Alias for Start";
+}
+
+function describeList() {
+    echo "List firewall rules";
+}
+
+function doList() {
+    $IPTABLES -L -t $@
+}
+
+function doFWStart() {
+    local resultMsg;
+    declare -i result;
+    log "FWSTART configuring firewall";
+    resultMsg=$(doStart); result=$?;
+    [[ "${result}" -eq "0" ]] && writeJSONResponceOut "result=>${result}" "message=>Firewall has been started" || writeJSONResponceErr "result=>${result}" "message=>${resultMsg}";
+    return ${result};
+}
+
+function describeStop() {
+    echo "clear all rules and stop firewall";
+}
+
+function doStop() {
+    [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
+    $IPTABLES -X;
+    $IPTABLES -X -t nat;
+    $IPTABLES -F;
+    $IPTABLES -F -t nat;
+    _setDefaultPolicy "ACCEPT";
+    return 0;
+}
+
+function describeFWStop() {
+    echo "Alias for Stop";
+}
+
+function doFWStop() {
+    local resultMsg;
+    declare -i result;
+    resultMsg=$(doStop); result=$?;
+    [[ "${result}" ]] && writeJSONResponceOut "result=>${result}" "message=>Firewall has been stopped" || writeJSONResponceErr "result=>${result}" "message=>${resultMsg}";
+}
+
+function _isFWEnabled() {
+    local status=$($SED -rne '/FIREWALL_ENABLED/{s/FIREWALL_ENABLED=([0-1]){1}/\1/;p}' ${META_FILE});
+    [[ "${status}" -eq "1" ]] && return 0;
+    return 1;
+}
+
+function describeFWStatus() {
+    echo "displays firewall status";
+}
+
+function doFWStatus() {
+    local param=${1};
+
+    [[ -z ${param} ]] && {
+        _isFWEnabled && writeJSONResponceOut "result=>0" "message=>Firewall enabled" || writeJSONResponceOut "result=>0" "message=>Firewall disabled";
+        return 0;
+    }
+
+    message=$($IPTABLES -vnL INPUT | $SED -re '/INPUT/d;/target/d;s/\s*((\S+)\s+){8}(\S+)\s+(.*)/\4/g' | $SED -rne '/^\s*$/d;/:/{s/.*dpt(s)?:([0-9]+)(:)?([0-9]+)?.*/\2:\4/;p}' | $SED -re ':a;N;$!ba;s/\n/,/g;s/:,/,/g;s/:$//g');
+    message="Open ports: ${message}";
+    writeJSONResponceOut "result=>0" "message=>${message}";
+    return 0;
+}
+
+function describeFWReconfigure() {
+    echo "reconfigure firewall";
+}
+
+function describeFWReconfigureParameters() {
+    describeStartParameters
+}
+
+function describeFWReconfigureOptions() {
+    describeStartOptions
+}
+
+
+function doFWReconfigure() {
+    _isFWEnabled && doStart;
+}
+
+function describeEnable() {
+    echo "enable firewall";
+}
+
+function describeEnableParameters() {
+   describeStartParameters
+}
+
+function describeEnableOptions() {
+    describeStartOptions
+}
+
+function doEnable() {
+    [[ -n "${META_FILE}" ]] && [[ -e "${META_FILE}" ]] && {
+        if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
+            $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=1/g" ${META_FILE};
+        else
+            echo -e "\nFIREWALL_ENABLED=1" >> ${META_FILE};
+            $SED -i -re '/^$/d' ${META_FILE};
+        fi;
+        chkconfig --level 345 iptables on 2>&1 | $GRAB_OUTPUT;
+        echo "Firewall enabled";
+        return 0;
+    } || {
+        echo "Error: No metadata found!";
+        return ${ERR_NO_METADATA};
+    }
+}
+
+function describeFWEnable() {
+    echo "Alias for Enable";
+}
+
+function doFWEnable() {
+    local resultMsg;
+    declare -i result;
+    resultMsg=$(doEnable); result=$?;
+    [[ "${result}" ]] && writeJSONResponceOut "result=>${result}" "message=>Firewall has been enabled" || writeJSONResponceErr "result=>${result}" "message=>${resultMsg}";
+}
+
+function describeDisable() {
+    echo "disable firewall";
+}
+
+function doDisable() {
+    [[ -n "${META_FILE}" ]] && [[ -e "${META_FILE}" ]] && {
+        if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
+            $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=0/g" ${META_FILE};
+        fi;
+        chkconfig iptables off 2>&1 | $GRAB_OUTPUT;
+        echo "Firewall disabled";
+        return 0;
+    } || {
+        echo "Error: No metadata found!";
+        return ${ERR_NO_METADATA};
+    }
+}
+
+function describeDisable() {
+    echo "Alias for Disable";
+}
+
+function doFWDisable() {
+    local resultMsg;
+    declare -i result;
+    resultMsg=$(doDisable); result=$?;
+    [[ "${result}" ]] && writeJSONResponceOut "result=>${result}" "message=>Firewall has been disabled" || writeJSONResponceErr "result=>${result}" "message=>${resultMsg}";
+}
+
+function describePanic() {
+    echo "clear all rules and set default policy to DROP";
+}
+
+function doPanic() {
+    [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
+    $IPTABLES -X;
+    $IPTABLES -X -t nat;
+    $IPTABLES -F;
+    $IPTABLES -F -t nat;
+    _setDefaultPolicy "DROP";
+    return 0;
+}

@@ -1,0 +1,153 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${FSUTILS_VERSION:-}" ] && return 0;
+FSUTILS_VERSION="0.1";
+#
+# isMountpointMounted
+# 
+# ARGS: 
+#       mountpoint:string - FS mountpoint
+# RESULT: 
+#       0 - mountpoint exists and mounted
+#       1 - mountpoint doesn't exists or unmounted
+function isMountpointMounted() {
+    : ${1:?"Missing param: mountpoint"};
+    mount | grep -Pqo "\s+${1}\s+";
+    return $?;
+}
+
+#
+# getFSType
+# 
+# ARGS: 
+#       mountpoint:string - FS mountpoint
+# RESULT: 
+#       0 - no error
+#       1 - error detecting FS type
+function getFSType() {
+    : ${1:?"Missing param: mountpoint"};
+    local mountpoint=$(sed -re 's/\//\\\//g' <<< ${1}) fstype;
+    isMountpointMounted ${mountpoint} && {
+        fstype=$(mount | sed -rne "/\/dev\/.*\s+${mountpoint}\s+.*/{s/.*type\s+(\S+)\s+.*/\1/g;p}");
+        echo ${fstype};
+        return 0;
+    }
+    return 1;
+}
+
+#
+# isWritable
+#
+# ARGS:
+#       user - user
+#       dir - dir
+#       arights - accessrights for check
+
+function checkRights(){
+    local user=${1:?"Missing param: user"};
+    local dir=${2:?"Missing param: dir"};
+    local arights=${3:?"Missing param: access rights"};
+
+    case $arights in
+        "execute" )
+                OWNER_PATTERN="0100";
+                GROUP_PATTERN="0010";
+                OTHER_PATTERN="0001";
+            ;;
+        "write" )
+                OWNER_PATTERN="0200";
+                GROUP_PATTERN="0020";
+                OTHER_PATTERN="0002";
+            ;;
+        "read" )
+                OWNER_PATTERN="0400";
+                GROUP_PATTERN="0040";
+                OTHER_PATTERN="0004";
+            ;;
+        * )
+                OWNER_PATTERN="0400";
+                GROUP_PATTERN="0040";
+                OTHER_PATTERN="0004";
+            ;;
+    esac
+    local file_info=( $(stat -Lc "%a %G %U" "$dir") )
+    local file_perm=$((8#${file_info[0]}))
+    local file_group=${file_info[1]}
+    local file_owner=${file_info[2]}
+
+    ACCESS=no
+    if [[ $(($file_perm & $OTHER_PATTERN)) != 0 ]]; then
+        # Everyone has write access
+        ACCESS=yes
+    elif [[ $(($file_perm & $GROUP_PATTERN)) != 0 ]]; then
+        # Some group has write access. Is user in that group?
+        gs=( $(groups $user) )
+        for g in "${gs[@]}"; do
+            if [[ $file_group == $g ]]; then
+                ACCESS=yes
+                break
+            fi
+        done
+    elif [[ $(($file_perm & $OWNER_PATTERN)) != 0 ]]; then 
+        # The owner has write access. Does the user own the file?
+        [[ $user == $file_owner ]] && ACCESS=yes
+    fi
+    if [ "x$ACCESS" == "xyes" ] ; then
+        return 0
+    else
+        return 1;
+    fi
+}
+
+function fileExists(){
+    local essence=${1:?"Missing param: file name"};
+    [ -f "$essence" ] ;
+    return $?;
+}
+
+function dirExists(){
+    local essence=${1:?"Missing param: directory name"};
+    [ -d "$essence" ] ;
+    return $?;
+}
+
+function unitExists(){
+    # if [ ! -z "$1" -o -e "$essence" ]; then
+    #     return 0;
+    # fi
+    local essence=${1:?"Missing param: directory name"};
+    [ -e "$essence" ];
+    return $?;
+}
+
+function userExists(){
+    local user=${1:?"Missing param: user name"};
+    getent passwd "$user" >/dev/null 2>&1  ;
+    return $?;
+}
+
+function checkUnit(){
+    if [ -z "$1" ]; then
+      # writeJSONResponceErr "result=>4076x" "message=>Empty 'source' dir";
+      return 1;
+    fi
+    if ! unitExists "$1"; then
+        # writeJSONResponceErr "result=>4076x" "message=>'source' dir not exists";
+        return 1;
+    fi
+    return 0;
+}

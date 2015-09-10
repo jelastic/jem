@@ -1,0 +1,323 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default os envinfo;
+include output;
+
+DESCRIPTION="Enables SSL for application stack";
+VERSION="1";
+DEFAULT_ACTION="Usage";
+VCS_CONFIG_DIR="/var/lib/jelastic/vcs";
+DEFAULT_DOMAIN="jelastic";
+
+export GIT_SSL_NO_VERIFY=true;
+SCRIPTS_DIR="/root/maven/scripts/"
+JELASTIC_API="api.jelastic.com"
+LOG_DIR="/var/log/maven"
+MVN='/opt/maven/bin/mvn'
+MAVEN_PLUGIN_VERSION="";
+$PROGRAM 'svn';
+$PROGRAM 'git';
+$PROGRAM 'curl';
+$PROGRAM 'java';
+$PROGRAM 'zip';
+MAVEN_OPTIONS=""
+APPROOT=$WEBROOT;
+DEPLOY_PROPROPERTIES="/tmp/dep_prop.tmp";
+
+free_mem=`free -m | grep Mem | awk '{print $2}'`;
+
+function getMavenParam() {
+
+if [[ $1 -gt 256 ]]; then
+    Result=( $1 * 0.9 )
+else
+    Result=( $1 * 0.8 )
+fi
+    echo "-Xmx${Result}m"
+}
+
+function parseArguments() {
+
+while [ "$1" != "" ]; do
+  case $1 in
+
+    -n  | --project-name )      shift;
+                                PROJECT_NAME=$1;
+                                ;;
+    -a  | --api-host )          shift;
+                                API_HOST=$1;
+                                ;;
+    -s  | --session )           shift;
+                                SESSION=$1;
+                                ;;
+    -mpv | --maven-plugin-version )  shift;
+                                MAVEN_PLUGIN_VERSION=$1;
+                                ;;                                
+    -h  | --host-headers )      shift;
+                                HOST_HEADERS=$1;
+                                ;;
+    -t  | --vcs-type )          shift;
+                                VCS_TYPE=$1;
+                                ;;
+    -u  | --url )               shift;
+                                URL=$1;
+                                ;;
+    -l  | --login )             shift;
+                                LOGIN=$1;
+                                ;;
+    -p  | --password )          shift;
+                                PASSWORD=$1;
+                                ;;
+    -b  | --branch )            shift;
+                                BRANCH=$1;
+                                ;;
+    -o  | --old-project-name )  shift;
+                                OLD_PROJECT_NAME=$1;
+                                ;;
+    -c  | --context )           shift;
+                                CONTEXT=$1;
+                                ;;
+    -e  | --environment )       shift;
+                                ENVIRONMENT=$1;
+                                ;;
+    -au | --autoupdate )        shift;
+                                AUTOUPDATE=$1;
+                                ;;
+    -m  | --updateinverval )    shift;
+                                UPDATE_INTERVAL=$1;
+                                ;;                                
+  esac
+  shift
+done
+}
+
+function checkProjectsDirectory(){
+    [ ! -d  $APPROOT ] && mkdir -p $APPROOT;
+}
+
+function doCreateProject(){
+    local err;
+    checkProjectsDirectory;
+    doAction vcs createproject "$@";
+    err=$?; [[ ${err} -gt 0 ]] && exit ${err};
+}
+
+function doDeleteProject(){
+    local err;
+    doAction vcs deleteproject "$@";
+    err=$?; [[ ${err} -gt 0 ]] && exit ${err};
+}
+
+function doGetProject(){
+    local err;
+    doAction vcs getproject "$@";
+    err=$?; [[ ${err} -gt 0 ]] && exit ${err};
+}
+
+function doUpdate(){
+    local err;
+    doAction vcs update "$@" > /dev/null;
+    err=$?; [[ ${err} -gt 0 ]] && exit ${err};
+}
+
+function doEditProject(){
+    local err;
+    doAction vcs editproject "$@";
+    err=$?; [[ ${err} -gt 0 ]] && exit ${err};
+}
+
+function generateDeployProperties(){
+    [ -f "$DEPLOY_PROPROPERTIES" ] && rm "$DEPLOY_PROPROPERTIES";
+    echo "environment=${ENVIRONMENT}" >> $DEPLOY_PROPROPERTIES;
+    echo "context=${CONTEXT}" >> $DEPLOY_PROPROPERTIES;
+}
+
+function readProjectConfig(){
+    local project_to_read;
+    [ -z "$1" ] && project_to_read=${PROJECT_NAME} || project_to_read="$1";
+    if [ -e "${VCS_CONFIG_DIR}/${project_to_read}.properties" ] ; then
+      source "${VCS_CONFIG_DIR}/${project_to_read}.properties";
+      [ -z $VCS_TYPE ] && {
+          #echo "You must specify version control system";
+          return 1;
+      }
+      hash idn 2>/dev/null && { ENVIRONMENT=`idn --quiet $ENVIRONMENT`; }
+      return 0;
+      else
+            #echo "Couldn't find project options!";
+            return 1;
+      fi
+}
+
+function doBuild(){ 
+    BUILD_IS_OK="false";
+    parseArguments "$@"  || return 40021;
+    readProjectConfig;
+    doUpdate update -n $PROJECT_NAME;
+    if [ -e "${APPROOT}/${PROJECT_NAME}/pom.xml" ] ; then
+        #echo "Building $m_name ..."
+        $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true";
+        if [ "x$BUILD_IS_OK" == "xtrue" ] ; then
+            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:publish $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST"  -Djelastic-upload-only=true -Djelastic-session="$SESSION" --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
+			[ $? -eq 0 ] && {
+				writeJSONResponceOut "result=>0" "message=>Build success" 	
+            } || {
+                writeJSONResponceErr "result=>4060" "message=>Deploy failed, see logs for details" ; return 4060 ;
+            };
+        else
+            writeJSONResponceErr "result=>4059" "message=>Build failed, see logs for details" ; return 4059 ;
+        fi
+    else
+        echo "[ERROR] File pom.xml is absent" >> "${LOG_DIR}/${PROJECT_NAME}_build.log"
+        writeJSONResponceErr "result=>4059" "message=>Build failed, see logs for details" ; return 4059 ;
+    fi
+}
+
+function doDeploy(){
+    BUILD_IS_OK="false";
+    parseArguments "$@"  || return 40021;
+    readProjectConfig;
+    doUpdate update -n $PROJECT_NAME;
+    #echo "Deploying $m_name ..."
+    if [ -e "${APPROOT}/${PROJECT_NAME}/pom.xml" ] ; then
+        $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true";
+        readProjectConfig $PROJECT_NAME;
+        generateDeployProperties;
+        if [ "x$BUILD_IS_OK" == "xtrue" ] ; then
+            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:deploy $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST" -Djelastic-properties="$DEPLOY_PROPROPERTIES" -Dcontext="$CONTEXT" -Denvironment="$ENVIRONMENT" -Djelastic-session="$SESSION" --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
+            [ $? -eq 0 ] && { 
+                [ -f "$DEPLOY_PROPROPERTIES" ] && rm "$DEPLOY_PROPROPERTIES" ; 
+            } || { 
+                writeJSONResponceErr "result=>4060" "message=>Deploy failed, see logs for details" ; return 4060 ;
+            };
+        fi
+    else
+		echo "[ERROR] File pom.xml is absent" >> "${LOG_DIR}/${PROJECT_NAME}_build.log"
+        writeJSONResponceErr "result=>4059" "message=>Build failed, see logs for details" ; return 4059 ;
+    fi
+}
+
+function describeBuild() {
+    echo "Build project";
+}
+
+function describeBuildParameters() {
+    echo "-n|--project-name <name> -s <> -mpv <> -a app.dev.jelastic.com -h <>";
+}
+
+function describeBuildOptions() {
+    echo "-n|--project-name: project name";
+}
+
+function describeCreateProject() {
+    echo "Create new project";
+}
+
+function describeCreateProjectParameters() {
+    echo "-n|--project-name <name> -t|--vcs-type <git|svn> -u|--url <url> -l|--login <login> [-p|--password <password>] \n\t-b|--branch <branch name> -c|--context <context> -e|--environment <environment name> -au|--autoupdate <true|false>\n\t-m|--updateinverval <interval>";
+}
+
+function describeCreateProjectOptions() {
+    echo "-au|--autoupdate: allow auto update feature (true|false)";
+    echo "-b|--branch: branch ";
+    echo "-c|--context: context for deploy";
+    echo "-e|--environment: environment name ";
+    echo "-l|--login: login ( __GUEST__ )";
+    echo "-m|--updateinverval: interval or autoupdates";
+    echo "-n|--project-name: project name";
+    echo "-p|--password: password";
+    echo "-t|--vcs-type: project type";
+    echo "-u|--url:project url";
+}
+
+
+function describeDeleteProject() {
+    echo "Delete project";
+}
+
+function describeDeleteProjectParameters() {
+    echo "-n|--project-name <name>";
+}
+
+function describeDeleteProjectOptions() {
+    echo "-n|--project-name: project name";
+}
+
+function describeDeploy() {
+    echo "Deploy project";
+}
+
+function describeDeployParameters() {
+    echo "-s|--session <session> -mpv|--maven-plugin-version <version> -a|--api-host <api host> -n|--project-name <name> -h|--host-headers <headers>";
+}
+
+function describeDeployOptions() {
+    echo "-s|--session: session";
+    echo "-mpv|--maven-plugin-version: maven plugin version";
+    echo "-a|--api-host: API host name";
+    echo "-n|--project-name: project name";
+    echo "-h--host-headers: headers";
+}
+
+function describeEditProject() {
+    echo "Edit project";
+}
+
+function describeEditProjectParameters() {
+    echo "-n|--project-name <name> -o|--old-project-name <old project name> -t|--vcs-type <git|svn> -u|--url <url>\n\t-l|--login <login> [-p|--password <password>] -b|--branch <branch name> -c|--context <context>\n\t-e|--environment <environment name> -au|--autoupdate <true|false> -m|--updateinverval <interval>";
+}
+
+function describeEditProjectOptions() {
+    echo "-au|--autoupdate: allow auto update feature (true|false)";
+    echo "-b|--branch: branch ";
+    echo "-c|--context: context for deploy";
+    echo "-e|--environment: environment name ";
+    echo "-l|--login: login ( __GUEST__ )";
+    echo "-m|--updateinverval: interval or autoupdates";
+    echo "-n|--project-name: project name";
+    echo "-o|--old-project-name: old project name";
+    echo "-p|--password: password";
+    echo "-t|--vcs-type: project type";
+    echo "-u|--url:project url";
+}
+
+function describeGetProject() {
+    echo "Get project settings";
+}
+
+function describeGetProjectParameters() {
+    echo "-n|--project-name <name>";
+}
+
+function describeGetProjectOptions() {
+    echo "-n|--project-name: project name";
+}
+
+function describeUpdate() {
+    echo "Update project";
+}
+
+function describeUpdateParameters() {
+    echo "-n|--project-name <name>";
+}
+
+function describeUpdateOptions() {
+    echo "-n|--project-name: project name";
+
+}

@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+[ -n "${PYTHONCOMMONENGINELIB_VERSION:-}" ] && return 0;
+PYTHONCOMMONENGINELIB_VERSION="0.1";
+
+PYTHON27_DIR="/opt/jelastic-python27";
+PYTHON33_DIR="/opt/jelastic-python33";
+PYTHON34_DIR="/opt/jelastic-python34";
+
+PYTHON_DEFAULT_CLI="/usr/bin/python";
+PYTHON_DEFAULT_CONFIG="/usr/bin/python-config";
+PYTHON_DEFAULT_PIP="/usr/bin/pip";
+PYTHON_VIRTUALENV="/usr/bin/virtualenv";
+
+WSGI_MODULE="/etc/httpd/modules/mod_wsgi.so";
+
+
+function switchEngine(){
+
+        local engine_type=$1
+
+        case $engine_type in
+                "python2.7" )
+                 local python_dir=$PYTHON27_DIR;
+        ;;
+                "python3.3" )
+                 local python_dir=$PYTHON33_DIR;
+        ;;
+                "python3.4" )
+                 local python_dir=$PYTHON34_DIR;
+        ;;
+        *)
+        return 4023
+        esac
+        
+        [ -f /usr/bin/python2.6 ] && sed -i 's/^#!\/usr\/bin\/python$/#!\/usr\/bin\/python2.6/g' /usr/bin/yum #YUM hack for Centos6;
+	[ -f /usr/bin/python2.7 ] && sed -i 's/^#!\/usr\/bin\/python$/#!\/usr\/bin\/python2.7/g' /usr/bin/yum #YUM hack for Centos7;
+
+        chown -R ${DATA_OWNER} "$PYTHON27_DIR" 2>>"$JEM_CALLS_LOG";
+        chown -R ${DATA_OWNER} "$PYTHON33_DIR" 2>>"$JEM_CALLS_LOG";
+        chown -R ${DATA_OWNER} "$PYTHON34_DIR" 2>>"$JEM_CALLS_LOG";
+
+        python_bin=$(ls -1 ${python_dir}/bin/pytho* | head -n 1)
+        [ -L "$PYTHON_DEFAULT_CLI" ] && rm "$PYTHON_DEFAULT_CLI";
+        [ -d "$python_dir" ] && ln -sf "${python_bin}" "$PYTHON_DEFAULT_CLI";
+
+        python_pip=$(ls -1 ${python_dir}/bin/pip* | head -n 1)
+        [ -L "$PYTHON_DEFAULT_PIP" ] && rm "$PYTHON_DEFAULT_PIP";
+        [ -d "$python_dir" ] && ln -sf "${python_pip}" "$PYTHON_DEFAULT_PIP";
+        
+        python_virtualenv="${python_dir}/bin/virtualenv";
+        [ -f "$python_virtualenv" ] && ln -sf "$python_virtualenv" "$PYTHON_VIRTUALENV";
+
+        [ -L "$PYTHON_DEFAULT_CONFIG" ] && rm "$PYTHON_DEFAULT_CONFIG";
+        [ -d "$python_dir" ] && ln -sf "${python_dir}/bin/python-config" "$PYTHON_DEFAULT_CONFIG";
+
+        echo "${python_dir}/lib" >> /etc/ld.so.conf.d/jeastic_python.conf && ldconfig > /dev/null 2>&1;
+
+        [ -L "$WSGI_MODULE" ] && rm $WSGI_MODULE;
+        [ -f "${python_dir}/httpd/modules/mod_wsgi.so" ] && ln -sf "${python_dir}/httpd/modules/mod_wsgi.so" $WSGI_MODULE;
+
+}
+
+
+function describeSetVersion(){
+        echo "\n\t<version>\tset python version";
+}

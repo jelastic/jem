@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit os;
+include log;
+
+DESCRIPTION="Manipulate memcached";
+VERSION="1"
+DEFAULT_ACTION="SetMem";
+
+typeset -i __RESERVED_SIZE=20;
+PREFIX='memcached';
+
+function doUsage() {
+    showUsageMessage
+}
+
+function describeStart () {
+    echo "Starts a memcached daemon";
+}
+
+function doStart() {
+    startService memcached || die -q "Unable to start service"
+}
+
+function describeStop () {
+    echo "Stops a memcached daemon";
+}
+
+function doStop() {
+    stopService memcached || die -q "Unable to stop service";
+}
+
+function describeSetMem () {
+    echo "Sets memcached memory size";
+}
+
+function doSetMem() {
+    FLOAT_SCALE=0;
+    typeset -i memcached_CACHESIZE=$(getMemory MemTotal MB)-${__RESERVED_SIZE};
+    local var_names=$(grep -o -P "${PREFIX}_[a-zA-Z_]*" $BASH_SOURCE) v cpn;
+    local config_path=${1:-'/etc/sysconfig/memcached'};
+
+    doStop;
+    for v in ${var_names} ; do
+        cpn=${v:10};
+        sed -i 's/^'${cpn}'=.*$'/${cpn}'="'${!v}'"/g' ${config_path};
+        isFunction log && log "Parameter ${cpn} is set to ${!v}";
+    done
+    doStart;
+
+    return 0;
+}

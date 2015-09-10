@@ -1,0 +1,1185 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default config vzexec virtuozzo;
+include os output;
+
+DESCRIPTIO="Setup docker templates into PCS container";
+VERSION="1"
+DEFAULT_ACTION="Usage";
+
+$PROGRAM vzctl;
+$PROGRAM vzlist;
+$PROGRAM vzpkg;
+$PROGRAM docker;
+$PROGRAM tar;
+$PROGRAM sed;
+$PROGRAM awk;
+$PROGRAM cut;
+$PROGRAM base64;
+$PROGRAM "rsync";
+
+OS_centos[7]=".centos-7-x86_64";
+OS_centos[6]=".centos-6-x86_64";
+OS_centos[5]=".centos-5-x86_64";
+OS_debian[6]=".debian-6.0-x86_64";
+OS_debian[7]=".debian-7.0-x86_64";
+OS_debian[8]=".debian-8.0-x86_64";
+OS_ubuntu[1204]=".ubuntu-12.04-x86_64";
+OS_ubuntu[1210]=".ubuntu-12.04-x86_64";
+OS_ubuntu[1304]=".ubuntu-13.10-x86_64";
+OS_ubuntu[1310]=".ubuntu-13.10-x86_64";
+OS_ubuntu[1404]=".ubuntu-14.04-x86_64";
+OS_ubuntu[1410]=".ubuntu-14.10-x86_64";
+OS_fedora[18]=".fedora-18-x86_64";
+OS_fedora[19]=".fedora-19-x86_64";
+OS_fedora[20]=".fedora-20-x86_64";
+OS_fedora[21]=".fedora-21-x86_64";
+OS_fedora[22]=".fedora-22-x86_64";
+OS_suse[121]=".suse-12.1-x86_64";
+OS_suse[122]=".suse-12.2-x86_64";
+OS_suse[123]=".suse-12.3-x86_64";
+OS_suse[131]=".suse-13.1-x86_64";
+OS_suse[132]=".suse-13.2-x86_64";
+
+_DOCKER_CONF="/etc/sysconfig/docker" ;
+_DOCKER_LIB="/var/lib/docker" ;
+_DOCKER_DRIVER="devicemapper/mnt";
+
+DOCKER_CACHE_DIR="/vz/cache/dockers";
+DOCKER_="/var/lib/docker/graph/ba5877dc9beca5a0af9521846e79419e98575a11cbfe1ff2ad2e95302cff26bf/json"
+DOCKER_AUTH_CONFIG="~/.dockercfg";
+DOCKER_REGISTRY="index.docker.io"
+DOCKER_IO_FORMAT=""
+
+RIMAGE_ID=""
+_IS_UPDATE=0
+
+debian_ostemplate=".debian-D-VERSION-x86_64";
+ubuntu_ostemplate=".ubuntu-D-VERSION-x86_64";
+centos_ostemplate=".centos-D-VERSION-x86_64";
+
+[ ! -d  "$DOCKER_CACHE_DIR" ] && mkdir -p "$DOCKER_CACHE_DIR";
+
+function doUsage() {
+    showUsageMessage;
+}
+
+function checkParams() {
+    local params=($*)
+    local result=""
+    for p in "${params[*]}" ; do
+        eval "[[ -z \"\$$p\" ]] && { result=\"$p $result\";}"
+    done
+    [[ -z "$result" ]] && return 0;
+    return 1;
+}
+
+function onModLoadCallback() {
+    log "Preload callback";
+    local shortopts="c:,n:,v:,u:,U:,P:,M:,C:,H:,I:,R:,L:,e:,a:,V:,T:,f:E:"
+    local longopts="ctid:,name:,version:,url:,username:,password:,email:,cmd:,remote-host:,linkip:,remote-port:,local-port:,env:,alias:,volumes:,ostemplate:,format:,entrypoint:"
+
+    local temp=`getopt -o $shortopts -l $longopts -- params "$@" 2>/dev/null`;
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp";
+
+    while true ; do
+        #uppercase variables added for migration
+        #lowercase variables should be removed as soon as it not used in code
+        case "$1" in
+            -n   | --name )
+                shift;
+                docker_id=$1;
+                DOCKER_ID=$1;
+                shift;
+                ;;
+            -v   | --version )
+                shift;
+                version=$1;
+                DOCKER_TAG=$1;
+                shift;
+                ;;
+            -c   | --ctid )
+                shift;
+                ctid=$1;
+                CTID=$1;
+                shift;
+                ;;
+            -u   | --url )
+                shift;
+                url=$1;
+                URL=$1;
+                DOCKER_REGISTRY=$(sed "s@https://\|http://@@g" <<< $1);
+                shift;
+                ;;
+            -U   | --username )
+                shift;
+                username=$1;
+                USERNAME=$1;
+                shift;
+                ;;
+            -P   | --password )
+                shift;
+                password=$1;
+                PASSWORD=$1;
+                shift;
+                ;;
+            -M   | --email )
+                shift;
+                email=$1;
+                shift;
+                ;;
+            -C   | --cmd )
+                shift;
+                cmd=$1;
+                shift;
+                ;;
+            -H  | --remote-host )
+                shift;
+                REMOTE_HOST=$1;
+                shift;
+                ;;
+            -I  | --linkip )
+                shift;
+                LINK_IP=$1;
+                shift;
+                ;;
+            -R  | --remote-port )
+                shift;
+                REMOTE_PORT=$1;
+                shift;
+                ;;
+            -L  | --local-port )
+                shift;
+                LOCAL_PORT=$1;
+                shift;
+                ;;
+            -e   | --env )
+                for arg in "$@" ; do
+                    [[ "$2" =~  ^- ]] && break;
+                    shift;
+                    USER_ENV="$USER_ENV $1"
+                done
+                shift;
+                ;;
+            -a  | --alias )
+                shift;
+                ALIAS=$1;
+                shift;
+                ;;
+            -T  | --ostemplate )
+                shift;
+                OSTEMPLATE=$1;
+                shift;
+                ;;
+            -V  | --volumes )
+                shift;
+                oldifs=$IFS;
+                IFS=';';
+                _VOLUMES=(${1});
+                IFS='|';
+                _VOLUMES=(${_VOLUMES[*]});
+                IFS=${oldifs};
+                shift;
+                ;;
+            -f  | --format )
+                shift
+                DOCKER_IO_FORMAT=$1
+                shift
+                ;;
+            -E  | --entrypoint )
+                shift
+                docker_entrypoint_p=$1
+                shift
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+    done;
+    [[ -z "$url" ]] && url=$DOCKER_REGISTRY
+    $GREP -q  "index.docker.io" <<< $DOCKER_REGISTRY || DOCKER_ID="${DOCKER_REGISTRY}/${DOCKER_ID}"
+    [[ ! -z "$DOCKER_TAG" ]] && DOCKER_ID="${DOCKER_ID}:${DOCKER_TAG}"
+}
+
+function prepareCleanContainer(){
+    local ctid=$1;
+    [[ $1 =~ ^-?[0-9]+$ ]] || { writeJSONResponceErr "result=>4099" "message=>Required parameter is missing!"; exit 4099; };
+
+    $VZCTL mount $ctid  >> $ACTIONS_LOG 2>&1 ;
+    [ -d "/vz/root/${ctid}/etc/apache2" ] && { rm -rf "/vz/root/${ctid}/etc/apache2" 2>&1 1>>$ACTIONS_LOG; }
+    [ -f "/vz/root/${ctid}/etc/rc3.d/S*apache2" ] && { rm -rf "/vz/root/${ctid}/etc/rc*.d/S*apache2" 2>&1 1>>$ACTIONS_LOG; }
+    [ -d "/vz/root/${ctid}/etc/httpd" ] && { rm -rf "/vz/root/${ctid}/etc/httpd" 2>&1 1>>$ACTIONS_LOG; }
+    [ -f "/vz/root/${ctid}/etc/rc3.d/S*httpd" ] && { rm -rf "/vz/root/${ctid}/etc/rc3.d/S*httpd" 2>&1 1>>$ACTIONS_LOG; }
+}
+
+function retreiveDockerTemplate(){
+    local docker_id=$1;
+    local docker_id_no_version=$($SED s/:[^:]*$// <<< $docker_id );
+    $DOCKER pull $docker_id > /dev/null 2>&1;
+    ct_image_id=$($DOCKER create $docker_id 2>/dev/null);
+    [[ -z "$ct_image_id" ]] && ct_image_id=$($DOCKER create $docker_id  /bin/bash 2>/dev/null);
+    [[ -z "$ct_image_id" ]] && { writeJSONResponceErr "result=>4081" "message=>Could not set up docker template!"; exit 1; }
+    docker_tarball="${DOCKER_CACHE_DIR}/${ct_image_id}.tar";
+    $DOCKER export $ct_image_id > "${docker_tarball}"
+    res=$?
+    [[ "$res" -gt 0 ]] && return 1
+    echo "$ct_image_id"
+    return 0;
+}
+
+function loginToDockerServer(){
+    local ctid=$1;
+    if  [[ "$docker_host" == "index.docker.io" || "$DOCKER_REGISTRY" == "index.docker.io" ]]
+    then {
+        $DOCKER login --username="$username" --password="$password" --email="jelastic@jelastic.com" >> $ACTIONS_LOG 2>&1 && return 0; } || { writeJSONResponceErr "result=>4095" "message=>Authentication failed"; exit 4095; }
+    else {
+        $DOCKER login --username="$username" --password="$password" --email="jelastic@jelastic.com" $docker_host >> $ACTIONS_LOG 2>&1 || { writeJSONResponceErr "result=>4095" "message=>Authentication failed"; exit 4095; }
+    }
+    fi
+}
+
+#function importTarballToContainer(){
+#        local tarball="$1";
+#        local ctid="$2";
+#        [[ -d "/vz/root/${ctid}/" ]] && {  $TAR --overwrite --exclude=dev -xpf $tarball -C "/vz/root/${ctid}/" 2>/dev/null ;  rm $tarball; }
+#}
+
+function importFilesToContainer(){
+    local tarball="$1";
+    local ctid="$2";
+    if [ ! -d "/vz/root/${ctid}.tmpfs/" ]
+    then
+        mkdir "/vz/root/${ctid}.tmpfs/";
+    fi
+    if [ -d "/vz/root/${ctid}.tmpfs/" ]
+    then
+        $TAR --overwrite --exclude=dev -xpf $tarball -C "/vz/root/${ctid}.tmpfs/" 2>/dev/null ;
+        rm $tarball;
+	$RSYNC -aP --force  "/vz/root/${ctid}.tmpfs/" "/vz/root/${ctid}/"
+        rm -rf "/vz/root/${ctid}.tmpfs/";
+    else
+        return 1;
+    fi
+    return 0;
+}
+
+function doCleanup(){
+    local crontab_file="/var/spool/cron/root";
+
+    [ -f "$crontab_file"  ] && grep -q "jem docker" $crontab_file || printf "*/15 * * * *  /usr/bin/jem docker cleanup --all \n \n \n" >> $crontab_file
+    ps aux | grep -q "jem docker" | grep -v "grep" || {
+        [ -d  "$DOCKER_CACHE_DIR" ] && rm -rf ${DOCKER_CACHE_DIR}/*;
+            $DOCKER rmi $(docker images -q) >/dev/null 2>/dev/null;
+            $DOCKER rm $(docker ps -a -q) >/dev/null 2>/dev/null;
+    }
+}
+
+function parseDockerConfig() {
+    local docker_id=$1
+
+    RUN_SCRIPT_PRIMARY=$($DOCKER inspect --format="{{.Config.Cmd}}" $ct_image_id | sed -e "s/{\|}//g" -e "s/^\[//" -e "s/\]$//" -re "s/\s*<no value>\s*//g" -e "s/\s*<nil>\s*//g" );
+    DOCKER_WORKINGDIR_PRIMARY=$($DOCKER inspect --format="{{.Config.WorkingDir}}" $ct_image_id );
+    ENTRYPOINT_PRIMARY=$($DOCKER inspect --format="{{.Config.Entrypoint}}" $ct_image_id | sed -e "s/{\|}//g" -e "s/^\[//" -e "s/\]$//" -re "s/\s*<no value>\s*//g" -e "s/\s*<nil>\s*//g" );
+    DOCKER_ENV=$($DOCKER inspect --format="{{json .Config.Env }}" $ct_image_id | sed -e  "s/\[\|\]//g" -re 's|\"\,\"|\n|g' -e 's/\"//g' );
+    DOCKER_EXPOSED_PORT=$($DOCKER inspect --format="{{.Config.ExposedPorts }}" $ct_image_id | sed -re 's/\s+/\n/g;s/[^0-9\n]//g;s/\n/,/g' -e 's/\,\s*$//' );
+    RIMAGE_ID=$($DOCKER inspect --format="{{.Id }}" $docker_id | sed "s/\[\|\]//g");
+    return 0;
+}
+
+function getOSTemplateVersion(){
+    local ctid=$1;
+    local issue_file="/vz/root/${ctid}/etc/issue";
+    local release_files="/vz/root/${ctid}/etc/*-release";
+#   local version=$($SED 's/[^0-9.]*\([0-9.]*\).*/\1/' $issue_file | $SED 's/.1$\|.2$\|//g' | $SED '/^$/d'); ### second SED is used as a hack for Ubuntu patches
+    local version=$($GREP -h VERSION_ID $issue_file | $SED -ne 's/.*=\"\([0-9.]*\).*/\1/;p;n');
+    [ -z "$version" ] && {
+	version=$($GREP -h VERSION_ID $release_files | $SED -ne 's/.*=\"\([0-9.]*\).*/\1/;p;n');
+    }
+    [ -z "$version" ] && {
+          $GREP -iq "jessie" $issue_file && version="8";
+    }
+
+    [ -z "$version" ] && {
+          $GREP -iq "jessie" $issue_file && version="8";
+    }
+
+    [ -z "$version" ] && {
+          $GREP -iq "jessie" $issue_file && version="8";
+    }
+
+    $GREP -iq "debian" $issue_file && [ "${#version}" == "1" ] && version="${version}.0"; # for debian support on PCS
+    echo $version;
+}
+
+function getOSTemplateType(){
+        local ctid=$1;
+        local version=$(grep OSTEMPLATE  /vz/private/$ctid/ve.conf | sed -nre 's/OSTEMPLATE=\".([a-z]*)-.*/\1/;p;n');
+        [ ! -z "$version" ] && { echo "$version" ; } || { echo "undefined"; }
+        return 0;
+}
+
+function detectWorkingDir(){
+#    local ctid=$1;
+    DOCKER_WORKINGDIR='';
+    # [ ! -z "$docker_entrypoint_p" ] DOCKER_WORKINGDIR="$docker_entrypoint_p" && return 0;
+    [ ! -z "$DOCKER_WORKINGDIR_PRIMARY" ] && DOCKER_WORKINGDIR=`echo "$DOCKER_WORKINGDIR_PRIMARY" | base64`;
+    return 0;
+}
+
+function detectEntryPoint(){
+#    local ctid=$1;
+    DOCKER_ENTRYPOINT='';
+    [ ! -z "$docker_entrypoint_p" ] && DOCKER_ENTRYPOINT="$docker_entrypoint_p" && return 0;
+    [ ! -z "$ENTRYPOINT_PRIMARY" ] && DOCKER_ENTRYPOINT=`echo $ENTRYPOINT_PRIMARY | base64`;
+    return 0;
+}
+
+function detectCmd(){
+#    local ctid=${1:?"CTID required"}
+    RUN_SCRIPT='';
+    [ ! -z "$cmd" ] && RUN_SCRIPT="$cmd" && return 0 ;
+    [ ! -z "$RUN_SCRIPT_PRIMARY" ] && RUN_SCRIPT=`echo $RUN_SCRIPT_PRIMARY | base64` ;
+    return 0 ;
+    # RUN_SCRIPT=$(find /vz/root/${ctid}/ -maxdepth 2  -type f \( -name "run.sh" -o -name "start.sh" -o -name "startup.sh" \) | sed "s/\/vz\/root\/$ctid//g" | base64 );
+    # [ -z "$RUN_SCRIPT" -a ! -z "$RUN_SCRIPT_PRIMARY" ] && RUN_SCRIPT=$(base64 <<< "$RUN_SCRIPT_PRIMARY");
+}
+
+
+function getEntryPoint(){
+    local ctid=${1:?"CTID required"}
+    local jelinit="/vz/root/${ctid}/etc/init.d/jelinit";
+    if [ -f "$jelinit" ] ; then
+        file=$($GREP ^ENTRYPOINT_CMD= $jelinit | sed 's/ENTRYPOINT_CMD=\|"//g');
+        [ -f "/vz/root/${ctid}/${file}" ] && { cat "/vz/root/${ctid}/${file}";  } || echo $file  ;
+    fi
+}
+
+function getCmd(){
+    local ctid=${1:?"CTID required"}
+    local jelinit="/vz/root/${ctid}/etc/init.d/jelinit";
+    if [ -f "$jelinit" ] ; then
+        file=$($GREP ^RUN_CMD= $jelinit | sed 's/RUN_CMD=\|"//g');
+        [ -z "$file" ] && file=$($GREP ^RUNSCRIPT= $jelinit | sed 's/RUNSCRIPT=\|"//g');
+        [ -f "/vz/root/${ctid}/${file}" ] && { cat "/vz/root/${ctid}/${file}";  } || echo $file  ;
+    fi
+}
+
+
+function setCmd(){
+#   local ctid=$1;
+    local jelf="$1"
+#   /vz/root/${ctid}/.jelstart
+    local cmd=$2;
+    touch $jelf && chmod +x $jelf;
+    local dcmd="";
+    if [ ! -z "$cmd" ] ; then
+        dcmd=$(echo "$cmd" | sed 's/ //g' | base64 -d)
+        if [ "$dcmd" == "NULL" ] ; then
+            dcmd=""
+        fi
+    fi
+    echo $dcmd > $jelf
+#    local jelentry="/vz/root/${ctid}/.jelentry"
+}
+
+function doGetRunCmd(){
+      local cmd=$(getCmd $ctid);
+      cmd1=$(sed -re "s/^\[//g" -e "s/\]$//g" -e 's/\//\\\//g' -e 's/\"/\\"/g' <<< $cmd );
+      writeJSONResponceOut "result=>0" "cmd=>$cmd1"
+}
+
+function doGetEntrypoint(){
+      local cmd=$(getEntryPoint $ctid);
+      cmd1=$(sed -re "s/^\[//g" -e "s/\]$//g" -e 's/\//\\\//g' -e 's/\"/\\"/g' <<< $cmd );
+      writeJSONResponceOut "result=>0" "entrypoint=>$cmd1"
+}
+
+function doSetRunCmd(){
+      setCmd "/vz/root/${ctid}/.jelstart" "$cmd";
+      writeJSONResponceOut "result=>0" "message=>run command was set"
+}
+
+function doSetEntrypoint(){
+      setCmd "/vz/root/${ctid}/.jelentry" "$docker_entrypoint_p";
+      if [ -f "/vz/root/${ctid}/etc/init.d/jelinit" ] ; then
+        if ! grep -q ENTRYPOINT_CMD=  "/vz/root/${ctid}/etc/init.d/jelinit"; then
+    	    runsc=$(grep ^RUNSCRIPT "/vz/root/${ctid}/etc/init.d/jelinit" | sed 's/RUNSCRIPT=\|"//g')
+            sed -i "/^RUNSCRIPT=/a RUN_CMD=\"$runsc\"\nENTRYPOINT_CMD=\"/.jelentry\"\nRUNSCRIPT=\$(sed ':a;N;$!ba;s/\\\n/ /g' <<< cat \$ENTRYPOINT_CMD \$RUN_CMD  2>/dev/null )\ndir=\$(cat \$WORKINDIR_CMD 2>/dev/null ) && cd $dir 2>/dev/null" "/vz/root/${ctid}/etc/init.d/jelinit"
+	    sed -i '0,/RUNSCRIPT/{//d;}' "/vz/root/${ctid}/etc/init.d/jelinit"
+        fi
+      fi
+      writeJSONResponceOut "result=>0" "message=>entrypoint was set"
+}
+
+function doGetEnv(){
+      local userenvs_config="/vz/root/${ctid}/.jelenv";
+      [ ! -f "$userenvs_config" ] && writeJSONResponceOut "result=>0" "env=>" && return 0;
+      val='';
+      OLD_IFS=$IFS; IFS=$'\n';
+      for keyvalue in $(cat $userenvs_config | sed 's/export//g' )
+      do
+             key=$(awk -F "=" '{ print $1 }' <<< $keyvalue);
+             value=$(sed -e "s/${key}=//" -e  's/\"/\\\"/g' <<< $keyvalue);
+             val="${val},\"${key}\":\"${value}\""
+      done
+      IFS=$OLD_IFS;
+      [ -f "$ACTIONS_LOG" ] && rm "$ACTIONS_LOG";
+      writeJSONResponceOut "result=>0" "env\":\"{${val#\,}}" | $SED -e 's/:"{/:{/' -e 's/}\"}/}}/g';
+
+}
+
+function doSetEnv(){
+      local userenvs_config="/vz/root/${ctid}/.jelenv";
+    for varpair in $USER_ENV
+    do
+        key=$(awk -F "=" '{ print $1 }' <<< $varpair);
+        if [[ ! ${key} =~ ^[a-zA-Z_]+[a-zA-Z0-9_]* ]]; then
+            writeJSONResponceErr "result=>4096" "message=>Could not set up variable"; return 99;
+        fi;
+    done
+
+      echo "" > $userenvs_config;
+      for varpair in $USER_ENV
+      do
+            key=$(awk -F "=" '{ print $1 }' <<< $varpair);
+            value=$(cut -d=  -f2- <<< $varpair | base64 -d);
+            echo "${key}=${value}" >> $userenvs_config;
+      done
+      writeJSONResponceOut "result=>0" "message=>command completed successfully"
+}
+
+function patchProfile(){
+      local ctid=$1;
+      local global_profile="/vz/root/${ctid}/etc/profile";  ### local because per container, global because for all users in container
+      [ -f "$global_profile" ] && $GREP -q "jelenv" "$global_profile" || echo "OLD_IFS=\$IFS; IFS=$'\n'; for env in \$(cat /.jelenv); do export \"\$env\"; done ; IFS=\$OLD_IFS" >> $global_profile;
+}
+
+function patchPCSContainer(){
+    local ctid=$1;
+    local userenvs_config="/vz/root/${ctid}/.jelenv";
+    local ve_config="/vz/private/${ctid}/ve.conf";
+    local default_ostemplate=".busybox-jelastic-multiverse-x86_64";
+    DOCKER_OSTEMPLATE=$(getOSTemplateType $ctid);
+    patchProfile $ctid;
+    echo "$DOCKER_ENV" >>  "$userenvs_config";
+    echo "DOCKER_EXPOSED_PORT=$DOCKER_EXPOSED_PORT" >> "$userenvs_config";
+    $SED -i '/=/!d' "$userenvs_config";
+    [ -f "$userenvs_config" ]  && { sort -u -t "=" -k1,1 "$userenvs_config"  > "${userenvs_config}.old" ; mv  "${userenvs_config}.old"  "${userenvs_config}" ; };
+    [ -s "$userenvs_config" ] && {
+        OLD_IFS=$IFS; IFS=$'\n';
+        for envvar in $(cat "$userenvs_config")
+        do
+            export "$envvar";
+        done
+        IFS=OLD_IFS
+    }
+
+    if [ "x$DOCKER_OSTEMPLATE" == "xdebian" -o "x$DOCKER_OSTEMPLATE" == "xubuntu" ]
+    then
+        echo -e '#!/bin/bash\nip addr show | grep -q venet0:0 && sleep 10 &&  /etc/init.d/jelinit start & \nexit 0;' > /vz/root/${ctid}//etc/network/if-up.d/jelinit;
+        chmod +x /vz/root/${ctid}//etc/network/if-up.d/jelinit 2>>"$JEM_CALLS_LOG"
+        touch /vz/root/${ctid}/etc/network/interfaces
+    fi
+    if [ "x$DOCKER_OSTEMPLATE" == "xcentos" ] ; then 
+            [ -f /sbin/MAKEDEV ] && /sbin/MAKEDEV -d /vz/root/${CTID}/dev/ -x {p,t}ty{a,p}{0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f} ;
+    fi
+    [ -d "/vz/root/${ctid}/etc/init.d" -o  -L "/vz/root/${ctid}/etc/init.d" ] && echo "$DOCKERINIT" > /vz/root/${ctid}/etc/init.d/jelinit;
+    chmod +x /vz/root/${ctid}/etc/init.d/jelinit;
+    setCmd "/vz/root/${ctid}/.jelstart" "$RUN_SCRIPT"
+    setCmd "/vz/root/${ctid}/.jelentry" "$DOCKER_ENTRYPOINT"
+    setCmd "/vz/root/${ctid}/.jelworkdir" "$DOCKER_WORKINGDIR"
+    [ -f "/vz/root/${ctid}"/run/resolvconf/resolv.conf ] && ln -sf /run/resolvconf/resolv.conf  /vz/root/${ctid}/etc/resolv.conf;
+    [ -f "/vz/root/${ctid}/etc/rsyslog.conf" ] && $SED -i "s/^\$ModLoad imklog/#\$ModLoad imklog/g" /vz/root/${ctid}/etc/rsyslog.conf
+    ### APP COMMON PATCH ###
+    [ ! -d "/vz/root/${ctid}/run/apache2" ] && mkdir -p "/vz/root/${ctid}/run/apache2";
+    [ ! -d "/vz/root/${ctid}/run/lock/apache2" ] && mkdir -p "/vz/root/${ctid}/run/lock/apache2";
+    ########################
+    return 0;
+}
+
+function doRunCommand() {
+    if [ -z "$cmd" ] ; then
+        writeJSONResponceErr "result=>99" "message=>command to run required"
+        log "docker name required"
+        return 99;
+    fi
+    if [ -z "$CTID" ] ; then
+        writeJSONResponceErr "result=>99" "message=>ctid required"
+        log "docker name required"
+        return 99;
+    fi
+    vzexecSetCTID $CTID
+    if vzexecRun $cmd ; then
+        writeJSONResponceOut "result=>0" "message=>$(vzexecGetLastStdOut)"
+    else
+        writeJSONResponceErr "result=>99" "message=>$(vzexecGetLastStdOut)"
+    fi
+    return 0;
+}
+
+function describeFetch() {
+    echo "Get remote manifest for specified image";
+}
+
+function describeFetchParameters() {
+    echo "--name|-n [image name] --url|-u [registry url] --username|-U [username] --password|-P [password] -f|--format [format]";
+}
+
+function describeFetchOptions() {
+    echo "name    : name of the docker image";
+    echo "url     : URL to the docker registry. Default is ${DOCKER_HOST}";
+    echo "username: username for login to docker registry";
+    echo "password: password for the username"
+    echo "format  : format the output using the given go template"
+}
+
+
+function doFetch() {
+    local requiredParqams=("DOCKER_ID")
+    local msg=$(checkParams ${requiredParqams[@]})
+    [[ ! -z "${msg}" ]] && { writeJSONResponceErr "result=>4099" "message=>Missing param $msg" ; return 1; }
+
+    [ ! -z "$USERNAME" ] && [ ! -z "$PASSWORD" ] && loginToDockerServer $CTID >> $ACTIONS_LOG;
+    local lDockerOpts=""
+    [[ ! -z "${DOCKER_IO_FORMAT}" ]] && { lDockerOpts="--format='"${DOCKER_IO_FORMAT}"'"; }
+    manifest=$(
+        if [[ ! -z "${lDockerOpts}" ]] ; then
+            $DOCKER manifest "$lDockerOpts" $DOCKER_ID 2>&1
+        else
+            $DOCKER manifest $DOCKER_ID 2>&1
+        fi
+    );
+    ret=$?;
+    result=$($SED -n -re '/[Rr]esult/{s/.*[Rr]esult":\s*"?([0-9]+)"?.*/\1/;p}' <<< $manifest )
+    outfn="writeJSONResponceOut";
+    if [[ $ret -ne "0" ]] ; then
+        outfn="writeJSONResponceErr";
+    else
+        if [[ ! -z "$result" ]] ; then
+            outfn="writeJSONResponceErr";
+            ret=$result
+        fi
+    fi
+    $outfn "result=>$ret" "manifest=>$manifest" ;
+    $DOCKER logout 2>&1 >/dev/null ;
+    return $ret
+}
+
+function processMounts() {
+    local message
+    local fstab
+    for i in $(seq 0 2 $((${#_VOLUMES[@]} -1)) ) ; do
+        lSource=${_VOLUMES[$i]}
+        lTarget=${_VOLUMES[$(($i+1))]}
+        msg=$(doAction storage mount --source "${lSource}" --destination "${lTarget}" --ctid $CTID)
+        result=$($SED -n -re '/result/{s/.*result":"([0-9]+)".*/\1/;p}' <<< $msg )
+        [[ $result -ne 0 ]] && {
+            message=$($SED -n -re '/message/{s/.*message":"(.*)"/\1/;p}' <<< $msg)
+            log "Fail to mount $lTarget: $message"
+        }
+        fstab="${fstab}$($SED -n -re '/message/{s/.*"message":"([^"]+)".*/\1/;p}' <<< $msg)\n"
+    done
+    echo $fstab
+    return 0
+}
+
+function describeSetup() {
+    echo "Setup docker image inside VZ container";
+}
+
+function describeSetupParameters() {
+    echo "--name|-n 'image name' --url|-u [registry url] --username|-U [username] --password|-P [password] --ctid|-c ctid";
+}
+
+function describeSetupOptions() {
+    echo "name    : name of the docker image";
+    echo "url     : URL to the docker registry. Default is ${DOCKER_HOST}";
+    echo "username: username for login to docker registry";
+    echo "password: password for the username"
+    echo "ctid    : target VZ container"
+}
+
+function doSetup(){
+    local requiredParqams=("DOCKER_ID" "CTID")
+    local msg=$(checkParams ${requiredParqams[@]})
+    [[ ! -z "${msg}" ]] && { writeJSONResponceErr "result=>4099" "message=>Missing param $msg" ; return 1; }
+    [ ! -z "$USERNAME" ] && [ ! -z "$PASSWORD" ] && loginToDockerServer $CTID #>> $ACTIONS_LOG 2>&1;
+    ct_image_id=$(retreiveDockerTemplate "$DOCKER_ID")
+
+    res=$?
+    [[ "$res" -gt 0 ]] && return 1;
+
+    dockerTarball="${DOCKER_CACHE_DIR}/${ct_image_id}.tar";
+    prepareCleanContainer $CTID  >> $ACTIONS_LOG 2>&1;
+
+    if [[ $_IS_UPDATE -eq 0 ]] ; then
+        fstab=$(processMounts )
+    fi
+
+    $VZCTL set $CTID --hostname localhost --save >> $ACTIONS_LOG 2>&1;
+    $VZCTL start $CTID >> $ACTIONS_LOG 2>&1;
+#    importTarballToContainer $dockerTarball $CTID  >> $ACTIONS_LOG 2>&1;
+    importFilesToContainer $dockerTarball $CTID >> $ACTIONS_LOG 2>&1;
+    $VZCTL stop $CTID >> $ACTIONS_LOG 2>&1;
+    $VZCTL mount $CTID >> $ACTIONS_LOG 2>&1;
+
+    parseDockerConfig $DOCKER_ID >> $ACTIONS_LOG 2>&1;
+    detectEntryPoint >> $ACTIONS_LOG 2>&1;
+    detectCmd >> $ACTIONS_LOG 2>&1;
+    detectWorkingDir >> $ACTIONS_LOG 2>&1;
+    doSetEnv $@ >> $ACTIONS_LOG 2>&1;
+    patchPCSContainer $CTID >> $ACTIONS_LOG 2>&1;
+
+
+    if [[ $_IS_UPDATE -eq 0 ]]  ; then
+        echo -e "$fstab" >> "/vz/root/$ctid/etc/fstab"
+    else
+        log "restoring files"
+        if [[ -f "/vz/tmp/ct${CTID}.tar.gz" ]] ; then
+            mkdir "/vz/root/${CTID}/data"
+            unpackFiles $CTID "/vz/root/${CTID}/data" && {
+                rm "/vz/tmp/ct${CTID}.tar.gz"
+            }
+        fi
+        echo -e "$f_fstab" > "/vz/root/${CTID}/etc/fstab"
+    fi
+
+    $VZCTL umount $CTID >> $ACTIONS_LOG 2>&1;
+    $VZCTL start $CTID >> $ACTIONS_LOG 2>&1 || { writeJSONResponceErr "result=>4081" "message=>Could not set up docker template!"; exit 4081; }
+
+    local result=$?;
+    [ -f "$DOCKER_AUTH_CONFIG" ] && rm "$DOCKER_AUTH_CONFIG";
+    $VZCTL exec $CTID  mknod --mode=666 /dev/ptmx c 5 2 > /dev/null 2>&1;
+    [ $result -eq 0 ] && writeJSONResponceOut "result=>0" "message=>Docker template been set up succesfully" "os=>$DOCKER_OSTEMPLATE" "imageid=>$RIMAGE_ID" || { writeJSONResponceErr "result=>4081" "message=>Could not set up docker template!"; return 1; };
+    return 0
+}
+
+function doRun(){
+    local requiredParqams=("CTID")
+    [[ ! -z "${msg}" ]] && { writeJSONResponceErr "result=>4099" "message=>Missing param $msg" ; return 1; }
+    DOCKER_OSTEMPLATE=$(getOSTemplateType $CTID);
+    local sshd_config="/vz/root/${CTID}/etc/ssh/sshd_config";
+    local ve_config="/vz/private/${CTID}/ve.conf";
+
+    vzexecSetCTID $CTID
+
+    [ "x$DOCKER_OSTEMPLATE" == "xdebian" -o "x$DOCKER_OSTEMPLATE" == "xubuntu"  ] && {
+        vzexecRun "update-rc.d jelinit defaults" ;
+        # if ! vzexecRun "update-rc.d jelinit defaults" ; then
+        #     writeJSONResponceErr "result=>4081" "message=>Could not start docker template!$(vzexecGetLastStdErr)"; return 1;
+        # fi
+        # $VZCTL exec $CTID update-rc.d jelinit defaults >> $ACTIONS_LOG 2>&1;
+        [ ! -e "/vz/root/${CTID}/dev/tty" ]  && {
+            mknod "/vz/root/${CTID}/dev/random" c 1 8 >/dev/null 2>&1;
+            mknod "/vz/root/${CTID}/dev/urandom" c 1 9 >/dev/null 2>&1;
+            for i in $(seq 1 1 9); do mknod -m 660 "/vz/root/${CTID}/dev/tty$i" c 3 $i >/dev/null 2>&1; done ;
+            vzexecRun "chown root:tty /dev/tty*" ;
+            # if ! vzexecRun "chown root:tty /dev/tty*" ; then
+            #     writeJSONResponceErr "result=>4081" "message=>Could not start docker template!$(vzexecGetLastStdErr)"; return 1;
+            # fi
+            # $VZCTL exec $CTID "chown root:tty /dev/tty*";
+        }
+
+        $VZCTL exec $CTID "touch /tmp/ttt"
+        $VZCTL exec $CTID "chown sshd /tmp/ttt >/dev/null 2>/dev/null  || adduser --quiet --system --no-create-home --home /var/run/sshd --shell /usr/sbin/nologin sshd >/dev/null 2>/dev/null"
+        $VZCTL exec $CTID "chgrp ssl-cert /tmp/ttt >/dev/null 2>/dev/null || addgroup --system ssl-cert >/dev/null 2>/dev/null"
+        $VZCTL exec $CTID "chgrp postfix /tmp/ttt >/dev/null 2>/dev/null || addgroup --system postfix >/dev/null 2>/dev/null"
+        $VZCTL exec $CTID "chgrp postdrop /tmp/ttt >/dev/null 2>/dev/null || addgroup --system postdrop >/dev/null 2>/dev/null"
+        $VZCTL exec $CTID "chgrp mlocate /tmp/ttt >/dev/null 2>/dev/null || addgroup --system mlocate >/dev/null 2>/dev/null"
+        $VZCTL exec $CTID "chown postfix /tmp/ttt >/dev/null 2>/dev/null || adduser --system --home /var/spool/postfix --no-create-home --disabled-password --ingroup postfix postfix >/dev/null 2>/dev/null"
+
+        tries=10
+        while [ "$tries" -gt 0 ]
+        do
+            if $VZCTL exec $CTID ifconfig | grep -q 'venet0:0' ; then
+                break;
+            fi
+            sleep 1
+            tries=$(($tries-1))
+        done
+        vzexecRun "apt-get update" ;
+        vzexecRun "apt-get -o Dpkg::Options::=\"--force-confold\" install -y openssh-server --force-yes" ;
+#        if ! vzexecRun "apt-get update" ; then
+#            writeJSONResponceErr "result=>4081" "message=>Could not start docker template!$(vzexecGetLastStdErr)"; return 1;
+#        fi
+        # $VZCTL exec $CTID apt-get update > /dev/null 2>&1;
+#        if ! vzexecRun "apt-get install -y openssh-server --force-yes" ; then
+#            writeJSONResponceErr "result=>4081" "message=>Could not start docker template!$(vzexecGetLastStdErr)"; return 1;
+#        fi
+        [ -d "/vz/root/${CTID}/etc/network/if-post-down.d" -o  -L "/vz/root/${CTID}/etc/network/if-post-down.d" ] && echo "$DEBIANNETFIX" > "/vz/root/${CTID}/etc/network/if-post-down.d/jelnetfix";
+        chmod +x "/vz/root/${CTID}/etc/network/if-post-down.d/jelnetfix";
+        [ -f  "/vz/root/${CTID}/etc/init.d/rmnologin" ] && sed -i -re '/.*Required-Start:\s/{s/(.*)\$all(.*)/\1\2/}' "/vz/root/${CTID}/etc/init.d/rmnologin" ;
+        [ -f "/vz/root/${CTID}/etc/init.d/ssh" ] &&  sed -i '/chrooted() {/areturn 0' "/vz/root/${CTID}/etc/init.d/ssh";
+    }
+
+    [ "x$DOCKER_OSTEMPLATE" == "xcentos" -o "x$DOCKER_OSTEMPLATE" == "xfedora" ] && {
+        $VZPKG install -q -p $CTID openssh-server 2>&1 >/dev/null ;
+        $VZCTL exec ${ctid} "chkconfig --add jelinit" > /dev/null 2>&1;
+    }
+    [ "x$DOCKER_OSTEMPLATE" == "xcentos" ] && {
+        ct_version=$( grep VERSION_ID /vz/root/${CTID}/etc/os-release 2>/dev/null | sed  -ne 's/.*=\"\([0-9.]*\).*/\1/;p;n' )
+        if  [ "x$ct_version" == "x7" ] ; then
+            vzexecRun "/etc/init.d/network start 2>/dev/null"
+            vzexecRun "yum -y swap -- remove systemd-container systemd-container-libs -- install systemd systemd-libs"
+            # (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+            rm -f /vz/root/${CTID}/lib/systemd/system/multi-user.target.wants/*;\
+            rm -f /vz/root/${CTID}/etc/systemd/system/*.wants/*;\
+            rm -f /vz/root/${CTID}/lib/systemd/system/local-fs.target.wants/*; \
+            rm -f /vz/root/${CTID}/lib/systemd/system/sockets.target.wants/*udev*; \
+            rm -f /vz/root/${CTID}/lib/systemd/system/sockets.target.wants/*initctl*; \
+            rm -f /vz/root/${CTID}/lib/systemd/system/basic.target.wants/*;\
+            rm -f /vz/root/${CTID}/lib/systemd/system/anaconda.target.wants/*;
+
+            vzexecRun "yum -y reinstall openssh-server"
+            vzexecRun "mkdir -p /etc/systemd/system/multi-user.target.wants/; ln -s /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/sshd.service";
+
+        fi
+    }
+
+    [ -f "$sshd_config" ] && {
+        $SED -i "/PasswordAuthentication/d" $sshd_config;
+        $SED -i "/PermitRootLogin/d" $sshd_config;
+        echo "PasswordAuthentication yes" >> $sshd_config;
+        echo "PermitRootLogin yes" >> $sshd_config;
+    }
+
+    #  fix permissions
+    [ -d "/vz/root/${ctid}/etc/ssh" ] && chmod 600 /vz/root/${ctid}/etc/ssh/*key  > /dev/null 2>&1;
+    [ -f "/vz/root/${ctid}/etc/init.d/sshd" ] && $VZCTL exec ${ctid} "/etc/init.d/sshd restart" > /dev/null 2>&1;
+    [ -f "/vz/root/${ctid}/etc/init.d/ssh" ] && $VZCTL exec ${ctid} "/etc/init.d/ssh restart" > /dev/null 2>&1;
+    $VZCTL exec2 ${ctid} ifconfig 2>/dev/null | grep -q "venet0:0" || { $VZCTL restart ${ctid} > /dev/null 2>&1 ; writeJSONResponceOut "result=>0" "message=>Docker template been started succesfully" "os=>$DOCKER_OSTEMPLATE"; return 0; };
+    $VZCTL exec ${ctid} "/etc/init.d/jelinit start" > /dev/null 2>&1;
+    [ $? -eq 0 ] && writeJSONResponceOut "result=>0" "message=>Docker template been started succesfully" "os=>$DOCKER_OSTEMPLATE" || { writeJSONResponceErr "result=>4081" "message=>Could not start docker template!"; return 4081; };
+    # attempt to install some stuff, this step can end with error and this is acceptable, important to throw to /dev/null
+    return 0
+}
+
+
+function doLink(){
+    local ct_hosts="/vz/root/${CTID}/etc/hosts";
+    local userenvs_config="/vz/root/${CTID}/.jelenv";
+
+    [ -z "$ALIAS" ] &&  { writeJSONResponceErr "result=>4099" "message=>Required parameter is missing!"; return 1; };
+    [ -z "$LINK_IP" ] &&  { writeJSONResponceErr "result=>4099" "message=>Required parameter is missing!"; return 1; };
+    $GREP -q "$ALIAS" $ct_hosts || echo  "$LINK_IP  $ALIAS"  >> $ct_hosts;
+    for varpair in $USER_ENV ; do
+        key=$($AWK -F "=" '{ print $1 }' <<< $varpair);
+        value=$($CUT -d=  -f2- <<< $varpair | $BASE64 -d);
+        $GREP -q "${ALIAS}_${key}=${value}" $userenvs_config || echo "${ALIAS}_${key}=${value}" >> $userenvs_config;
+        local old_value="${ALIAS}_${key}";
+        $SED -i "/${old_value}/d" $userenvs_config;
+        echo "${ALIAS}_${key}=${value}" >> $userenvs_config;
+        [ "$key" == "DOCKER_EXPOSED_PORT" ] && {
+            OLD_IFS=$IFS
+            IFS=,
+            a_value=($value)
+
+            number_of_elements=${#a_value[@]}
+            index=0
+            while [ "$index" -lt "$number_of_elements" ] ; do
+                DOCKER_EXPOSED_PORT="${a_value[$index]}";
+                echo "${ALIAS}_PORT_${DOCKER_EXPOSED_PORT}_TCP=tcp://${LINK_IP}:${DOCKER_EXPOSED_PORT}" >>  "$userenvs_config";
+                echo "${ALIAS}_PORT_${DOCKER_EXPOSED_PORT}_TCP_PORT=${DOCKER_EXPOSED_PORT}" >>  "$userenvs_config";
+                echo "${ALIAS}_PORT_${DOCKER_EXPOSED_PORT}_TCP_ADDR=${LINK_IP}" >> "$userenvs_config";
+                echo "${ALIAS}_PORT_${DOCKER_EXPOSED_PORT}_TCP_PROTO=tcp" >> "$userenvs_config";
+                echo "${ALIAS}_HOST=$LINK_IP" >> "$userenvs_config";
+                echo "${ALIAS}_PORT=$DOCKER_EXPOSED_PORT" >> "$userenvs_config";
+                let "index += 1"
+            done
+
+            IFS=$OLD_IFS
+        }
+    done
+    writeJSONResponceOut "result=>0" "message=>containers linked succesfully"
+    return 0
+}
+
+function describeTags() {
+    echo "Get remote tags for specified image";
+}
+
+function describeTagsParameters() {
+    echo "--name|-n [image name] --url|-u [registry url] --username|-U [username] --password|-P [password]";
+}
+
+function describeTagsOptions() {
+    echo "name    : name of the docker image";
+    echo "url     : URL to the docker registry. Default is ${DOCKER_HOST}";
+    echo "username: username for login to docker registry";
+    echo "password: password for login"
+}
+
+function doTags() {
+    local requiredParqams=("DOCKER_ID")
+    local msg=$(checkParams ${requiredParqams[@]}) message result tags
+    [[ ! -z "${msg}" ]] && { writeJSONResponceErr "result=>4099" "message=>Missing param $msg" ; return 1; }
+
+    [ ! -z "$USERNAME" ] && [ ! -z "$PASSWORD" ] && loginToDockerServer $CTID
+    msg=$($DOCKER tags "$DOCKER_ID" 2>&1 | $SED -re 's/\{"tags":(.*)\}/\1/g' -e 's/\r//' )
+    [ "x$msg" == "xnull" ] &&  { writeJSONResponceErr "result=>4098" "message=>Error: image not found"; return 1 ; }
+    result=$($SED -n -re '/[Rr]esult/{s/.*[Rr]esult":\s*"?([0-9]+)"?.*/\1/;p}' <<< $msg )
+#    result=$?
+
+    if [[ "${result:-0}" -gt 0 ]] ; then
+        message="Error get tags: $($SED 's/\"/\\"/g' <<< ${msg} )"
+        writeJSONResponceErr "result=>$result" "message=>${message}"
+        return 1
+    else
+        tags="$msg"
+        echo "{\"result\":\"0\",\"message\":\"complete\",\"tags\":${tags}}"
+    fi
+    return 0
+}
+
+function doUnlink(){
+    local ct_hosts="/vz/root/${ctid}/etc/hosts";
+    local userenvs_config="/vz/root/${ctid}/.jelenv";
+    $SED  -i "s@$ALIAS@@g" $ct_hosts;
+    for varpair in $USER_ENV
+    do
+        key=$(awk -F "=" '{ print $1 }' <<< $varpair);
+        value=$(cut -d=  -f2- <<< $varpair | base64 -d);
+        $SED -i "/^${ALIAS}_/d" $userenvs_config;
+    done
+    writeJSONResponceOut "result=>0" "message=>containers unlinked succesfully"
+    return 0
+}
+
+function doRelink(){
+    doUnlink "$@" >> $ACTIONS_LOG 2>&1;
+    doLink "$@" >> $ACTIONS_LOG 2>&1;
+    writeJSONResponceOut "result=>0" "message=>containers relinked succesfully"
+    return 0
+}
+
+function dogetPCSTemplate(){
+
+    local requiredParqams=("DOCKER_ID")
+    local msg=$(checkParams ${requiredParqams[@]})
+    [[ ! -z "$USERNAME" ]] && [[ ! -z "$PASSWORD" ]] && loginToDockerServer $CTID #>> $ACTIONS_LOG 2>&1;
+    calldocker=$($DOCKER baseid --format "{{.Id}}" $DOCKER_ID 2>&1) ;
+    [ $? -ne 0 ] && {
+	writeJSONResponceErr "result=>4098" "message=>No such docker image" "execTime=>$SECONDS"; return 4098;
+    }
+    DOCKER_IMAGE_HASH=$($SED -re 's/.*:\s?\"([a-z0-9]*)\"?.*/\1/' <<< $calldocker) ;
+    [ -z "$DOCKER_IMAGE_HASH" ] && {
+        writeJSONResponceErr "result=>4098" "message=>No such docker image" "execTime=>$SECONDS"; return 4098;
+    }
+
+    $DOCKER mount $DOCKER_IMAGE_HASH 2>/dev/null >/dev/null
+
+    $DOCKER logout 2>&1 >/dev/null ;
+    _DOCKER_PATH="${_DOCKER_LIB}/${_DOCKER_DRIVER}/$DOCKER_IMAGE_HASH/rootfs"
+
+    if [ -f "${_DOCKER_LIB}/${_DOCKER_DRIVER}/$DOCKER_IMAGE_HASH/id" ] ; then
+        issue_file="${_DOCKER_PATH}/etc/issue";
+        release_files="${_DOCKER_PATH}/etc/*-release";
+        OS_version="";
+        _OS="";
+
+        issue_string=$(cat $release_files $issue_file    2>/dev/null);
+        OS_version=$($GREP -h VERSION_ID <<< "$issue_string" 2>/dev/null | $SED -nre 's/.*=\"?([0-9.]*).*/\1/;p;n');
+        if [ -z "$OS_version" ] ; then
+            OS_version=$($GREP -h DISTRIB_RELEASE <<< "$issue_string" 2>/dev/null | $SED -nre 's/.*=\s?\"?([0-9.]*).*/\1/;p;n');
+            if [ -z "$OS_version" ] ; then
+                if $GREP -hqi "jessie" <<< "$issue_string" 2>/dev/null ; then
+                    OS_version="8";
+                elif [ -f "${_DOCKER_PATH}/etc/SuSE-brand" ] ; then
+                    OS_version=$(grep ${_DOCKER_PATH}/etc/SuSE-brand | $SED -nre 's/.*=\s?\"?([0-9.]*).*/\1/;p;n');
+                    _OS="suse";
+                elif [ -z "$OS_version" ] ; then
+                    # for  devopsil/puppet
+                    OS_version=$($GREP -m 1 -h "CentOS release" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z ]*\s([0-9.]*).*/\1/;p;n');
+                fi
+                if [ -z "$OS_version" ] ; then
+                    OS_version=$($GREP -m 1 -h "Debian" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z\/ ]*\s([0-9.]*).*/\1/;p;n');
+                fi
+                if [ -z "$OS_version" ] ; then
+                     #Oracle Linux Server release 6.6
+                     OS_version=$($GREP -m 1 -h "release" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z ]*\s([0-9.]*).*/\1/;p;n');
+		fi
+            fi
+        fi
+        $DOCKER umount $DOCKER_IMAGE_HASH 2>/dev/null >/dev/null
+
+        [ -z "$_OS" ] && $GREP -iq "ubuntu\|mint" <<< $issue_string && _OS="ubuntu"
+        [ -z "$_OS" ] && $GREP -iq "debian" <<< $issue_string && _OS="debian"
+        [ -z "$_OS" ] && $GREP -iq "centos" <<< $issue_string && _OS="centos"
+        [ -z "$_OS" ] && $GREP -iq "Oracle Linux Server" <<< $issue_string && _OS="centos"
+        [ -z "$_OS" ] && $GREP -iq "fedora" <<< $issue_string && _OS="fedora"
+        [ -z "$_OS" ] && $GREP -iq "redhat" <<< $issue_string && _OS="centos"
+        [ -z "$_OS" ] && $GREP -iq "suse" <<< $issue_string && _OS="suse"
+
+
+        # echo "undefined" && return 0;
+        [ "x$_OS" == "xdebian" -o "x$_OS" == "xsuse"  ] && [ "${#OS_version}" == "1" ] && OS_version="${OS_version}.0  "; # for debian support on PCS
+
+        if [ -z "$_OS" -a -z "$OS_version" ]; then
+            writeJSONResponceErr "result=>4097" "message=>Can not detect OS verion for docker ${DOCKER_ID} : $_OS $OS_version" "execTime=>$SECONDS"; return 4097;
+        else
+            [ "x$_OS" == "xubuntu" -o "x$_OS" == "xsuse" ] && { OSTPL=OS_$_OS[${OS_version/./}] ; } || { OSTPL=OS_$_OS[${OS_version%%.*}] ;}
+            [ -z "${!OSTPL}" ] && {
+                writeJSONResponceErr "result=>4097" "message=>Can not detect OS verion for docker ${DOCKER_ID} : $_OS $OS_version" "execTime=>$SECONDS"; return 4097;
+            }||{
+                writeJSONResponceOut "result=>0" "message=>Ok" "os=>${!OSTPL}" "detectedOs=>${_OS}-${OS_version}" "execTime=>$SECONDS" ;
+            }
+        fi
+    else
+        $DOCKER umount $DOCKER_IMAGE_HASH 2>/dev/null >/dev/null
+        writeJSONResponceErr "result=>4097" "message=>Doker driver [${_DOCKER_DRIVER}] dir not found" "execTime=>$SECONDS"; return 4097;
+    fi
+}
+
+function packFiles() {
+    local lctid=${1:=$CTID}
+    local lpath=${2:?"Path required"}
+    msg=$(cd $lpath && $TAR cPpzf "/vz/tmp/ct${lctid}.tar.gz" .)
+    res=$?
+    if [[ $res -gt 0 ]] ; then
+        echo "Error saving files to: /vz/tmp/ct${lctid}.tar.gz"
+        return 1
+    fi
+    return 0
+}
+
+function unpackFiles() {
+    local lctid=${1:=$CTID}
+    local lpath=${2:?"Path required"}
+    msg=$(cd $lpath && $TAR xpzf "/vz/tmp/ct${lctid}.tar.gz" .)
+    res=$?
+    if [[ $res -gt 0 ]] ; then
+        echo "Error restoring files from: /vz/tmp/ct${lctid}.tar.gz"
+        return 1
+    fi
+    return 0
+}
+
+
+function doUpdate() {
+    local f_pswd f_shadow f_group f_akeys f_akeys2 f_hosts
+    if [ -z "$CTID" ] ; then
+        writeJSONResponceErr "result=>99" "message=>ctid required"
+        log "ctid required"
+        return 99;
+    fi
+    if [ -z "$OSTEMPLATE" ] ; then
+        writeJSONResponceErr "result=>99" "message=>ostemplate required"
+        log "ostemplate required"
+        return 99;
+    fi
+
+    vzIsContainerExists $CTID || { writeJSONResponceErr "result=>4000" "message=>ctid $CTID not found"; return 1; }
+    _IS_UPDATE=1
+
+    log "Stopping CTID ${CTID}"
+    $VZCTL stop $CTID >> $ACTIONS_LOG 2>&1;
+    $VZCTL mount $CTID >> $ACTIONS_LOG 2>&1;
+
+    log "saving old files"
+    f_pswd=$(cat "/vz/root/${CTID}/etc/passwd")
+    f_shadow=$(cat "/vz/root/${CTID}/etc/shadow")
+    f_fstab=$(cat "/vz/root/${CTID}/etc/fstab")
+    f_group=$(cat "/vz/root/${CTID}/etc/group")
+    f_hosts=$(cat "/vz/root/${CTID}/etc/hosts")
+    f_akeys=$( [[ -f "/vz/root/${CTID}/root/.ssh/authorized_keys" ]] && cat "/vz/root/${CTID}/root/.ssh/authorized_keys" )
+    f_akeys2=$( [[ -f "/vz/root/${CTID}/root/.ssh/authorized_keys2" ]] && cat "/vz/root/${CTID}/root/.ssh/authorized_keys2" )
+
+    log "Saving user data for: ${CTID}"
+    if [[ -d "/vz/root/${CTID}/data" ]] ; then
+        packFiles $CTID "/vz/root/${CTID}/data" || {
+            writeJSONResponceErr "result=>4000" "message=>can not save user files";
+            $VZCTL start $CTID
+            return 1;
+        }
+    fi
+    $VZCTL umount $CTID >> $ACTIONS_LOG 2>&1;
+
+    log "Replacing OSTEMPLATE with ${OSTEMPLATE}"
+    $SED -i -re "/OSTEMPLATE=/{s/=\".*\"/=\"${OSTEMPLATE}\"/g}" "/vz/private/${CTID}/ve.conf" >> $ACTIONS_LOG 2>&1;
+
+    log "Reinstalling ctid ${CTID}"
+    $VZCTL reinstall ${CTID} --skipbackup >> $ACTIONS_LOG 2>&1;
+    $VZCTL mount ${CTID} >> $ACTIONS_LOG 2>&1;
+    echo $f_fstab > "/vz/root/${CTID}/etc/fstab"
+    doSetup
+
+    echo -e "$f_pswd" > "/vz/root/${CTID}/etc/passwd"
+    echo -e "$f_shadow" > "/vz/root/${CTID}/etc/shadow"
+    echo -e "$f_group" > "/vz/root/${CTID}/etc/group"
+    echo -e "$f_hosts" > "/vz/root/${CTID}/etc/hosts"
+
+
+    if [ ! -z "$f_akeys" ] ; then
+        [ ! -d "/vz/root/${CTID}/root/.ssh" ] && mkdir -p "/vz/root/${CTID}/root/.ssh"
+        echo -e "$f_akeys" > "/vz/root/${CTID}/root/.ssh/authorized_keys"
+    fi
+
+    if [ ! -z "$f_akeys2" ] ; then
+        [ ! -d "/vz/root/${CTID}/root/.ssh" ] && mkdir -p "/vz/root/${CTID}/root/.ssh"
+        echo -e "$f_akeys2" > "/vz/root/${CTID}/root/.ssh/authorized_keys2"
+    fi
+
+    return 0
+}
+
+
+defineBigInline DEBIANNETFIX <<'EOF'
+#!/bin/bash
+cmd=`ip a l  | sed -nre "/\s+inet\s/{s/.*\s([0-9]{1,3}.[0-9\.]{1,3}.[0-9]{1,3}.[0-9]{1,3}([\/0-9]{1,}))\sbrd.*(venet0:[0-9]{1,})/ip addr del \1 dev \3 \; /p}"`
+eval "$cmd" 2>/dev/null
+
+EOF
+
+
+
+defineBigInline DOCKERINIT <<'EOF'
+#! /bin/bash
+### BEGIN INIT INFO
+# Provides:          jelinit
+# Required-Start:    $local_fs $time $network $named
+# Required-Stop:     $local_fs $time $network $named
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start/stop
+#
+# Description: The init script will start/stop
+#              Then log (FATAL,ERROR,WARN,INFO and Notic)
+### END INIT INFO
+
+RUN_CMD="/.jelstart"
+ENTRYPOINT_CMD="/.jelentry"
+WORKINDIR_CMD="/.jelworkdir"
+RUNSCRIPT=$(sed ':a;N;$!ba;s/\n/ /g' <<< cat $ENTRYPOINT_CMD $RUN_CMD  2>/dev/null )
+dir=$(cat $WORKINDIR_CMD 2>/dev/null ) && cd ${dir:-/} 2>/dev/null;
+SSHINIT="/etc/init.d/ssh"
+JELINIT_LOCK="/var/run/lock/jelinit.lock"
+[ ! -d /var/run/lock/ ] && mkdir -p /var/run/lock/ >/dev/null 2>/dev/null
+
+_SYSTEMCTL_SKIP_REDIRECT="true"
+
+[ -f "/lib/lsb/init-functions" ] && . /lib/lsb/init-functions
+[ -f "/etc/redhat-lsb/lsb_log_message" ] && . /etc/redhat-lsb/lsb_log_message
+[ -f "/.jelenv" ] &&  OLD_IFS=$IFS; IFS=$'\n'; for env in $(cat /.jelenv); do export "$env"; done ; IFS=$OLD_IFS
+
+PATH="$PATH:/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin:/usr/local/bin"
+
+runfile=$(awk '{print $1}' <<< $RUNSCRIPT );
+[ ! -z "$runfile" -a -f "${runfile}" ] && { chmod a+x "${runfile}"; } || {
+        runfile=$(which $runfile 2>/dev/null );
+        [ ! -z "$runfile" -a -f "${runfile}" ] && { chmod a+x "${runfile}"; }
+}
+
+function patchenv(){
+        temp_dirs="/run/apache2 /run/lock/apache2";
+        for temp_dir in $temp_dirs
+                do
+                        mkdir -p $temp_dir;
+                        chmod 777 $temp_dir;
+                done
+}
+
+ports="22\|23\|25\|21\|^80$\|111\|139\|389\|445\|443\|8743\|8009\|1433\|1434\|1521\|1528\|2424\|2483\|2484\|3306\|5432\|6262\|27017"
+
+function rpss(){
+        val=$(ss -tnlp| grep -v '127.0.0.'| sed -r -e '1d'  -e 's/LISTEN[^:]+:+//g' | cut -d' ' -f1 | grep -v $ports);
+        echo "$val";
+}
+
+function rpnetstat(){
+        val=$(netstat -tnlp 2>/dev/null| grep -v '127.0.0.'| sed -r -e '1,2d' -e 's/tcp[^:]+:+//g' | cut -d' ' -f1  | grep -v $ports)
+        echo "$val";
+}
+
+start () {
+        [ -f "$JELINIT_LOCK" ] && return || echo "$$" >> "$JELINIT_LOCK";
+        patchenv
+        [ -f "/sbin/ifconfig" -a ! -e "/bin/systemctl" ] && /sbin/ifconfig lo up;
+
+        [ -f "$SSHINIT" -o -L "$SSHINIT" ] && $SSHINIT start &
+        [ ! -z "$RUNSCRIPT" ]  && export PATH="$PATH" &&  $RUNSCRIPT &
+        tryresetcount=200
+        eval "command -v netstat >/dev/null 2>&1 && get_ports=rpnetstat || get_ports=rpss";
+        while [ $tryresetcount -gt 0 ]
+        do
+            S_REDIRECT_PORT=$( $get_ports );
+            if [ ! -z "$S_REDIRECT_PORT" ] ; then
+                iptables -t nat -L | grep -E "REDIRECT.*$S_REDIRECT_PORT" || iptables -t nat -I PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports $S_REDIRECT_PORT;
+                break ;
+            else
+                sleep 2;
+            fi
+            tryresetcount=$((tryresetcount-1))
+        done
+
+        return $?
+}
+
+stop () {
+        [ ! -f "$JELINIT_LOCK" ] && return || rm "$JELINIT_LOCK";
+}
+
+case "$1" in
+    start)
+            log_daemon_msg "Starting jelinit"
+            if start ; then
+                    log_end_msg $?
+            else
+                    log_end_msg $?
+            fi
+            ;;
+    stop)
+            log_daemon_msg "Stopping jelinit"
+            if stop ; then
+                   log_end_msg $?
+           else
+                   log_end_msg $?
+           fi
+           ;;
+    restart)
+            log_daemon_msg "Restarting jelinit"
+            stop
+            if start ; then
+                    log_end_msg $?
+            else
+                    log_end_msg $?
+            fi
+            ;;
+    reload|force-reload)
+            log_daemon_msg "Reloading jelinit"
+            stop
+            if start ; then
+                    log_end_msg $?
+            else
+                    log_end_msg $?
+            fi
+            ;;
+    status)
+            exit 0
+            ;;
+    *)
+        echo "Usage: /etc/init.d/$NAME {start|stop|restart|reload|force-reload|status}"
+        exit 3
+        ;;
+esac
+
+exit 0
+EOF
+

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+### In this library you can ovveride any priviosly defined function
+### Designed from JPS 
+### for successful end of operation - function should return status code 0
+
+# Examples:
+
+#function _deploy(){
+#
+#
+#}
+
+

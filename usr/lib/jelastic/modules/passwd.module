@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default os envinfo;
+include "$passwd_module_inherit";
+include output cartridge-common;
+inherit extendperm;
+
+DESCRIPTION="JEM Password Manager module";
+VERSION="1";
+DEFAULT_ACTION="Usage";
+
+$PROGRAM 'chpasswd';
+
+
+function doUsage() {
+    showUsageMessage;
+}
+
+
+function doSet(){
+
+	[ "x${COMPUTE_TYPE}" == "xcartridge" ] &&  restoreEnvironmentVariables && {
+            export J_OPENSHIFT_APP_ADM_USER=$Admin_App_User;
+            [ -f "${CARTRIDGE_HOME}/jelastic/scripts/reset_password.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/reset_password.sh";
+            while [ "$1" != "" ];
+            do
+            case $1 in
+                 -p )       shift
+                  J_OPENSHIFT_APP_ADM_PASSWORD=$1 ;;
+              esac
+              shift
+            done
+            _setPassword > /dev/null 2>&1; local res=$?;
+            export J_OPENSHIFT_APP_ADM_USER=${J_OPENSHIFT_APP_ADM_USER}; 
+            #saveEnvironmentVariables;
+            [ $res -eq 0 ] && writeJSONResponceOut "result=>0" "message=>Password set succesfully" "username=>$J_OPENSHIFT_APP_ADM_USER" || { writeJSONResponceErr "result=>4051" "message=>Could not set password!"; return 4051; };
+            #
+            #  Parsing of argument is implemented inside module to avoid extra work for enduser in hook
+            #
+            return $res;
+    } ;
+
+	if echo $@ | grep -qP "\-u"
+	then
+		setPassword $@ && writeJSONResponceOut "result=>0" "message=>Password set succesfully" || { writeJSONResponceErr "result=>4051" "message=>Could not set password!"; return 4051; };
+	else
+		setPassword -u "$default_user" $@ && writeJSONResponceOut "result=>0" "message=>Password set succesfully" || { writeJSONResponceErr "result=>4051" "message=>Could not set password!"; return 4051; };
+	fi
+}
+
+function postSetCallback(){
+    ExtendPerm ;
+}
+
+function doSetos(){
+
+		while [ "$1" != "" ];
+		do
+		  case $1 in
+		    -u )       shift
+		      local user=$1
+		      ;;
+		    -p )       shift
+		      local password=$1
+		      ;;
+		  esac
+		  shift
+		done
+
+ 		echo "$user:$password" | $CHPASSWD > /dev/null 2>&1 && writeJSONResponceOut "result=>0" "message=>Password set succesfully" || { writeJSONResponceErr "result=>4051" "message=>Could not set password!"; return 4051; };
+
+}
+
+function postSetosCallback() {
+    [ -n "$FIREWALL_ENABLED" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && [ "${FIREWALL_ENABLED}" -eq "1" ] && {
+        doAction "firewall" "Start";
+    }
+    return 0;
+}
+
+function describeSet() {
+    echo "Set password for selected user";
+}
+
+function describeSetParameters() {
+    echo "-p <password> [-u <user>]";
+}
+
+function describeSetOptions() {
+    echo "-p: password";
+    echo "-u: user name";
+}
+
+function describeSetos() {
+    echo "Set password";
+}
+
+function describeSetosParameters() {
+    echo "-p <password> -u <user>";
+}
+
+function describeSetosOptions() {
+    echo "-p: new password";
+    echo "-u: user name";
+}

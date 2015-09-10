@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default os envinfo;
+inherit ${dumper_module_inherit};
+include output;
+
+DESCRIPTION="Database dumping module";
+VERSION="1";
+DEFAULT_ACTION="usage";
+
+function doUsage() {
+    showUsageMessage;
+}
+
+function doRestore(){
+    doRestore "$@" >> $ACTIONS_LOG 2>&1;
+    local err=$?;
+    [ $err -eq  4072 -o $err -eq 232 ] && { writeJSONResponceErr "result=>4101" "message=>Cound not create database" ; die -q; } ;
+    [ $err -eq  4073 -o $err -eq 233 ] && { writeJSONResponceErr "result=>4073" "message=>Cound not restore dump" ; die -q; } ;
+    [ $err -eq  4074 -o $err -eq 234 ] && { writeJSONResponceErr "result=>4074" "message=>Could not download dump file"; die -q; } ;
+    [ $err -eq  0 ] &&  { writeJSONResponceOut "result=>0" "message=>Dump restored succesfuly" ; return 0; } ;
+    [ $err -gt  0 ] && { writeJSONResponceErr "result=>4099" "message=>Unknown error"; die -q; } ;
+}
+
+function describeRestore() {
+    echo "Restore database dump from provided file";
+}
+
+function describeRestoreParameters() {
+    echo "-b|--dbname <db> -d|--dumpUrl <url> -p|--password <pasword> -u|--user <user>";
+}
+
+function describeRestoreOptions() {
+    echo "-b|--dbname: database to restore";
+    echo "-d|--dumpUrl: dump file url";
+    echo "-p|--password: user password";
+    echo "-u|--user: database user name";
+}

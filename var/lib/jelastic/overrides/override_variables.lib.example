@@ -1,0 +1,14 @@
+#!/bin/bash
+
+### In this library you can ovveride any priviosly defined variable in application
+### Designed from JPS 
+
+# Examples:
+
+# SERVICE='nginx';
+# DATA_OWNER='couchdb:couchdb';
+# VCS_UPDATE_LOG="/var/log/maven/vcs_update.log";
+# default_user="admin";
+# WEBROOT="/var/www/webroot";
+# DEFAULT_PORT=8080;
+

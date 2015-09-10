@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+inherit default os envinfo;
+[ -n "$ssl_module_inherit" ] && inherit "$ssl_module_inherit";
+include output cartridge-common;
+
+DESCRIPTION="Enables SSL for application stack";
+VERSION="1";
+DEFAULT_ACTION="Usage";
+SSL_CONFIG_DIR="/var/lib/jelastic/SSL";
+DEFAULT_DOMAIN="jelastic";
+
+function doUsage() {
+    showUsageMessage;
+}
+
+[ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
+	[ -f "${CARTRIDGE_HOME}/jelastic/jelastic.conf" ] && source "${CARTRIDGE_HOME}/jelastic/jelastic.conf";
+};
+
+function doInstall(){
+        if [ "x${COMPUTE_TYPE}" ==  "xcartridge" ]
+        then
+                [ "x${Node_Mission}" == "xbl" ] && {
+                        [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh";
+                } || { writeJSONResponceOut "result=>0" "message=>SSL installed was skipped"; return 0; } ### temporary solution
+        fi
+
+        enableSSL && writeJSONResponceOut "result=>0" "message=>SSL installed succesfully" || { writeJSONResponceErr "result=>4022" "message=>SSL installed with Error!"; return 4022; };
+}
+
+
+
+function doRemove(){
+   if [ "x${COMPUTE_TYPE}" ==  "xcartridge" ]
+      then
+               [ "x${Node_Mission}" == "xbl" ] && {
+                        [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh";
+             } || { writeJSONResponceOut "result=>0" "message=>SSL cleanup skipped"; return 0; }
+      fi
+
+      disableSSL && writeJSONResponceOut "result=>0" "message=>SSL removed succesfully" || { writeJSONResponceErr "result=>4023" "message=>SSL removed with Error!"; return 4023; };
+}
+
+
+function doCheckDomain(){
+  if [ "x${COMPUTE_TYPE}" ==  "xcartridge"  ]
+  then
+    [ "x${Node_Mission}" == "xbl" ] && {
+     [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh";
+    } || { writeJSONResponceOut "result=>0" "message=>SSL check skipped"; return 0; }
+  fi
+  doAction keystore checkDomain;
+}
+
+function describeCheckDomain() {
+  echo "Check domain name for uploaded certificate";
+}
+
+function describeInstall() {
+    echo "Install ssl keys";
+}
+
+function describeRemove() {
+    echo "Remove ssl keys";
+}
