@@ -1,2 +1,2 @@
 JEM
-![]({{site.baseurl}}//jem-core-scheme.jpg)
+({{site.baseurl}}//jem-core-scheme.jpg)
