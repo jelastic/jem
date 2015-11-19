@@ -1,1 +1,1 @@
-![JEM]({{site.baseurl}}/http://oi63.tinypic.com/huoc5d.jpg)
+![JEM](http://oi63.tinypic.com/huoc5d.jpg)
