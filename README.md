@@ -1,1 +1,1 @@
-![JEM Scheme]({{site.baseurl}}/https://download.jelastic.com/index.php/apps/files_sharing/ajax/publicpreview.php?x=1434&a=true&file=%252Fihorjem-core-scheme.jpg&t=26ced6cc2c30ddde360adb46d7ed4044&scalingup=0)
+![JEM]({{site.baseurl}}/http://oi63.tinypic.com/huoc5d.jpg)
