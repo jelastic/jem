@@ -1,13 +1,11 @@
 ![JEM](http://oi63.tinypic.com/huoc5d.jpg)
 
-**JEM Core**
-
+## **JEM Core**
 Jem Core is an application that manage all the JEM modules and libraries. Also it does produce command line interface to external functions that are available from application modules.
 
 Jem Core Libraries is a set of JEM common system libraries that handling all the operations that are usually performed by the application modules, this librariles includes a set of functions for proccessing system calls, mathematics, text proccessing, output proccessing, operations related to network, suppressing interactivity, testing etc.
 
-**JEM Common libraries**
-
+## **JEM Common libraries**
 **core.lib** - basic JEM system library which implements inheritance, including, traping, executing, error throwing and othe basic system operations.
 
 **default.lib** - JEM system library for managing application modules default operations like module description, managing help,  visioning, usage rules, etc.
@@ -45,8 +43,7 @@ Jem Core Libraries is a set of JEM common system libraries that handling all the
 
 **git.lib**  - JEM library that implements GIT management stuff
 
-**Application Layer Modules**
-
+## **Application Layer Modules**
 Application Layer Modules is a set of modules that are created for managing different application stacks inside containers by the Core of Jelastic Platform or manually with a help of command line interface.
 Each application module usually has functions that are externally available from JEM, in case if module has a list of implementations needed for different kind of stacks - it includes specific extra libraries that has unique implementation recipes created special for each stack separately. Functions inside stack libraries are internal and cannot be called by anything except parent module of this library.
 
@@ -192,28 +189,23 @@ postgres-dumper.lib - JEM library that implements database dumping for PostgreSQ
 
 **ruby-common-deploy.lib** - JEM common library that implements general concepts for switching Python engines.
 
+**ruby-common-engine.lib** - JEM common library that implements general concepts for switching Ruby engines.
 
+**ruby-common.lib** - JEM common library that implements general concepts for switching Ruby engines.
 
-ruby-common-engine.lib - JEM common library that implements general concepts for switching Ruby engines.
+**tomcat-deploy.lib** - JEM library that implements deployment automation for Tomcat servers.
 
+**tomcat-replication.lib** - JEM library that implements clusterring management for Tomcat servers
 
-ruby-common.lib - JEM common library that implements general concepts for switching Ruby engines.
+**tomcat-ssl.lib** - JEM library that implements SSL certificates management for the Tomcat application server.
 
+**uninterract.lib** - JEM library that implements management of interective command-line applications in non-interractive way.
 
+**user-common.lib** - JEM library that implements users management inside the container
 
-tomcat-deploy.lib - JEM library that implements deployment automation for Tomcat servers.
-
-tomcat-replication.lib - JEM library that implements clusterring management for Tomcat servers
-
-tomcat-ssl.lib - JEM library that implements SSL certificates management for the Tomcat application server.
-
-uninterract.lib - JEM library that implements management of interective command-line applications in non-interractive way.
-
-user-common.lib - JEM library that implements users management inside the container
-
-user-gate.lib - JEM library that implements a containers management to make containers compartible with SSH-gaway service provided by Jelastic (R)
+**user-gate.lib** - JEM library that implements a containers management to make containers compartible with SSH-gaway service provided by Jelastic (R)
  
-virtuozzo.lib - JEM library that implements a set functions related to Virtuozzo containers management
+**virtuozzo.lib** - JEM library that implements a set functions related to Virtuozzo containers management
 
-vzexec.lib - JEM library that implements remote commands execution on VZ containers
+**vzexec.lib** - JEM library that implements remote commands execution on VZ containers
 
