@@ -1,6 +1,6 @@
 ![JEM](http://oi63.tinypic.com/huoc5d.jpg)
 
-## **JEM **
+#### **JEM**
 JEM is an opensource component that is used for injection of smart logic into containers, that gives extra  abilities and extra automation to applications, that are designed to run inside Linux containers. 
 
 ## **JEM Core**
