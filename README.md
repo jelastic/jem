@@ -105,7 +105,7 @@ Application modules includes:
 **user.module** - JEM application module designed for user management
 
 
-**JEM Application Libraries**  (orange color on a scheme)
+## **JEM Application Libraries**  (orange color on a scheme)
 
 **apache-php-deploy.lib** - JEM library that implements deployment process for PHP applications in Apache using mod_php5/7 
 
