@@ -40,7 +40,6 @@ Jem Core Libraries is a set of JEM common system libraries that handling all the
 
 **svn.lib** - JEM library that implements SVN management stuff
 
-
 **git.lib**  - JEM library that implements GIT management stuff
 
 ## **Application Layer Modules**
