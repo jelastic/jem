@@ -72,7 +72,7 @@ Application modules includes:
 **balancer.module**  -  JEM application module that handles for automation  loadbalancers.
 **cartridge.module** -  JEM application module that does installation for OpenShift cartridges v1.
 
-**command.module** - 
+**command.module** - JEM common module for executing commands inside VZ container
 
 **configure.module**  -  JEM application module that is responsible for environment configuration.
 
@@ -107,7 +107,7 @@ Application modules includes:
 
 **apache-php-deploy.lib** - JEM library that implements deployment process for PHP applications in Apache using mod_php5/7 
 
-**apache-php-engine.lib** - JEM library that implements switching PHP versions in container
+**apache-php-engine.lib** - JEM library that implements switching PHP versions for Apache2 and mod_php
 
 **apache-php-ssl.lib** - JEM for managing SSL certifications in Apache2
 
@@ -147,7 +147,7 @@ for GlassFish
 
 **java-common-deploy.lib** - JEM library that implements general deployment concept for Java application servers
 
-**java-common-engine.lib** - JEM library that implements
+**java-common-engine.lib** -JEM library that adds ablility to switch different Java versions inside the container.
 
 **jetty-deploy.lib** - JEM library that implements deployment automation for Jetty
 
@@ -176,7 +176,7 @@ server.
 
 **path-manip.lib** - JEM library that implements path management/switching actions
 
-**php-common-deploy.lib** - JEM library that implements deployment automation for 
+**php-common-deploy.lib** - JEM common library that implements general deployment automation for PHP 
 
 **php-common-engine.lib** - JEM common library that implements general concepts for switching PHP engines.
 
