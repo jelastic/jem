@@ -17,7 +17,7 @@ Jem Core Libraries is a set of JEM common system libraries that handling all the
 
 **envinfo.lib** - JEM system library that helps JEM application to get information from containers metadata to let JEM know which kind of environment it is executing from and which kind of dependecy libraries need to be includes for managing stack.
 
-**log.lib** - JEM system library that implements logging  functionality.
+**log.lib** - JEM system library that implements logging functionality.
 
 **xml.lib** - JEM system library that implements XML processing operations (deprecated).
 
@@ -63,7 +63,7 @@ Application modules includes:
 
 **phpext.module** -   JEM application module that is used for enabling / disabling PHP extensions for application servers that are running PHP.
 
-**apache2ext.module** -  JEM application module that is used for enabling / disabling apache2 modules.
+**apache2ext.module** -  JEM application module that is used for enabling / disabling apache2 modules (deprecated).
 
 **keystore.module** -   JEM application module that is responsible for managing java keystores, also including operations like ceritificate modules validation, receiving a list of DNS alternative names from ceritificate, getting expiration date of given ceritificate, downloading certificates from storage and much more.
 
@@ -96,7 +96,7 @@ Application modules includes:
 
 **router.module** - JEM application module that is managing endpoints on resolver nodes
 
-**service.module** - JEM application service management module
+**service.module** - JEM application services management module
 
 **storage.module** - JEM application module for shared storage management 
 
@@ -205,7 +205,7 @@ postgres-dumper.lib - JEM library that implements database dumping for PostgreSQ
 
 **user-common.lib** - JEM library that implements users management inside the container
 
-**user-gate.lib** - JEM library that implements a containers management to make containers compartible with SSH-gaway service provided by Jelastic (R)
+**user-gate.lib** - JEM library that does users management in SSH gateway, a proprietary Jelastic (R) Infrastructure Component. 
  
 **virtuozzo.lib** - JEM library that implements a set functions related to Virtuozzo containers management
 
