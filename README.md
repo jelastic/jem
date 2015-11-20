@@ -145,25 +145,25 @@ for GlassFish
 
 **glassfish-tools.lib** - JEM library that has a set of tools for managing GlassFish cluster.
 
-**java-common-deploy.lib** - JEM library that implements
+**java-common-deploy.lib** - JEM library that implements general deployment concept for Java application servers
 
 **java-common-engine.lib** - JEM library that implements
 
-**jetty-deploy.lib** - JEM library that implements
+**jetty-deploy.lib** - JEM library that implements deployment automation for Jetty
 
-**jetty-replication.lib** - JEM library that implements
+**jetty-replication.lib** - JEM library that implements clusterring automation for Jetty
 
 **jetty-ssl.lib** - JEM library that implements SSL manament layer for Jetty servers.
 
 **mongo-passwd.lib** - JEM library that implements password reset for MongoDB
 
-**mysql-dumper.lib** - JEM library that implements
+**mysql-dumper.lib** - JEM library that implements dumping databases operations in MySQL
 
 **mysql-passwd.lib** - JEM library that implements password reset for MySQL, MariaDB, Percona, etc
 
-**nginx-php-deploy.lib** - JEM library that implements deployment automation for
+**nginx-php-deploy.lib** - JEM library that implements deployment automation for PHP-FPM container
 
-**nginx-php-engine.lib** - JEM library that implements
+**nginx-php-engine.lib** - JEM library that implements swithing PHP engines in container.
 
 **nginx-php-ssl.lib** - JEM library that implements SSL manament layer for NGINX 
 server.
@@ -174,7 +174,7 @@ server.
 
 **nodejs-common-engine.lib** - JEM common library that implements general concepts for switching NodeJS engines.
 
-**path-manip.lib** - JEM library that implements 
+**path-manip.lib** - JEM library that implements path management/switching actions
 
 **php-common-deploy.lib** - JEM library that implements deployment automation for 
 
@@ -208,4 +208,3 @@ postgres-dumper.lib - JEM library that implements database dumping for PostgreSQ
 **virtuozzo.lib** - JEM library that implements a set functions related to Virtuozzo containers management
 
 **vzexec.lib** - JEM library that implements remote commands execution on VZ containers
-
