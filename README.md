@@ -1,12 +1,13 @@
 ![JEM](http://oi63.tinypic.com/huoc5d.jpg)
 
 # **JEM**
-JEM is an opensource component that is used for injection of smart logic into containers, that gives extra  abilities and extra automation to applications, that are designed to run inside Linux containers. 
+JEM is an open source platform component, intended for injection of smart logic into containers. It gives extra abilities and extra automation for applications, designed to be run inside Linux containers.
 
 ## **JEM Core**
-Jem Core is an application that manage all the JEM modules and libraries. Also it does produce command line interface to external functions that are available from application modules.
+JEM Core is an application, that manages all of the JEM modules and libraries. Also, it does produce the command line interface for calling external functions, provided by application modules.
 
-Jem Core Libraries is a set of JEM common system libraries that handling all the operations that are usually performed by the application modules, this librariles includes a set of functions for proccessing system calls, mathematics, text proccessing, output proccessing, operations related to network, suppressing interactivity, testing etc.
+JEM Core Libraries represent a set of common system libraries for handling the operations, that are usually performed by application modules. These libraries comprise number of functions for processing system calls, mathematics, text processing, output processing, suppressing interactivity, testing, executing network-related operations, etc.
+
 
 ## **JEM Common libraries**  (blue color on a scheme)
 **core.lib** - basic JEM system library which implements inheritance, including, traping, executing, error throwing and othe basic system operations.
