@@ -1,12 +1,12 @@
 ![JEM](http://oi63.tinypic.com/huoc5d.jpg)
 
 # **JEM**
-JEM is an open source platform component, intended for injection of smart logic into containers. It gives extra abilities and extra automation for applications, designed to be run inside Linux containers.
+**JEM** is an open source platform component, intended for injection of smart logic into containers. It gives extra abilities and extra automation for applications, designed to be run inside Linux containers.
 
 ## **JEM Core**
-JEM Core is an application, that manages all of the JEM modules and libraries. Also, it does produce the command line interface for calling external functions, provided by application modules.
+**JEM Core** is an application, that manages all of the JEM modules and libraries. Also, it does produce the command line interface for calling external functions, provided by application modules.
 
-JEM Core Libraries represent a set of common system libraries for handling the operations, that are usually performed by application modules. These libraries comprise number of functions for processing system calls, mathematics, text processing, output processing, suppressing interactivity, testing, executing network-related operations, etc.
+**JEM Core Libraries** represent a set of common system libraries for handling the operations, that are usually performed by application modules. These libraries comprise number of functions for processing system calls, mathematics, text processing, output processing, suppressing interactivity, testing, executing network-related operations, etc.
 
 
 ## **JEM Common libraries**  (blue color on a scheme)
@@ -14,7 +14,7 @@ JEM Core Libraries represent a set of common system libraries for handling the o
 
 **default.lib** - system library, used for handling default operations with application modules, e.g. adding descriptions, help management, visioning, defining usage rules, etc.
 
-**output.lib** - system library, that specializes on output information management, like prompting errors and warnings, throwing JSON responses to STDOUT or STDERR outputs.
+**output.lib** - system library, that specializes on output information management, like prompting errors and warnings, throwing JSON responses to *STDOUT* or *STDERR* outputs.
 
 **envinfo.lib** - system library, that helps JEM application to retrieve the required information (like which kind of environment it is run at and list of dependent libraries, that needs to be included for managing stack) from container’s metadata and to pass it to JEM.
 
@@ -26,7 +26,7 @@ JEM Core Libraries represent a set of common system libraries for handling the o
 
 **string.lib** - system library, that implements a set of text processing operations.
 
-**net.lib** - system library, that implements common network-related operations like URL validation, parsing PORT/HOST/URI from URL, downloading files, etc.
+**net.lib** - system library, that implements common network-related operations like URL validation, parsing *PORT*/*HOST*/*URI* from URL, downloading files, etc.
 
 **tests.lib** - system library, that tests external functions, implemented in application modules.
 
@@ -47,20 +47,20 @@ JEM Core Libraries represent a set of common system libraries for handling the o
 **git.lib** - library, that implements GIT management stuff
 
 ## **Application Layer Modules**  (green color on a scheme)
-Application Layer Modules are designed for managing different application stacks inside containers. Such operations can be performed by Jelastic Platform Core or manually, with the help of command line interface. Each application module usually has functions, that are externally available from JEM. In case a module has a list of implementations, needed for different kinds of stacks, it includes specific extra libraries (each of which have unique implementation recipes, created specifically for a particular stack). Functions inside stack libraries are internal and cannot be called other than by parent module of this library.
+**Application Layer Modules** are designed for managing different application stacks inside containers. Such operations can be performed by Jelastic Platform Core or manually, with the help of command line interface. Each application module usually has functions, that are externally available from JEM. In case a module has a list of implementations, needed for different kinds of stacks, it includes specific extra libraries (each of which have unique implementation recipes, created specifically for a particular stack). Functions inside stack libraries are internal and cannot be called other than by parent module of this library.
 
 The list of application modules includes:
 
 **ssl.module** - implements basic functionality for enabling/disabling/configuring SSL certificates for:
-Java application servers: tomcat, glassfish, jetty;
-Load balancer: nginx;
-PHP application servers: httpd (Apache 2) and php-fpm (NGINX-PHP).
+* Java application servers: *tomcat*, *glassfish*, *jetty*;
+* Load balancer: *nginx*;
+* PHP application servers: *httpd* (Apache 2) and *php-fpm* (NGINX-PHP).
 
 It also requires a list of special libraries for managing each application server separately.
 
 **vcs.module** - implements VCS functionality for application stacks, like VCS projects management, checkout and update of projects, etc. For now, only Git and SVN version control systems are available for use. 
 
-***compute.module** - is used for deploying users’ applications into application servers. It also requires a list of dependent libraries with unique deployment procedures declared for different kinds of application servers.
+**compute.module** - is used for deploying users’ applications into application servers. It also requires a list of dependent libraries with unique deployment procedures declared for different kinds of application servers.
 
 **engine.module** - is used for switching JDK and PHP engines’ versions within the corresponding (i.e. running Java or PHP apps) application servers. 
 
@@ -68,7 +68,7 @@ It also requires a list of special libraries for managing each application serve
 
 **phpext.module** - is used for enabling/disabling PHP extensions for PHP application servers.
 
-**apache2ext.module** - is used for enabling/disabling apache2 modules (deprecated).
+**apache2ext.module** - is used for enabling/disabling *apache2* modules (deprecated).
 
 **keystore.module** - is responsible for managing Java keystores, including handling operations with certificates (like certificate modules’ validation, getting list of alternative DNS names, retrieving certificate expiration date, downloading it from storage and much more).
 
@@ -96,7 +96,7 @@ It also requires a list of special libraries for managing each application serve
 
 **firewall.module** - manages sets of common and custom firewall rules.
 
-**memcached.module** - is responsible for the memcached security management
+**memcached.module** - is responsible for the *memcached* security management
 
 **passwd.module** - manages authentication at different application servers and databases.
 
@@ -112,13 +112,13 @@ It also requires a list of special libraries for managing each application serve
 
 ## **JEM Application Libraries**  (orange color on a scheme)
 
-**apache-php-deploy.lib** - implements the process of PHP applications deployment in Apache using mod_php5/7.
+**apache-php-deploy.lib** - implements the process of PHP applications deployment in Apache using *mod_php5/7*.
 
-**apache-php-engine.lib** - handles PHP versions’ switching for apache2 and mod_php.
+**apache-php-engine.lib** - handles PHP versions’ switching for *apache2* and *mod_php*.
 
-**apache-php-ssl.lib** - manages SSL certification for apache2.
+**apache-php-ssl.lib** - manages SSL certification for *apache2*.
 
-**apache-ruby-deploy.lib** - implements the process of Ruby applications deployment in Apache using mod_ruby.
+**apache-ruby-deploy.lib** - implements the process of Ruby applications deployment in Apache using *mod_ruby*.
 
 **balancer-nginx.lib** - handles automatic configuration of NGINX load-balancing nodes.
 
@@ -168,9 +168,9 @@ It also requires a list of special libraries for managing each application serve
 
 **mysql-passwd.lib** - handles the password resetting function for MySQL, MariaDB, Percona, etc.
 
-**nginx-php-deploy.lib** - implements the deployment automation for php-fpm (NGINX-PHP) container.
+**nginx-php-deploy.lib** - implements the deployment automation for *php-fpm* (NGINX-PHP) container.
 
-**nginx-php-engine.lib** - handles PHP engine versions’ switching inside php-fpm (NGINX-PHP) container.
+**nginx-php-engine.lib** - handles PHP engine versions’ switching inside *php-fpm* (NGINX-PHP) container.
 
 **nginx-php-ssl.lib** - implements the SSL certificates’ management at NGINX server.
 
@@ -210,7 +210,7 @@ It also requires a list of special libraries for managing each application serve
 
 **user-common.lib** - common library, that is responsible for users’ management inside a container.
 
-**user-gate.lib** - handles users’ management via SSH gateway, a proprietary Jelastic® Infrastructure Component.
+**user-gate.lib** - handles users’ management via SSH gateway, a proprietary *Jelastic® Infrastructure Component*.
 
 **virtuozzo.lib** - implements a set of functions, related to Virtuozzo containers’ management.
 
