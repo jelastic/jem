@@ -33,6 +33,7 @@ $PROGRAM 'ifconfig';
 $PROGRAM 'grep';
 $PROGRAM 'awk';
 $PROGRAM 'sed';
+$PROGRAM 'ip';
 $PROGRAM 'chkconfig';
 
 inherit os default;
@@ -52,7 +53,7 @@ function setMac(){
 	until [ -n "$mac" ] 
 	do
 		sleep 1
-		mac=$(ip l show tap | sed -n -re '/\s*link/{s/.*ether\s+(\S+)\s+.*/\1/;p}')
+		mac=$($IP l show tap | $SED -n -re '/\s*link/{s/.*ether\s+(\S+)\s+.*/\1/;p}')
 	done
 	$SED -i "/^ifconfig/iip \"link set %% addr $mac\";" $VTUND_CONF
 }
@@ -112,7 +113,7 @@ function enableReplication(){
         VIP=''
         until [ -n "$VIP" ]
         do
-        	VIP=$(/sbin/ip a l | $GREP tap| $GREP 'inet ' | $AWK '{print $2}'| $SED 's/\/[0-9]*//g');
+        	VIP=$($IP a l | $GREP tap| $GREP 'inet ' | $AWK '{print $2}'| $SED 's/\/[0-9]*//g');
             sleep 1
         done
 	$SED -i "s/^VTUNIP[\=\"\.[:digit:]]\{0,\}$/VTUNIP=\"$VIP\"/"  $TOMCAT_HOME$TOMCAT_FILE

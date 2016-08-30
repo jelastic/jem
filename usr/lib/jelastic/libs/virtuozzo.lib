@@ -20,8 +20,9 @@
 [ -n "${VIRTUOZZOLIB_VERSION:-}" ] && return 0;
 VIRTUOZZOLIB_VERSION="0.1";
 
-$PROGRAM vzctl
-$PROGRAM vzlist
+$PROGRAM 'vzctl';
+$PROGRAM 'vzlist';
+$PROGRAM 'grep';
 
 # create a user container on HN
 # params:
@@ -39,7 +40,7 @@ function vzCreateContainer() {
 function vzIsContainerExists() {
     : ${1:?"Missing CTID param"};
     local ctid=$1
-    return $($VZLIST -a -o ctid | grep -qow ${ctid})
+    return $($VZLIST -a -o ctid | $GREP -qow ${ctid})
 }
 
 #
@@ -60,4 +61,22 @@ function readFileFromCtontainer() {
     vzIsContainerExists ${CTID} || { return 2; };
     cat "/vz/root/${CTID}/${filename}";
     return $?;
+}
+
+#
+# isContainerRunning
+#
+# ARGS:
+#       CTID:integer - container CTID
+# RESULT:
+#       0 - container status is running
+#       1 - container is stopped,mounted,suspended
+function isContainerRunning() {
+    : ${1:?"Missing CTID param"};
+    local CTID=$1
+    out=$($VZLIST -Ho status $CTID)
+    if [[ "x$out" != "xrunning" ]] ; then
+        return 1
+    fi
+    return 0
 }

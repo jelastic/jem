@@ -29,20 +29,22 @@ $PROGRAM 'curl';
 $PROGRAM 'zip';
 $PROGRAM 'unzip';
 $PROGRAM 'tar';
-$PROGRAM 'printenv';
 $PROGRAM 'ifconfig';
-$PROGRAM 'basename';
 $PROGRAM 'uuidgen';
 $PROGRAM 'erb';
 $PROGRAM 'groupadd';
 $PROGRAM 'adduser';
+$PROGRAM 'grep';
+$PROGRAM 'sed';
+$PROGRAM 'awk';
+$PROGRAM 'ip'
 
 
 ###### SERVICE STUFF #######
 
     function parseManifest(){
-        sed -e 's/:[^:\/\/]/="/g;s/$/"/g;s/ *=/=/g' $MANIFEST | grep -E "[a-zA-Z0-9]" | grep -i "name\|private\|version=" | sed  's/^-//g' | sed 's/-/_/g' | sed 's/ _//g' | sed  's/ //g'  | sed "s/\"'/\"/g"  | sed "s/\"'/\"/g" | sed "s/'\"/\"/g" > $MANIFEST_EXPORTED;
-        echo action_reset_password_hook=$(grep -A 100 "Subscribes" "$MANIFEST" | grep -B1 ":reset-password" | head -n1 | sed 's/://g' | sed 's/ //g') >> $MANIFEST_EXPORTED;
+        $SED -e 's/:[^:\/\/]/="/g;s/$/"/g;s/ *=/=/g' $MANIFEST | $GREP -E "[a-zA-Z0-9]" | $GREP -i "name\|private\|version=" | $SED  's/^-//g' | $SED 's/-/_/g' | $SED 's/ _//g' | $SED  's/ //g'  | $SED "s/\"'/\"/g"  | $SED "s/\"'/\"/g" | $SED "s/'\"/\"/g" > $MANIFEST_EXPORTED;
+        echo action_reset_password_hook=$($GREP -A 100 "Subscribes" "$MANIFEST" | $GREP -B1 ":reset-password" | head -n1 | $SED 's/://g' | $SED 's/ //g') >> $MANIFEST_EXPORTED;
         [ -f $MANIFEST_EXPORTED ] && source $MANIFEST_EXPORTED;
         [ -f ${CARTRIDGE_HOME}/jelastic/jelastic.conf ] && source ${CARTRIDGE_HOME}/jelastic/jelastic.conf;
     }
@@ -50,9 +52,9 @@ $PROGRAM 'adduser';
    function parseEndPoints(){
         for value in $(cat $MANIFEST_EXPORTED)
         do
-	   echo $value | grep -q "Private_IP_Name=\|Private_Port_Name=\|Private_Port=" && eval "export $value";
+	   echo $value | $GREP -q "Private_IP_Name=\|Private_Port_Name=\|Private_Port=" && eval "export $value";
            [ ! -z $Private_IP_Name ] && [ ! -z $Private_Port_Name ] && [ ! -z $Private_Port ] && {
-		eval "export J_OPENSHIFT_${Cartridge_Short_Name}_${Private_IP_Name}=\"$(ip a | grep -A1 venet0: | grep inet | awk '{print $2}'| sed 's/\/[0-9]*//g')\"";
+		eval "export J_OPENSHIFT_${Cartridge_Short_Name}_${Private_IP_Name}=\"$($IP a | $GREP -A1 venet0 | $GREP inet | $AWK '{print $2}'| $SED 's/\/[0-9]*//g' | tail -n 1)\"";
                 eval "export OPENSHIFT_${Cartridge_Short_Name}_${Private_IP_Name}=0.0.0.0"; 
                 eval "export OPENSHIFT_${Cartridge_Short_Name}_${Private_Port_Name}=\"${Private_Port}\"";
                 unset Private_IP_Name;
@@ -65,9 +67,9 @@ $PROGRAM 'adduser';
     function saveEnvironmentVariables(){
         local manualy_exported=$(mktemp);
         proceedStaticENV;
-        declare -p | sed 's/declare //g' | sed 's/^-x\|^-r\|^--\|^-ir\|^-i\|^-a\|^-ir\|^-ar\|-A\|^r \|\|^"//g' | sed 's/^ *//' |  sed '/^BASH\|^SHELLUID=\|^EUID=\|^UID\|^OLDPWD=\|^PPID=\|^SHELLOPTS\|^IFS=\|^LS_COLORS\|^HOME/d' | sed '/^__/d' | sed 's/^ *//' |  grep  "=" > $JENVIRONMENT;
+        declare -p | $SED 's/declare //g' | $SED 's/^-x\|^-r\|^--\|^-ir\|^-i\|^-a\|^-ir\|^-ar\|-A\|^r \|\|^"//g' | $SED 's/^ *//' |  $SED '/^BASH\|^SHELLUID=\|^EUID=\|^UID\|^OLDPWD=\|^PPID=\|^SHELLOPTS\|^IFS=\|^LS_COLORS\|^HOME/d' | $SED '/^__/d' | $SED 's/^ *//' |  $GREP  "=" > $JENVIRONMENT;
         $SED -i '/OPENSHIFT\|LOGIN\|PASS\|^PATH\|CARTRIDGE\|RUNAS\|DATA_OWNER\|HOME\|Name\|version\|Version\|Node_Mission\|Engine_Type\|_User\|Smart_Redirect\|Node_Type\|Firewall_Enabled\|Webroot_Path\|Context_Regex/!d' $JENVIRONMENT;
-        cat  $JENVIRONMENT | sed 's/^OPENSHIFT/export OPENSHIFT/g' | sed 's/^env_/export /g'  > $manualy_exported;
+        cat  $JENVIRONMENT | $SED 's/^OPENSHIFT/export OPENSHIFT/g' | $SED 's/^env_/export /g'  > $manualy_exported;
         [ -f "$manualy_exported" ] && cat $manualy_exported > $JENVIRONMENT && rm $manualy_exported;
         [ -f $JENVIRONMENT ] && cat $JENVIRONMENT > ${CARTRIDGE_HOME}/.profile;
     }
@@ -81,10 +83,10 @@ $PROGRAM 'adduser';
         local envdir=${CARTRIDGE_HOME}/env;
      
         [ -d $envdir ] && {
-        for envnode in $(ls -1 ${envdir} 2>/dev/null | grep -v "erb$"  )
+        for envnode in $(ls -1 ${envdir} 2>/dev/null | $GREP -v "erb$"  )
         do
-                export "$($BASENAME $envnode)"="$(cat ${envdir}/${envnode})"; # for current configure session
-                export "env_$($BASENAME $envnode)"="$(cat ${envdir}/${envnode})"; # for exports
+                export "$(basename $envnode)"="$(cat ${envdir}/${envnode})"; # for current configure session
+                export "env_$(basename $envnode)"="$(cat ${envdir}/${envnode})"; # for exports
         done;
         }
     }
@@ -95,19 +97,19 @@ $PROGRAM 'adduser';
 
         local erbfilelist=$(mktemp);
         local varlist=$(mktemp);
-        cat "${J_OPENSHIFT_METADATA_DIR}/managed_files.yml" | grep ".erb" | sed "s/'//g" | sed "s@^- @/${CARTRIDGE_HOME}/@g" > $erbfilelist;
+        cat "${J_OPENSHIFT_METADATA_DIR}/managed_files.yml" | $GREP ".erb" | $SED "s/'//g" | $SED "s@^- @/${CARTRIDGE_HOME}/@g" > $erbfilelist;
 
         [ ! -s $erbfilelist  ] && return 0;
 
         for erbfile in $(ls -1 $(cat ${erbfilelist}) 2>/dev/null)
         do
-            [ -f "$erbfile" ] && cat "$erbfile" | sed '/ENV\[/!d;s//&\n/;s/.*\n//;:a;/\]/bb;$!{n;ba};:b;s//\n&/;P;D' | sed "s/'//g"  > $varlist;
-            exportvar=$($BASENAME  $erbfile | sed 's/.erb//g');
+            [ -f "$erbfile" ] && cat "$erbfile" | $SED '/ENV\[/!d;s//&\n/;s/.*\n//;:a;/\]/bb;$!{n;ba};:b;s//\n&/;P;D' | $SED "s/'//g"  > $varlist;
+            exportvar=$(basename  $erbfile | $SED 's/.erb//g');
             cp "$erbfile"   "/tmp/${exportvar}";
             for envvar in $(cat ${varlist})
             do
                 value=$(eval echo "\$$envvar")
-                [ ! -z "$value" ] && sed -i "s@<%= ENV\['$envvar'\] %>@$value@g"  "/tmp/${exportvar}";
+                [ ! -z "$value" ] && $SED -i "s@<%= ENV\['$envvar'\] %>@$value@g"  "/tmp/${exportvar}";
             done
 
             export "${exportvar}"="$(cat "/tmp/${exportvar}")" > /dev/null 2>&1;
@@ -125,34 +127,35 @@ $PROGRAM 'adduser';
    function proceedMountPoints(){
             local resource_config="${CARTRIDGE_HOME}/jelastic/file_manager.conf";
             [ ! -f $resource_config ] && return 0;
-            local sections=$(sed -ne '/\[.*\]/p' $resource_config | sed 's/\[\|\]//g');
+            local sections=$($SED -ne '/\[.*\]/p' $resource_config | $SED 's/\[\|\]//g');
             local fstabfile="/etc/fstab";
-            [ ! -d $CARTRIDGE_APP_SHARED ] && mkdir -p $CARTRIDGE_APP_SHARED || return 0;
+            [ ! -d $CARTRIDGE_APP_SHARED ] && mkdir -p $CARTRIDGE_APP_SHARED;
 
             echo "/var/spool/cron $J_OPENSHIFT_CRON_DIR none  bind 0 0" > $fstabfile;
 
             for section in $sections
             do
-                [ -d "${CARTRIDGE_APP_SHARED}/${section}" ] && mkdir -p "${CARTRIDGE_APP_SHARED}/${section}"
-                resourcelist=$(sed -n "/$section\]/,/\[/p" $resource_config | grep -v "\[\|\]");
+                [ ! -d "${CARTRIDGE_APP_SHARED}/${section}" ] && mkdir -p "${CARTRIDGE_APP_SHARED}/${section}"
+                resourcelist=$($SED -n "/$section\]/,/\[/p" $resource_config | $GREP -v "\[\|\]");
                     for resource in ${resourcelist}
                     do
                         srcdir="${CARTRIDGE_HOME}/${resource}";
                         
-                        if [ ${#resourcelist[@]} -eq 1 -a "${section}" == "$($BASENAME $resource)"  ]
+                        if [ ${#resourcelist[@]} -eq 1 -a "${section}" == "$(basename $resource)"  ]
                         then
                            dstdir="${CARTRIDGE_APP_SHARED}/${section}";
                         else
-                           dstdir="${CARTRIDGE_APP_SHARED}/${section}/$($BASENAME $resource)";
+                           dstdir="${CARTRIDGE_APP_SHARED}/${section}/$(basename $resource)";
                         fi
 
                         [ ! -d $dstdir ] && mkdir -p $dstdir;
-                        if ! grep -qP "${srcdir}\s+${dstdir}\s+none\s+bind\s+0\s+0" ${fstabfile}
+                        if ! $GREP -qP "${srcdir}\s+${dstdir}\s+none\s+bind\s+0\s+0" ${fstabfile}
                         then
                              echo "${srcdir}  ${dstdir} none  bind 0 0" >> $fstabfile ;
                         fi
                     done
             done
+	    chkconfig network on;
             mount -a;
     }
 
@@ -176,15 +179,9 @@ $PROGRAM 'adduser';
 
         for erbfile in $(ls -1 $(cat ${erbfilelist}) 2>/dev/null)
         do
-            [ -f "$erbfile" ] && cat "$erbfile" | sed '/ENV\[/!d;s//&\n/;s/.*\n//;:a;/\]/bb;$!{n;ba};:b;s//\n&/;P;D' | sed "s/'//g"  > $varlist;
-            staticfile=$(echo $erbfile | sed 's/.erb//g');
+            [ -f "$erbfile" ] && cat "$erbfile" | $SED '/ENV\[/!d;s//&\n/;s/.*\n//;:a;/\]/bb;$!{n;ba};:b;s//\n&/;P;D' | $SED "s/'//g"  > $varlist;
+            staticfile=$(echo $erbfile | $SED 's/.erb//g');
             $ERB $erbfile > $staticfile;
-#            cp  "$erbfile"   "$staticfile";
-#            for envvar in $(cat ${varlist})
-#            do
-#                value=$(eval echo "\$$envvar")
-#                [ ! -z "$value" ] && sed -i "s@<%= ENV\['$envvar'\] %>@$value@g"  "$staticfile";
-#            done
             [ -f "$varlist" ] && rm $varlist;
         done
 
@@ -194,29 +191,29 @@ $PROGRAM 'adduser';
     function generateCartDATA(){
         local openshift_vars=$(mktemp);
 
-        typeset | grep "^OPENSHIFT\|^CART_PROP_" | sed 's/CART_PROP_//g' > $openshift_vars;
+        typeset | $GREP "^OPENSHIFT\|^CART_PROP_" | $SED 's/CART_PROP_//g' > $openshift_vars;
         local key;
         local value;
         while read envvar 
         do
-            key=$(awk -F "=" '{print $1}' <<< $envvar);
-            #value=$(awk -F "=" '{for(i=1;i<2;i++) $i="";print}' <<< $envvar);
+            key=$($AWK -F "=" '{print $1}' <<< $envvar);
+            #value=$($AWK -F "=" '{for(i=1;i<2;i++) $i="";print}' <<< $envvar);
             value=$(eval echo "\$$key");
             result=${result}$(echo {\"Key\":\""$key"\", \"Value\":\""$value"\"});
         done < ${openshift_vars}
-        cartdata=$(sed 's/}{/},{/g' <<< "[$result]")
+        cartdata=$($SED 's/}{/},{/g' <<< "[$result]")
         [ -f "$openshift_vars" ] && rm "$openshift_vars";
     }
 
     function addNativeOpenshiftUser(){
         [ -z $OPENSHIFT_GEAR_UUID ] && return 0;
-        APPSERVER_USER_UID=`grep "^jelastic" /etc/passwd | awk -F ":" '{print $3}'`
-        APPSERVER_GROUP_UID=`grep "^jelastic" /etc/group | awk -F ":" '{print $3}'`
+        APPSERVER_USER_UID=`$GREP "^jelastic" /etc/passwd | $AWK -F ":" '{print $3}'`
+        APPSERVER_GROUP_UID=`$GREP "^jelastic" /etc/group | $AWK -F ":" '{print $3}'`
         [ -n $APPSERVER_USER_ID  ] && APPSERVER_USER_ID="700";
         [ -n $APPSERVER_GROUP_ID  ] && APPSERVER_GROUP_ID="700";
 
-        grep -q "$OPENSHIFT_GEAR_UUID"  /etc/passwd || $ADDUSER  -o --uid $APPSERVER_USER_UID --gid $APPSERVER_GROUP_UID --home-dir $CARTRIDGE_HOME --shell /bin/bash $OPENSHIFT_GEAR_UUID > /dev/null 2>&1;
-        grep -q "$OPENSHIFT_GEAR_UUID" /etc/group || $GROUPADD  -o $OPENSHIFT_GEAR_UUID --gid $APPSERVER_GROUP_UID > /dev/null 2>&1;
+        $GREP -q "$OPENSHIFT_GEAR_UUID"  /etc/passwd || $ADDUSER  -o --uid $APPSERVER_USER_UID --gid $APPSERVER_GROUP_UID --home-dir $CARTRIDGE_HOME --shell /bin/bash $OPENSHIFT_GEAR_UUID > /dev/null 2>&1;
+        $GREP -q "$OPENSHIFT_GEAR_UUID" /etc/group || $GROUPADD  -o $OPENSHIFT_GEAR_UUID --gid $APPSERVER_GROUP_UID > /dev/null 2>&1;
         return 0;
     }
 
@@ -233,7 +230,7 @@ $PROGRAM 'adduser';
         #export "OPENSHIFT_${Cartridge_Short_Name}_DIR"="$CARTRIDGE_HOME/versions/${VERSION}/${Name}-${VERSION}";
         export "OPENSHIFT_${Cartridge_Short_Name}_DIR"="$CARTRIDGE_HOME/";
         export "OPENSHIFT_REPO_DIR"="$CARTRIDGE_HOME/";
-        export "OPENSHIFT_${Cartridge_Short_Name}_IP"=$(ip a show venet0:0 | grep venet0:0 | awk '{print $2}' | sed 's/\/[0-9]*//g');
+        export "OPENSHIFT_${Cartridge_Short_Name}_IP"=$($IP a show venet0 | $GREP venet0 | $AWK '{print $2}' | $SED 's/\/[0-9]*//g' | tail -n1);
         export "OPENSHIFT_${Cartridge_Short_Name}_PID_DIR"="/var/run/cartridges";
         export "OPENSHIFT_APP_NAME"="${Name}";   
         export "OPENSHIFT_APP_DNS"="${FQDN}";
@@ -241,15 +238,15 @@ $PROGRAM 'adduser';
         export "OPENSHIFT_CLOUD_DOMAIN"="${FQDN}";
         export "OPENSHIFT_DATA_DIR"="/opt/${Name}/data";
         export "OPENSHIFT_TMP_DIR"="/opt/${Name}/tmp";
-        [ -z $OPENSHIFT_APP_UUID ] && export "OPENSHIFT_APP_UUID"=$($UUIDGEN | sed 's/-//g');
-        [ -z $OPENSHIFT_GEAR_UUID ] && export "OPENSHIFT_GEAR_UUID"=$($UUIDGEN | sed 's/-//g');
-        export "OPENSHIFT_GEAR_MEMORY_MB"="$(free -m | grep Mem | awk '{print $2}')";      
+        [ -z $OPENSHIFT_APP_UUID ] && export "OPENSHIFT_APP_UUID"=$($UUIDGEN | $SED 's/-//g');
+        [ -z $OPENSHIFT_GEAR_UUID ] && export "OPENSHIFT_GEAR_UUID"=$($UUIDGEN | $SED 's/-//g');
+        export "OPENSHIFT_GEAR_MEMORY_MB"="$(free -m | $GREP Mem | $AWK '{print $2}')";      
 
         #Iinitializing endpoints
 
 
-        export "J_OPENSHIFT_${Cartridge_Short_Name}_IP"=$(ip a show venet0:0 | grep venet0:0 | awk '{print $2}' | sed 's/\/[0-9]*//g');
-        export "J_OPENSHIFT_${Cartridge_Short_Name}_${Private_IP_Name}"=$(ip a show venet0:0 | grep venet0:0 | awk '{print $2}' | sed 's/\/[0-9]*//g');
+        export "J_OPENSHIFT_${Cartridge_Short_Name}_IP"=$($IP a show venet0 | $GREP venet0 | $AWK '{print $2}' | $SED 's/\/[0-9]*//g' | tail -n 1);
+        export "J_OPENSHIFT_${Cartridge_Short_Name}_${Private_IP_Name}"=$($IP a show venet0 | $GREP venet0 | $AWK '{print $2}' | $SED 's/\/[0-9]*//g' | tail -n 1);
         export "OPENSHIFT_${Cartridge_Short_Name}_IP"="0.0.0.0";
         export "OPENSHIFT_${Cartridge_Short_Name}_${Private_IP_Name}"="0.0.0.0";
         export "OPENSHIFT_${Cartridge_Short_Name}_${Private_Port_Name}"="${Private_Port}";
@@ -300,9 +297,9 @@ $PROGRAM 'adduser';
         proceedDynamicENV;
         proceedDynamicDATA;
         saveEnvironmentVariables;
-        [ -d "$J_OPENSHIFT_APPHOME_DIR" ] &&  [ ! -L "$CARTRIDGE_APP_HOME"  ] && ln -s "$J_OPENSHIFT_APPHOME_DIR" "$CARTRIDGE_APP_HOME";
         [ ! -d "${J_OPENSHIFT_APPHOME_DIR}/data"  ]  && mkdir -p "${J_OPENSHIFT_APPHOME_DIR}/data";
         [ ! -d "${J_OPENSHIFT_APPHOME_DIR}/tmp"  ]  && mkdir -p "${J_OPENSHIFT_APPHOME_DIR}/tmp";
+	[ -d "$J_OPENSHIFT_APPHOME_DIR" ] &&  [ ! -L "$CARTRIDGE_APP_HOME"  ] && ln -s "$J_OPENSHIFT_APPHOME_DIR" "$CARTRIDGE_APP_HOME";
         [ ! -d "${DEFAULT_JELASTIC_KEY_PATH}"  ]  && mkdir -p "${DEFAULT_JELASTIC_KEY_PATH}";
         [ ! -d "${J_OPENSHIFT_CRON_DIR}"  ]  && mkdir -p "${J_OPENSHIFT_CRON_DIR}";
         [ ! -d "$J_OPENSHIFT_KEYS_DIR" ] && mkdir -p "$J_OPENSHIFT_KEYS_DIR";       

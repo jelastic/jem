@@ -1,0 +1,573 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+inherit os net vzexec virtuozzo;
+include log;
+
+DESCRIPTION="Manipulate NFS authentication inside container";
+VERSION="1"
+DEFAULT_ACTION="Usage";
+
+declare -l ATYPE;
+declare DESTINATION;
+declare -a IPLIST;
+declare -i CTID;
+declare FALSE=1
+declare TRUE=0
+
+EXPORTS_PATH="/etc/exports"
+EXPORTS_EXT=""
+CONTAINER_EXPORTS_FILE="${EXPORTS_PATH}${EXPORTS_EXT}"
+CONTAINER_NFS_CONFIG_FILE="/etc/ganesha/ganesha.conf"
+CONTAINER_NFS_CONFIG_DIR="/etc/ganesha"
+NFS_CONFIG_DIR="/etc/ganesha"
+NFS_CONFIG_FILE="/etc/ganesha/ganesha.conf"
+DEFAULTEXPORTOPT="(async,rw,no_subtree_check,no_root_squash)"
+NFS_BACKEND="Native"  #posible values native,ganesha
+
+MOUNTPROG="/sbin/unfsd"
+MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-server.tar.gz"
+
+$PROGRAM "tar"
+
+function doUsage() {
+    showUsageMessage
+}
+
+function onModLoadCallback() {
+    log "Preload callback";
+
+    ## TODO: remove "params" garbarge option
+    local temp=`getopt -o t:,l:,p:,c:,r: -l list:,type:,path:,ctid:,readonly: -- params "$@" 2>/dev/null` oldifs;
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp";
+
+    while true ; do
+        case "$1" in
+            -t | --type)
+                shift;
+                ATYPE=${1,,}
+                shift;
+                ;;
+            -l | --list )
+                shift;
+                oldifs=$IFS;
+                IFS=';';
+                IPLIST=(${1});
+                IFS=${oldifs};
+                shift;
+                ;;
+            -p | --path )
+                shift;
+                DESTINATION=${1}
+                shift;
+                ;;
+            -c | --ctid )
+                shift;
+                CTID=$1
+                vzexecSetCTID $CTID
+                shift;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+    done;
+    [[ ! -z "${CTID}" ]] && {
+        NFS_CONFIG_DIR="/vz/root/${CTID}${NFS_CONFIG_DIR}"
+        NFS_CONFIG_FILE="/vz/root/${CTID}${NFS_CONFIG_FILE}"
+        EXPORTS_FILE="/vz/root/${CTID}${CONTAINER_EXPORTS_FILE}"
+    }
+}
+
+
+function dosetupUtils() {
+    local issue_file="/vz/root/${CTID}/etc/issue";
+    local release_files="/vz/root/${CTID}/etc/*-release";
+
+    if [[ ! -e "${MOUNTPACKAGE}" ]] ; then
+        log "${MOUNTPACKAGE} not found!"
+        exit 1;
+    fi
+    issue_string=$(cat $release_files $issue_file 2>/dev/null);
+    OS=$(detectOS "$issue_string")
+    OS_ver=$(getOSVersion "$issue_string")
+    OS_ver=${OS_ver%%.*}
+    installCmd=$(installPackageCmd $OS install rpcbind)
+    #JE-25896
+    if [ "x$OS" == "xalpine" ] ; then
+        echo "Alpine linux is not supported"
+        return $FALSE
+    fi
+    if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "5" ] ; then
+        echo "Centos 5 is not supported"
+        return $FALSE
+    fi
+    if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "6" ] ; then
+        echo "Debian 6 is not supported"
+        return $FALSE
+    fi
+
+    $TAR zxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
+
+    # install systemD unit
+    [[ -d "/vz/root/${CTID}/lib/systemd/system" ]] && echo "$SystemDUnit" > "/vz/root/${CTID}/lib/systemd/system/unfsd.service"
+    isContainerRunning ${CTID} && {
+        vzexecRun "$installCmd"
+        if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" -o "x$OS" == "xsuse" ] ; then
+            vzexecRun 'ln -s "/etc/rc.d/init.d/unfsd.jelastic" "/etc/init.d/unfsd.jelastic"'
+        fi
+
+        if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
+            vzexecRun 'update-rc.d unfsd.jelastic defaults'
+            if [ "x$OS" == "xdebian" ] ; then
+                if [ "$OS_ver" -ge "8" ] ; then
+                    vzexecRun "systemctl enable unfsd"
+                else
+                    vzexecRun 'sed -i -r "/^#/!s/exit\s+0/service rpcbind start;\n\/etc\/init.d\/unfsd.jelastic start;\nexit 0/g" /etc/rc.local'
+                fi
+            fi
+        fi
+
+        vzexecRun "[ -f /etc/init.d/rpcbind ] && /etc/init.d/rpcbind restart"
+        vzexecRun "systemctl restart rpcbind"
+        vzexecRun 'sname="rpcbind.service"; srv="/lib/systemd/system/$sname"; [ -f "$srv" ] && ln -s $srv "/etc/systemd/system/multi-user.target.wants/$sname"'
+        vzexecRun 'sname="rpcbind.target"; srv="/lib/systemd/system/$sname"; [ -f "$srv" ] && ln -s $srv "/etc/systemd/system/multi-user.target.wants/$sname"'
+        vzexecRun "systemctl enable unfsd"
+        vzexecRun 'sed -i "s/\/usr\/sbin\/unfsd/\/sbin\/unfsd/g" /etc/init.d/unfsd.jelastic'
+        vzexecRun 'sed -i "s/\/usr\/sbin\/unfsd/\/sbin\/unfsd/g" /etc/rc.d/init.d/unfsd.jelastic'
+        if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xsuse" ] ; then
+            vzexecRun "chkconfig --level 345 rpcbind on"
+            vzexecRun "chkconfig --level 345 unfsd.jelastic on"
+        fi
+        vzexecRun "/etc/init.d/unfsd.jelastic start"
+    }
+    return $TRUE
+}
+
+function _adjustFirewall() {
+    isContainerRunning ${CTID} || return $FALSE;
+    vzexecRun "jem firewall isEnabled"
+    fwstatus=$(vzexecGetLastErrCode)
+    if [[ "$fwstatus" -gt 0 ]] ; then
+        #firewall is not running in container (or old jem inside)
+        [ -e "/vz/root/${CTID}/etc/exports" ] && NFSIPS=($($SED -re 's/.+(\s|\t)+(([0-9]+\.){3}[0-9]+(\/[0-9]{0,2})?).*/\2/g' -e '/#/d' "/vz/root/${CTID}/etc/exports" | sort | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'))
+
+        vzexecRun "which iptables"
+        IPT="$(vzexecGetLastStdOut)"
+        if [ ! -z "$IPT" ] ; then
+
+            if [[ "${#NFSIPS[@]}" -gt 0 ]] ; then
+                for nfsip in ${NFSIPS[@]} ; do
+                    #remove rule if already exists
+                    vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                    vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                    #add new rule for selected IP
+                    vzexecRun "$IPT -I INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                    vzexecRun "$IPT -I INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                done
+            fi
+            vzexecRun "$IPT -D INPUT -i lo -j ACCEPT"
+            vzexecRun "$IPT -I INPUT -i lo -j ACCEPT"
+
+            vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -j DROP"
+            vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
+            #DROP ALL OTHER SOURCES
+            vzexecRun "$IPT -A INPUT -p udp -m multiport --dports 111,2049 -j DROP"
+            vzexecRun "$IPT -A INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
+            vzexecRun "service iptables save"
+            #JE-26417
+            vzexecRun "[ -x /etc/init.d/iptables-persistent ] && /etc/init.d/iptables-persistent save"
+            vzexecRun "[ -x /etc/init.d/netfilter-persistent ] && /etc/init.d/netfilter-persistent save"
+        fi
+    else
+        #firewall is enabled, so call reconfiguration method
+        vzexecRun "jem firewall FWReconfigure"
+    fi
+}
+
+function _checkConfigs() {
+    local UNFSDBIN='/sbin/unfsd'
+    [[ ! -e "/vz/root/${CTID}/etc/exports" ]] && return 1
+    isContainerRunning ${CTID} && {
+       vzexecRun "$UNFSDBIN -T"
+       errCode=$(vzexecGetLastErrCode)
+       [[ "$errCode" -ne 0 ]] && return $FALSE
+    }
+    return $TRUE
+}
+
+function _nfsReexport() {
+    log "ReExporting shares"
+    _checkConfigs || {
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" ; return 99;
+        return $FALSE
+    }
+    _adjustFirewall
+    PID=$(vzctl exec ${CTID} pgrep unfsd)
+    if [[ ! -z "${PID}" ]] ; then
+         vzctl exec ${CTID} kill -HUP $PID > /dev/null 2>&1
+    fi
+}
+
+function doRestart() {
+    _nfsReexport
+}
+
+function getGaneshaCfgValue() {
+    local cfgFile="$1"
+    local key=$2
+    cfgFile=("${cfgFile[*]//\}/$'\n'\}}")
+    cfgFile=("${cfgFile[*]//{/{$'\n'}")
+    cfgFile=("${cfgFile[*]//\    =/=}")
+    cfgFile=("${cfgFile[*]//=\   /=}")
+    cfgFile=("${cfgFile[*]//\ =\ /=}")
+    local result=$($SED -re "/$key/!d" <<< "${cfgFile:0:${#cfgFile}}" | $SED -re "/#.*$key/d" | $SED -re "s/.*($key=([^;]*)).*/\2/g")
+    log "$key = $result"
+    echo "${result}"
+}
+
+function getGaneshaLastExportedID() {
+    OLDIFS=$IFS;IFS=$'\n'
+    local configFiles=($(find "${NFS_CONFIG_DIR}/jelastic" -type f))
+    IFS=$OLDIFS
+    local IDS=()
+    local result=0
+    for (( i=0; i<${#configFiles[@]}; i++ )); do
+        log "getting export_id from ${configFiles[$i]}"
+        IDS=(${IDS[*]} $(getGaneshaCfgValue "$(<"${configFiles[$i]}")" "Export_Id"))
+    done
+    [[ ! -z "${IDS[*]}" ]] && {
+        _ids="${IDS[*]}"
+        result=$(sort -r <<< "${_ids//\ /$'\n'}" | head -n 1)
+        log "lastis is $result"
+    }
+    echo "${result}"
+}
+
+function makeConfigFileName() {
+    local _path="${1}"
+    _path="${_path[*]//\//_}"
+    _path="${_path[*]// /_}.conf"
+    echo "${_path}"
+}
+
+function replaceGaneshaClientsBlock() {
+    local _config="${1}"
+    local _newClients="${2}"
+    [[ -e "${_config}" ]] && return 1
+
+    _newClients=${_newClients//\}/\\\}}
+    _newClients=${_newClients//\{/\\\{}
+    _newClients=${_newClients////\\/}
+    _newClients=${_newClients//$'\n'/\\n}
+    re='0,/\}/s//\}\n'$_newClients'\n/'
+
+    $SED -i -re "/CLIENT/d" "$_config"
+    $SED -i -re "$re" "$_config"
+    return $?
+}
+
+
+function _addGaneshaip() {
+    if [[ -z "${IPLIST[*]}" ]] ; then
+        log "ADD: Empty ip list. Nothing to do. Exiting";
+        return;
+    fi
+    local aCurrentIPs=()
+
+    eval "$(sed -re "/^R[OW]:.*/{s/^((RO|RW):)?(\/.*)/accessMode='\2';destinationPath='\3'/g;ta};s/^(\/.*)/destinationPath='\1'/g;ta;s/(.*)/errValue='\1'/;q1;:a;q0;" <<< "$DESTINATION")"
+    [[ -z "$errValue" ]] && {
+        writeJSONResponseErr "result=>4066" "message=>Wrong param. DESTINATION required" ;
+        return 1;
+    }
+    _destPath="${NFS_CONFIG_DIR}/jelastic/$(makeConfigFileName "$destinationPath")"
+    [[ -z "${accessMode}" ]] && accessMode="RW"
+    ACCESSMODE=${accessMode^^}
+
+    [[ ! -e "${NFS_CONFIG_FILE}" ]] && echo "${GENERICCONF}" > "${NFS_CONFIG_FILE}"
+
+    if [[ -e "${_destPath}" ]] ; then
+        aCurrentIPs=($(getGaneshaCfgValue "$(<${_destPath})" "Clients"))
+    else
+        SHAREPATH="${destinationPath}"
+        PSEUDO="${destinationPath}"
+        ID="$(getGaneshaLastExportedID)"
+        let ID=ID+1
+        echo "$(renderTemplate "$SHARETEMPLATE")" > "${_destPath}"
+        includeFile="${CONTAINER_NFS_CONFIG_DIR}/jelastic/${_destPath##*/}"
+        echo "%include ${includeFile}" >> "${NFS_CONFIG_FILE}"
+        $SED -i -re "/${includeFile//\//\\/}/d" "${NFS_CONFIG_FILE}"
+    fi
+
+    log "Adding IPs to exports file (${_destPath})"
+    for i in "${IPLIST[@]}" ; do
+        isValidIP ${i%\/*} || continue
+        if [[ -z $(indexOf "${aCurrentIPs[*]}" "$i") ]] ; then
+            aCurrentIPs=(${aCurrentIPs[*]} "$i")
+            log "${i} added"
+        else
+            log "${i} already in list"
+        fi
+    done
+
+    sIP="${aCurrentIPs[*]}"
+    IP="${sIP// /,}"
+    newClientSection=$(renderTemplate "$CLIENTSECTION")
+    replaceGaneshaClientsBlock "$_destPath" "$newClientSection"
+
+    return $?
+}
+
+function _addNativeip() {
+    if [[ -z "${IPLIST[*]}" ]] ; then
+        log "ADD: Empty ip list. Nothing to do. Exiting";
+        return;
+    fi
+
+    eval "$($SED -re "/^r[ow]:.*/{s/^((ro|rw):)?(\/.*)/accessMode='\2'\ndestinationPath='\3'/g;ta};s/^(\/.*)/destinationPath='\1'/g;ta;s/(.*)/errValue='\1'/;q1;:a;q0;" <<< "$DESTINATION" |  $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
+    [[ -z "$destinationPath" ]] && {
+        writeJSONResponseErr "result=>4066" "message=>Wrong param. DESTINATION required" ;
+        return 1;
+    }
+
+    local aCurrentIPs=()
+    local running
+
+    isContainerRunning ${CTID} ; running=$?
+    if [[ $running -ne 0 ]] ; then
+        $VZCTL mount $CTID > /dev/null 2>&1
+    else
+        if ! vzexecRun "which rpcbind" ; then
+            out=$(dosetupUtils $CTID)
+            if [[ $? -ne $TRUE ]]; then
+                writeJSONResponseOut "result=>4112" "message=>$out" ;
+                return $FALSE
+            fi
+        fi
+
+        if [[ ! -e "/vz/root/${CTID}${MOUNTPROG}" ]] ; then
+            out=$(dosetupUtils $CTID)
+            if [[ $? -ne $TRUE ]]; then
+                writeJSONResponseOut "result=>4112" "message=>$out" ;
+                return $FALSE
+            fi
+        fi
+    fi
+
+    if [ -e "${EXPORTS_FILE}" ] ; then
+        dPath="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< $destinationPath)\s+"
+        aCurrentIPs=($(grep -E "$dPath" "${EXPORTS_FILE}" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])(\/[0-9]{2})?'))
+    fi
+
+    log "Adding IPs to exports file (${EXPORTS_FILE})"
+    for i in "${IPLIST[@]}" ; do
+        isValidIP $i || continue
+        [[ ! -d "/vz/root/${CTID}${destinationPath}" ]] && {
+            mkdir -p "/vz/root/${CTID}${destinationPath}"
+            chmod 0777 "/vz/root/${CTID}${destinationPath}"
+        }
+        if [[ -z $(indexOf "${aCurrentIPs[*]}" "$i") ]] ; then
+            log "${DESTINATION}\t${i}${DEFAULTEXPORTOPT}"
+            [[ "x${accessMode}" == "xro" ]] && DEFAULTEXPORTOPT=$($SED -re 's/,rw,/,ro,/g' <<< ${DEFAULTEXPORTOPT})
+            echo -e "\"${destinationPath}\"\t${i}${DEFAULTEXPORTOPT}" >> "${EXPORTS_FILE}"
+        else
+            log "${i} already in list"
+        fi
+    done
+
+    if [[ $running -ne 0 ]] ; then
+        $VZCTL umount $CTID > /dev/null 2>&1
+    else
+        _nfsReexport
+    fi
+    return $?
+}
+
+
+function _removeGaneshaip() {
+    if [[ -z "${IPLIST[*]}" ]] ; then
+        log "REMOVE: Empty ip list. Nothing to do. Exiting";
+        return;
+    fi
+
+    [[ ! -e "${NFS_CONFIG_FILE}" ]] && return 0
+
+    _destPath="${NFS_CONFIG_DIR}/jelastic/$(makeConfigFileName "$DESTINATION").conf"
+    local aCurrentIPs=()
+    if [[ -e "${_destPath}" ]] ; then
+        aCurrentIPs=($(getGaneshaCfgValue "$(<${_destPath})" "Clients"))
+    fi
+    for i in "${aCurrentIPs[@]}" ; do
+        aCurrentIPs=($(removeValueFromArray "${aCurrentIPs[*]}" "${i}"));
+    done
+    sIP="${aCurrentIPs[*]}"
+    IP="${sIP// /,};"
+    newClientSection=$(renderTemplate "$CLIENTSECTION")
+    replaceGaneshaClientsBlock "$_destPath" "$newClientSection"
+
+    return $?
+}
+
+function _removeNativeip() {
+    if [[ -z "${IPLIST[*]}" ]] ; then
+        log "REMOVE: Empty ip list. Nothing to do. Exiting";
+        return;
+    fi
+
+    isContainerRunning ${CTID} ; running=$?
+    if [[ $running -ne 0 ]] ; then
+        $VZCTL mount $CTID > /dev/null 2>&1
+    fi
+
+    _checkConfigs || {
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" ;
+        return $FALSE
+    }
+
+    DESTINATION=${DESTINATION//\//\\/}
+    if [[ $running -eq 0 ]] ; then
+        vzexecRun "which iptables"
+        IPT="$(vzexecGetLastStdOut)"
+        if [ ! -z "$IPT" ] ; then
+           for i in "${IPLIST[@]}" ; do
+                isValidIP $i || continue
+                log "removing ${i} from ${EXPORTS_FILE}"
+                $SED -i -re "/\"?$DESTINATION\"?\s+${i//./\\.}/{/${i//./\\.}/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
+                vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $i -j ACCEPT"
+                vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $i -j ACCEPT"
+            done
+        fi
+        #JE-26420
+        vzexecRun "jem firewall isEnabled"
+        fwstatus=$(vzexecGetLastErrCode)
+        if [[ "$fwstatus" -gt 1 ]] ; then
+            vzexecRun "jem firewall FWReconfigure"
+        fi
+    else
+        for i in "${IPLIST[@]}" ; do
+            isValidIP $i || continue
+            log "removing ${i} from ${EXPORTS_FILE}"
+            $SED -i -re "/\"?$DESTINATION\"?\s+/{/${i//./\\.}/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
+        done
+    fi
+
+    # clean up the exports file
+    $SED -i -re '/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/!d' "${EXPORTS_FILE}"
+
+    if [[ $running -ne 0 ]] ; then
+        $VZCTL umount $CTID > /dev/null 2>&1
+    else
+        _nfsReexport
+    fi
+    return $?
+}
+
+
+function _cleanNativeip() {
+    if [[ -z "${IPLIST[*]}" ]] ; then
+        log "ADD: Empty ip list. Cleaning all";
+
+        isContainerRunning ${CTID} ; running=$?
+        if [[ $running -ne 0 ]] ; then
+            $VZCTL mount $CTID > /dev/null 2>&1
+        fi
+
+        echo "" > "${EXPORTS_FILE}"
+
+        if [[ $running -ne 0 ]] ; then
+            $VZCTL umount $CTID > /dev/null 2>&1
+        else
+            _nfsReexport
+        fi
+        return;
+    fi
+    return 0
+}
+
+function _cleanip() {
+    return 0
+}
+
+function doAdjustFirewall() {
+    _adjustFirewall
+    return 0;
+}
+
+function doAdd() {
+    local requiredParqams=("CTID" "DESTINATION" "IPLIST" "TYPE")
+    local msg=$(checkParams ${requiredParqams[@]})
+    [[ ! -z "${msg}" ]] && { writeJSONResponseErr "result=>4099" "message=>Missing param $msg" ; return 99; }
+    _add${NFS_BACKEND}${ATYPE};
+}
+
+function doRemove() {
+    local requiredParqams=("CTID" "DESTINATION" "IPLIST" "TYPE")
+    local msg=$(checkParams ${requiredParqams[@]})
+    [[ ! -z "${msg}" ]] && { writeJSONResponseErr "result=>4099" "message=>Missing param $msg" ; return 99; }
+    _remove${NFS_BACKEND}${ATYPE};
+    return $?
+}
+
+function doClean() {
+    _clean${NFS_BACKEND}${ATYPE};
+    return $?
+}
+
+defineBigInline SHARETEMPLATE <<'EOF'
+EXPORT
+{
+        Export_Id = $ID;
+        Path = $SHAREPATH;
+        Pseudo = $PSEUDO;
+        Access_Type = $ACCESSMODE;
+        Squash = All;
+        SecType = None;
+        Anonymous_Uid = 65535;
+        Anonymous_Gid = 65535;
+        FSAL {
+                Name = VFS;
+        }
+}
+EOF
+
+defineBigInline CLIENTSECTION <<'EOF'
+        CLIENT { Clients = $IP; }
+EOF
+
+defineBigInline GENERICCONF <<'EOF'
+NFS_CORE_PARAM {
+        NFS_Protocols = 3,4;
+}
+EOF
+
+
+defineBigInline SystemDUnit << 'EOF'
+[Unit]
+Description=Jelastic UNFSD
+Requires=rpcbind.target rpcbind.service
+
+[Service]
+ExecStart=/sbin/unfsd
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+Alias=unfsd.service
+EOF

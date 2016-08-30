@@ -22,6 +22,7 @@ PYTHONCOMMONENGINELIB_VERSION="0.1";
 PYTHON27_DIR="/opt/jelastic-python27";
 PYTHON33_DIR="/opt/jelastic-python33";
 PYTHON34_DIR="/opt/jelastic-python34";
+PYTHON35_DIR="/opt/jelastic-python35";
 
 PYTHON_DEFAULT_CLI="/usr/bin/python";
 PYTHON_DEFAULT_CONFIG="/usr/bin/python-config";
@@ -29,6 +30,7 @@ PYTHON_DEFAULT_PIP="/usr/bin/pip";
 PYTHON_VIRTUALENV="/usr/bin/virtualenv";
 
 WSGI_MODULE="/etc/httpd/modules/mod_wsgi.so";
+$PROGRAM 'sed';
 
 
 function switchEngine(){
@@ -45,16 +47,20 @@ function switchEngine(){
                 "python3.4" )
                  local python_dir=$PYTHON34_DIR;
         ;;
+	        "python3.5" )
+                 local python_dir=$PYTHON35_DIR;
+        ;;
         *)
-        return 4023
+        return 1
         esac
         
-        [ -f /usr/bin/python2.6 ] && sed -i 's/^#!\/usr\/bin\/python$/#!\/usr\/bin\/python2.6/g' /usr/bin/yum #YUM hack for Centos6;
-	[ -f /usr/bin/python2.7 ] && sed -i 's/^#!\/usr\/bin\/python$/#!\/usr\/bin\/python2.7/g' /usr/bin/yum #YUM hack for Centos7;
+        [ -f /usr/bin/python2.6 ] && $SED -i 's/^#!\/usr\/bin\/python$/#!\/usr\/bin\/python2.6/g' /usr/bin/yum #YUM hack for Centos6;
+	[ -f /usr/bin/python2.7 ] && $SED -i 's/^#!\/usr\/bin\/python$/#!\/usr\/bin\/python2.7/g' /usr/bin/yum && $SED -i 's/^#! \/usr\/bin\/python$/#! \/usr\/bin\/python2.7/g' /usr/libexec/urlgrabber-ext-down #YUM hack for Centos7;
 
         chown -R ${DATA_OWNER} "$PYTHON27_DIR" 2>>"$JEM_CALLS_LOG";
         chown -R ${DATA_OWNER} "$PYTHON33_DIR" 2>>"$JEM_CALLS_LOG";
         chown -R ${DATA_OWNER} "$PYTHON34_DIR" 2>>"$JEM_CALLS_LOG";
+	chown -R ${DATA_OWNER} "$PYTHON35_DIR" 2>>"$JEM_CALLS_LOG";
 
         python_bin=$(ls -1 ${python_dir}/bin/pytho* | head -n 1)
         [ -L "$PYTHON_DEFAULT_CLI" ] && rm "$PYTHON_DEFAULT_CLI";

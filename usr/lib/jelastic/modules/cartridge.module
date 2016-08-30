@@ -23,18 +23,15 @@
     VERSION="1";
     DEFAULT_ACTION="Usage";
 
-    $PROGRAM git;
-    $PROGRAM curl;
-    $PROGRAM zip;
-    $PROGRAM unzip;
-    $PROGRAM tar;
-    $PROGRAM printenv;
-    $PROGRAM ifconfig;
-    $PROGRAM basename;
-    $PROGRAM uuidgen;
-    $PROGRAM erb;
-    $PROGRAM groupadd;
-    $PROGRAM adduser;
+    $PROGRAM 'git';
+    $PROGRAM 'curl';
+    $PROGRAM 'zip';
+    $PROGRAM 'unzip';
+    $PROGRAM 'tar';
+    $PROGRAM 'uuidgen';
+    $PROGRAM 'erb';
+    $PROGRAM 'groupadd';
+    $PROGRAM 'adduser';
 
     function doUsage() {
         showUsageMessage;
@@ -81,9 +78,9 @@
 
     case $URL_TYPE in
 
-        ARCHIVE | archive )         deploy $URL && { writeJSONResponceOut "result=>0" "message=>Cartridge installed successfully";  }  ||  {  writeJSONResponceErr "result=>4060" "message=>Deploy failed" ; die -q; } ;
+        ARCHIVE | archive )         deploy $URL && { writeJSONResponseOut "result=>0" "message=>Cartridge installed successfully";  }  ||  {  writeJSONResponseErr "result=>4060" "message=>Deploy failed" ; die -q; } ;
                                     ;;
-        GIT | git )                 doCheckout $URL &&  { writeJSONResponceOut "result=>0" "message=>Cartridge installed successfully";  } || {  writeJSONResponceErr "result=>4060" "message=>Deploy failed" ; die -q; };
+        GIT | git )                 doCheckout $URL &&  { writeJSONResponseOut "result=>0" "message=>Cartridge installed successfully";  } || {  writeJSONResponseErr "result=>4060" "message=>Deploy failed" ; die -q; };
                                     ;;
     esac
 
@@ -97,38 +94,39 @@
         parseArguments $@;
         configureEnvironment;
         generateCartDATA; 
-        _setup $VERSION && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully" "cartdata=>$cartdata"; fixOwnership;  }  ||  {  writeJSONResponceErr "result=>4060" "message=>Cartridge setup failed" ; die -q; } ;
+        _setup $VERSION && { writeJSONResponseOut "result=>0" "message=>Cartridge setup successfully" "cartdata=>$cartdata"; fixOwnership;  }  ||  {  writeJSONResponseErr "result=>4064" "message=>Cartridge setup failed" ; die -q; } ;
         chmod 755 /etc/jelastic;
+	[ -e "/var/spool/cron/root" ] && chown root:root /var/spool/cron/root;
     }
 
 
     function doStart(){
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_start_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_start_$(echo $Name)" >> $ACTIONS_LOG 2>&1;
-        service cartridge start >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge start failed" ; die -q; } ;
+        service cartridge start >> $ACTIONS_LOG 2>&1 && { writeJSONResponseOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponseErr "result=>4058" "message=>Cartridge start failed" ; die -q; } ;
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_start_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_start_$(echo $Name)" >> $ACTIONS_LOG 2>&1;
     }
 
     function doStop(){
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_stop_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_stop_$(echo $Name)" >> $ACTIONS_LOG 2>&1;
-        service cartridge stop >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge stop failed" ; die -q; } ;
+        service cartridge stop >> $ACTIONS_LOG 2>&1 && { writeJSONResponseOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponseErr "result=>4054" "message=>Cartridge stop failed" ; die -q; } ;
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_stop_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_stop_$(echo $Name)" >> $ACTIONS_LOG 2>&1;
     }
 
     function doRestart(){
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_restart_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_restart_$(echo $Name)" >> $ACTIONS_LOG 2>&1;    
-        service cartridge restart >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge restart failed" ; die -q; } ;
+        service cartridge restart >> $ACTIONS_LOG 2>&1 && { writeJSONResponseOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponseErr "result=>4055" "message=>Cartridge restart failed" ; die -q; } ;
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_restart_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_restart_$(echo $Name)" >> $ACTIONS_LOG 2>&1;  
     }
 
     function doReload(){
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_reload_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_reload_$(echo $Name)" >> $ACTIONS_LOG 2>&1;    
-        service cartridge reload >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge reload failed" ; die -q; } ;
+        service cartridge reload >> $ACTIONS_LOG 2>&1 && { writeJSONResponseOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponseErr "result=>4056" "message=>Cartridge reload failed" ; die -q; } ;
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_reload_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_reload_$(echo $Name)" >> $ACTIONS_LOG 2>&1;    
     }
 
     function doStatus(){
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_status_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/pre_status_$(echo $Name)" >> $ACTIONS_LOG 2>&1;    
-        service cartridge status >> $ACTIONS_LOG 2>&1 && { writeJSONResponceOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponceErr "result=>4xxx" "message=>Cartridge status failed" ; die -q; } ;
+        service cartridge status >> $ACTIONS_LOG 2>&1 && { writeJSONResponseOut "result=>0" "message=>Cartridge setup successfully";  }  ||  {  writeJSONResponseErr "result=>4057" "message=>Cartridge status failed" ; die -q; } ;
         [ -f "${CARTRIDGE_HOME}/.openshift/action_hooks/post_status_$(echo $Name)" ] && "${CARTRIDGE_HOME}/.openshift/action_hooks/post_status_$(echo $Name)" >> $ACTIONS_LOG 2>&1;      
     }
 

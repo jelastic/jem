@@ -18,7 +18,7 @@
 
 [ -n "${OUTPUTLIB_VERSION:-}" ] && return 0;
 OUTPUTLIB_VERSION="0.1";
-
+$PROGRAM 'sed';
 include log;
 
 ACTIONS_LOG="/var/log/actions$$.log";
@@ -52,32 +52,35 @@ function cleanActionsLog() {
     fi
 }
 
-#### Usage:  writeJSONResponceOut "key1=>value1" "key2=>value2" "key3=>value3"
-function writeJSONResponceOut(){
+#### Usage:  writeJSONResponseOut "key1=>value1" "key2=>value2" "key3=>value3"
+function writeJSONResponseOut(){
     local args="\"$1\"";
+    args="$args,\"execTime=>$SECONDS\""
     shift;
     while (( "$#" )); do
         args="$args,\"$1\"";
         shift
         done
-    [ -f "$ACTIONS_LOG" ] && sed -i -e 's/["'\'']\|“\|”\|:\|=>//g' "$ACTIONS_LOG";
+    [ -f "$ACTIONS_LOG" ] && $SED -i -e 's/["'\'']\|“\|”\|:\|=>//g' "$ACTIONS_LOG";
     [ -f "$ACTIONS_LOG" ] && {
         local actions_log="\"log=>$(cat $ACTIONS_LOG | tr -d '\r')\"";
-        local json_resp_full=$(echo {${args}",$actions_log"} | sed 's/\=>/\":\"/g');
+        local json_resp_full=$(echo {"${args}"",$actions_log"} | $SED 's/\=>/\":\"/g');
     } || {
-        local json_resp_full=$(echo {$args} | sed 's/\=>/\":\"/g');
+        local json_resp_full=$(echo {"$args"} | $SED 's/\=>/\":\"/g');
     }
 
-    set -f;  # do not expand filepath on output // added by Andrey
-    json_resp_full=$(echo $json_resp_full | sed "s/}\s*]\s*\"/}]/g" | sed -r 's/"\[\{/\[{/g');
+    set -f;
+    json_resp_full=$(echo "$json_resp_full" | $SED "s/}\s*]\s*\"/}]/g" | $SED -re 's/"\[\s+?\{/\[{/g' -e 's|\"\[\]\"|\[\]|' ) ;
+    echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
+    echo ":[RESPONSE] [PID: $$]: $json_resp_full" >> ${JEM_CALLS_LOG} 2>&1;
     echo "$json_resp_full";
     set +f;
     cleanActionsLog ;
 }
 
-#### Usage:  writeJSONResponceErr "key1=>value1" "key2=>value2" "key3=>value3"
-function writeJSONResponceErr(){
-    echo "$(writeJSONResponceOut "$@")" 1>&2;
+#### Usage:  writeJSONResponseErr "key1=>value1" "key2=>value2" "key3=>value3"
+function writeJSONResponseErr(){
+    echo "$(writeJSONResponseOut "$@")" 1>&2;
 }
 
 function _space() {

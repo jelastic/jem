@@ -16,7 +16,7 @@
 
 [ -n "${CORELIB_VERSION:-}" ] && return 0;
 CORELIB_VERSION="0.1";
-            
+
 OVERRIDE_DIR="/var/lib/jelastic/overrides/"
 
 DEBUG=${DEBUG:=0};
@@ -49,6 +49,42 @@ function checkDo() {
 function defineBigInline() {
     IFS='\n' read -r -d '' ${1} || true;
 }
+
+# render bash template
+#       render bash template
+# params:
+#       $* - templates to render
+# result:
+#       rendered template
+#       return code is 0 if success 1 othervise
+
+function renderTemplate() {
+    local lines=$*
+    end_offset=${#lines}
+    while [[ "${lines:0:end_offset}" =~ (.*)\$(\{([a-zA-Z_][a-zA-Z_0-9]*)\}|([a-zA-Z_][a-zA-Z_0-9]*))(.*) ]] ; do
+        pre=${BASH_REMATCH[1]}
+        post=${BASH_REMATCH[5]}${lines:end_offset}
+        [[ -n ${BASH_REMATCH[3]} ]] && varName=${BASH_REMATCH[3]} || varName=${BASH_REMATCH[4]}
+        if [[ $pre =~ \\+$ ]] && (( ${#BASH_REMATCH} % 2 )); then
+            :
+        else
+            lines=${pre}${!varName}${post}
+        fi
+        end_offset=${#pre}
+    done
+    printf %s "$lines"
+}
+
+function checkParams() {
+    local params=($*)
+    local result=""
+    for p in "${params[*]}" ; do
+        eval "[[ -z \"\$$p\" ]] && { result=\"$p $result\";}"
+    done
+    [[ -z "$result" ]] && return 0;
+    return 1;
+}
+
 
 # indexOf
 #       return an index of specified element in given array
@@ -166,13 +202,41 @@ function startJemThreadQueueManager(){
 
     if [ "x$action" == "xvcs" -a "x$1" == "xautoupdate" ] ; then
 	[[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]] && {
-	    echo "$(date +%D.%k:%M:%S.%N): $1 - other process is running" >> $JEM_CALLS_LOG
- 		writeJSONResponceOut "result=>0" "message=>$1: other process is running"
+		echo "$(date +%D.%k:%M:%S.%N): $1 - other process is running" >> $JEM_CALLS_LOG
+ 		writeJSONResponseOut "result=>0" "message=>$1: other process is running"
 		exit 0;
 	}
     fi
-    if [ "x$action" == "xdocker" -o "x$action" == "xcommand" ] ; then
-        while [ "$1" != "" ]
+    if [ "x$action" == "xbalancer" -a "x$1" == "xUpdatePortMapping" ] ; then
+        jempidfile="/var/run/jem.294e8f74.pid";
+    elif [ "x$action" == "xhn" -a "x$1" == "xstat" ] ; then
+        jempidfile="/var/run/jem.42c7a29c9.pid";
+    elif [ "x$action" == "xuser" -a "x$1" == "xadd" ] ; then
+	while [ "$1" != "" ]
+        do
+            case "$1" in
+	    --eid)
+    	        TQctid=${2//-/};
+    		break
+    	    ;;
+    	    esac
+        shift;
+        done
+    elif [ "x$action" == "xauth" ] ; then
+	if [ "x$1" == "xadd" -o "x$1" == "xremove" ]; then
+	    jempidfile="/var/run/jem.5283f514f.pid";
+	fi
+    elif [ "x$action" == "xstorage" ] ; then
+	if [ "x$1" == "xmount" -o "x$1" == "xumount" ]; then
+	    jempidfile="/var/run/jem.86a06296.pid";
+	fi
+    elif [ "x$action" == "xfilemanager" ] ; then
+        jempidfile="/var/run/jem.dc6cbef1.pid"
+    elif [ "x$action" == "xdocker" -o "x$action" == "xcommand" ] ; then
+	if [ "x$1" == "xaftercreate" ] ; then
+	    jempidfile="/var/run/jem.f55b442$$.pid";
+	else
+	while [ "$1" != "" ]
         do
         case "$1" in
         --ctid)
@@ -191,16 +255,24 @@ function startJemThreadQueueManager(){
         esac
         shift;
         done
+        fi
         [ -z "$TQctid" ]  && TQctid="${$}$action";
         [ ! -z "$setgetTPL" ] && {
             [ ! -z "$nameTPL" -o ! -z "$versionTPL" ] && TQctid=$(md5sum <<< "${nameTPL}${versionTPL}X" | awk '{print $1}' )
         }
         jempidfile="/var/run/jem.${TQctid}.pid";
     fi
+
     [ -f $jempidfile ] && {
-          while [[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]]; do
-                sleep $sleep_period;
-          done
+        echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
+        echo ":[WAITING]   [PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
+
+        while [[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]]; do
+            sleep $sleep_period;
+        done
+
+        echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
+        echo ":[PROCESSING][PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
     }
 
     echo "$$" > $jempidfile;
@@ -208,6 +280,8 @@ function startJemThreadQueueManager(){
 
 function stopJemThreadQueueManager(){
     [ -f $jempidfile ] && {
+          echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
+          echo ":[CLEANING UP][PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
           rm -f $jempidfile
     }
 }
@@ -260,11 +334,14 @@ function doAction() {
         }
     );
     actionResult=${?};
+    echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
     [[ $actionResult -gt 0 ]] && {
+        echo ":[FAIL]      [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
         # stopJemThreadQueueManager;
         # [[ $actionResult -gt 5000 ]] && _manageDoHelp;
         return ${actionResult};
     };
+    echo ":[SUCCESS]   [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
     return 0; ## For cases if no other problems occured in doAction subshell
 }
 

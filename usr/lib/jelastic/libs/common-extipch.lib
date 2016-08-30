@@ -17,9 +17,12 @@
 [ -n "${COMMONEXTIPCHANGELIB_VERSION:-}" ] && return 0;
 COMMONEXTIPCHANGELIB_VERSION="0.1";
 
-include os;
+include os log;
 
 function ipChanged(){
-    doAction service restart;
+    VERBOSE=1;
+    log "extIpChange restart service";
+    VERBOSE=0;
+    doAction service restart >> $JEM_CALLS_LOG ;
 }
 

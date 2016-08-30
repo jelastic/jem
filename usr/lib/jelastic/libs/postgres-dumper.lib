@@ -50,10 +50,10 @@ function Restore() {
 		local dumpfile="/var/cache/tempdump$$.dump";
 		$WGET --no-check-certificate $dumpurl -O $dumpfile >> $ACTIONS_LOG 2>&1;
 		$GZIP -l ${dumpfile} > /dev/null 2>&1 && { mv "${dumpfile}" "${dumpfile}.gz" &&  $GZIP -d  "${dumpfile}.gz" && mv "${dumpfile}" "${dumpfile}.sql"; } || { mv "${dumpfile}" "${dumpfile}.sql"; }
-		[ -s ${dumpfile}.sql ] || return 4074;
+		[ -s ${dumpfile}.sql ] || return 74;
 		export PGPASSWORD="$password";
-		echo "CREATE DATABASE $database" | $PSQL  -d postgres -U $user >> $ACTIONS_LOG 2>&1 || return 4072;
-		$PSQL -U $user $database < ${dumpfile}.sql >> $ACTIONS_LOG 2>&1 || return 4073;
+		echo "CREATE DATABASE $database" | $PSQL  -d postgres -U $user >> $ACTIONS_LOG 2>&1 || return 72;
+		$PSQL -U $user $database < ${dumpfile}.sql >> $ACTIONS_LOG 2>&1 || return 73;
 		[ -f ${dumpfile}.sql ] && rm -f ${dumpfile}.sql;
 }
 

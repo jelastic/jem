@@ -16,7 +16,7 @@
 
 
 
-VERBOSE=2;
+VERBOSE=0;
 inherit default exceptor ;
 inherit os envinfo ;
 inherit extendperm;
@@ -55,12 +55,14 @@ function onModLoadCallback(){
                 ;;
         esac;
     done;
+    [ -z "$ARCHIVE_URL" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
+    [ -z "$DESTINATION" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
 }
 
 
 function doArchive() {
     [ -z "$ARCHIVE_URL" ] && { 
-	writeJSONResponceErr "result=>4040" "message=> failed" ; 
+	writeJSONResponseErr "result=>4050" "message=>URL is not valid!" ; 
         return 1;
     }
     [ ! -d "$DOWNLOADS" ] && { mkdir -p "$DOWNLOADS"; }
@@ -69,9 +71,9 @@ function doArchive() {
     rm -Rf "$DOWNLOADS"/*;
     shopt -u dotglob; 
 
-    if grep -qE "^file:" <<< ${ARCHIVE_URL} ; then
+    if $GREP -qE "^file:" <<< ${ARCHIVE_URL} ; then
 	#local file
-	package_name=$(sed 's/file:\/\///' <<< ${ARCHIVE_URL});
+	package_name=$($SED 's/file:\/\///' <<< ${ARCHIVE_URL});
     else
 	cd $DOWNLOADS
 	$CURL ${CURL_OPTIONS} -O ${ARCHIVE_URL} >> $ACTIONS_LOG 2>&1;
@@ -80,7 +82,7 @@ function doArchive() {
 		http_url=$($SED 's/^https/http/' <<< ${ARCHIVE_URL})
 		$CURL ${CURL_OPTIONS} -O ${http_url} >> $ACTIONS_LOG 2>&1;
 		[ $? -gt 0 ] && {
-			writeJSONResponceErr "result=>4078" "message=>Error loading file from URL" ; die -q; 
+			writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q; 
 		}
 	};
 	cd /
@@ -123,8 +125,8 @@ function doArchive() {
     result=$?;
 
     startService ${SERVICE} >> $ACTIONS_LOG 2>&1;	
-    # writeJSONResponceErr "result=>4052" "message=>Context does not exist";
-    writeJSONResponceOut "result=>0" "message=>Unpacked succesfuly";
+    # writeJSONResponseErr "result=>4052" "message=>Context does not exist";
+    writeJSONResponseOut "result=>0" "message=>Unpacked succesfuly";
     return 0;
 }
 

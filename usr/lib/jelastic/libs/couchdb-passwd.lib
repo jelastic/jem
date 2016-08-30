@@ -41,7 +41,7 @@ function setPassword() {
 	done
         stopServiceSilent ${SERVICE} ;
         sleep 2
-        count=$(ps aux | $GREP "/etc/couchdb/local.ini"| $GREP -v grep | wc -l )
+        count=$(ps aux | $GREP "/etc/couchdb/local.ini"| $GREP -v $GREP | wc -l )
         [ "$count" -ne 0 ]  &&{ sleep 5; killall -q couchdb; killall -q beam.smp;}
         $SED -i "s/^$user =.*$/$user = ${password}/" $CONF_FILE
         startServiceSilent ${SERVICE} ;

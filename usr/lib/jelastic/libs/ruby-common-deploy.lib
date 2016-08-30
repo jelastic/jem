@@ -37,7 +37,7 @@ function setContext(){
 function prepareContext(){
     local context=$1;
     if ! $GREP -q ${context} <<< "development production test" ; then 
-	    writeJSONResponceErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
+	    writeJSONResponseErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
     fi
     echo "${context}" > /var/lib/jelastic/env;
     bundle_type=$context;
@@ -54,13 +54,20 @@ function deploy(){
     ensureFileCanBeDownloaded $package_url;
     prepareContext ${context} ;
     $WGET -nv --tries=2 --content-disposition --no-check-certificate --directory-prefix=$DOWNLOADS $package_url >> $ACTIONS_LOG 2>&1;
-    [ $? -gt 0 ] && { writeJSONResponceErr "result=>4078" "message=>Error loading file from URL" ; die -q; };
+    [ $? -gt 0 ] && { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q; };
+
+    package_name=$(ls ${DOWNLOADS});
+    [ ! -s "$DOWNLOADS/$package_name" ] && { 
+        rm -f ${DOWNLOADS}/${package_name};
+        writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
+        die -q;
+    }
     # check exactly FILE - it should not exists, otherwise 'mkdir' return error
     if [[ -f "${APPWEBROOT%/}" ]]
     then
         rm -f "${APPWEBROOT%/}";
     fi
-    unpack $APPWEBROOT && echo "Application deployed successfully!" >> $ACTIONS_LOG 2>&1 || {  if [ "$context" != "ROOT" ];then rm -rf $APPWEBROOT 1>/dev/null 2>&1; fi;  writeJSONResponceErr "result=>4071" "message=>Cannot unpack package!"; die -q; }
+    unpack $APPWEBROOT && echo "Application deployed successfully!" >> $ACTIONS_LOG 2>&1 || {  if [ "$context" != "ROOT" ];then rm -rf $APPWEBROOT 1>/dev/null 2>&1; fi;  writeJSONResponseErr "result=>4071" "message=>Cannot unpack package"; die -q; }
     shiftContentFromSubdirectory $APPWEBROOT;
     if [ "$context" != "ROOT" ]
     then
@@ -91,10 +98,10 @@ function renameContext(){
     local newContext=$1;
     local oldContext=$2;
     if ! $GREP -q ${oldContext} <<< "development production test" ;then
-            writeJSONResponceErr "result=>4079" "message=>Invalid context name specified: ${oldContext}" ; exit 4079;
+            writeJSONResponseErr "result=>4079" "message=>Invalid context name specified: ${oldContext}" ; exit 4079;
     fi
     if ! $GREP -q ${newContext} <<< "development production test" ; then
-            writeJSONResponceErr "result=>4079" "message=>Invalid context name specified: ${newContext}" ; exit 4079;
+            writeJSONResponseErr "result=>4079" "message=>Invalid context name specified: ${newContext}" ; exit 4079;
     fi
 
     echo "${newContext}" > /var/lib/jelastic/env;

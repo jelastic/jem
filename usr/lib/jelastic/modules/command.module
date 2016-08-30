@@ -15,14 +15,12 @@
 # limitations under the License.
 
 
-inherit default config vzexec;
+inherit default config vzexec virtuozzo;
 include os output;
 
 DESCRIPTION="Description goes here";
 VERSION="1"
 DEFAULT_ACTION="Usage";
-
-$PROGRAM 'base64';
 
 function doUsage() {
         showUsageMessage;
@@ -41,17 +39,17 @@ function onModLoadCallback() {
         case "$1" in
             -n   | --cmd )
                 shift;
-                cmd=$1;
+                CMD=$1;
                 shift;
                 ;;
             -c   | --ctid )
                 shift;
-                ctid=$1;
+                CTID=$1;
                 shift;
                 ;;
             -b   | --cmdbase64 )
                 shift;
-                cmdbase64=$1;
+                CMDBASE64=$1;
                 shift;
                 ;;
             --)
@@ -63,27 +61,27 @@ function onModLoadCallback() {
 }
 
 function doExec() {
-    if [ -z "$ctid" ] ; then
-        writeJSONResponceErr "result=>99" "message=>ctid required"
+    if [ -z "$CTID" ] ; then
+        writeJSONResponseErr "result=>4007" "message=>CTID required"
         log "ctid required"
-        return 99;
+        return 1;
     fi
 
-    if [ ! -z "$cmdbase64" ] ; then
-        cmd="$(echo $cmdbase64 | $BASE64 -d)"
+    if [ ! -z "$CMDBASE64" ] ; then
+        CMD="$(echo $CMDBASE64 | base64 -d)"
     fi
 
-    if [ -z "$cmd" ] ; then
-        writeJSONResponceErr "result=>99" "message=>cmd or cmdbase64 required"
+    if [ -z "$CMD" ] ; then
+        writeJSONResponseErr "result=>4008" "message=>cmd or CMDBASE64 required"
         log "command required"
-        return 99;
+        return 1;
     fi
 
-    vzexecSetCTID "$ctid"
-    if vzexecRun "$cmd" ; then
-        writeJSONResponceOut "result=>0" "message=>$(vzexecGetLastStdOut)"
+    vzexecSetCTID "$CTID"
+    if vzexecRun "$CMD" ; then
+        writeJSONResponseOut "result=>0" "message=>$(vzexecGetLastStdOut)"
     else
-        writeJSONResponceErr "result=>99" "message=>$(vzexecGetLastStdErr)"
+        writeJSONResponseErr "result=>4019" "message=>$(vzexecGetLastStdErr)"
     fi
     return 0;
 }
@@ -100,4 +98,45 @@ function describeExecOptions() {
     echo "-c|--ctid: container id";
     echo "-n|--cmd: command to execute";
     echo "-b|--cmdbase64: command to execute base64 encoded";
+}
+
+function doExec2() {
+    if [ -z "$CTID" ] ; then
+        writeJSONResponseErr "result=>99" "message=>CTID required"
+        log "ctid required"
+        return 99;
+    fi
+
+    if [ ! -z "$CMDBASE64" ] ; then
+        CMD="$(echo $CMDBASE64 | base64 -d)"
+    fi
+
+    if [ -z "$CMD" ] ; then
+        writeJSONResponseErr "result=>99" "message=>cmd or cmdbase64 required"
+        log "command required"
+        return 99;
+    fi
+
+    msg=""
+
+    vzexecSetCTID "$CTID"
+
+    if isContainerRunning $CTID ; then
+        if vzexecRun "$CMD" ; then
+            msg="Success"
+            res=0
+        else
+            msg="The operation could not be performed"
+            res=4109
+        fi
+        stout="$(vzexecGetLastStdOut)"
+        sterr="$(vzexecGetLastStdErr)"
+        stdout=$($SED -re 's/\\/\\\\/g;s/"/\\"/g' <<< "$stout")
+        stderr=$($SED -re 's/\\/\\\\/g;s/"/\\"/g' <<< "$sterr")
+    else
+        res=4110
+        msg="Can not execute command. Container is not running"
+    fi
+    printf "{\"result\":\"%s\",\"exitcode\":\"%s\",\"message\":\"%s\",\"stdout\":\"%s\",\"stderr\":\"%s\"}\n" "$res" "$(vzexecGetLastErrCode)" "$msg" "$stdout" "$stderr"
+    return 0;
 }

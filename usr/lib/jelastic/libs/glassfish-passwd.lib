@@ -17,7 +17,7 @@
 [ -n "${GLASSFISHPASSWDLIB_VERSION:-}" ] && return 0;
 GLASSFISHPASSWDLIB_VERSION="0.1";
 include os output;
-
+$PROGRAM 'sed';
 AS_ADMIN="/opt/glassfish3/bin/asadmin";
 EMPTY_PASS='admin;{SSHA256}DdW1VfFCD0AqbQFzsu6Swqel1g1gZZ6f1m87JX6FQYSpu1X/BxTX5A==;asadmin';
 
@@ -38,12 +38,12 @@ function setPassword() {
     local domain="domain1";
 
 	[ -z "$password" ] && {
-		writeJSONResponceErr "result=>4063" "message=>Password did not set";
+		writeJSONResponseErr "result=>4063" "message=>Password did not set";
 	}
 
 	admin_key_file="/opt/glassfish3/glassfish/domains/$domain/config/admin-keyfile";
 	
-	sed -i "/admin.*asadmin/d" $admin_key_file;
+	$SED -i "/admin.*asadmin/d" $admin_key_file;
 	echo $EMPTY_PASS >> $admin_key_file;
 
 	echo -e "AS_ADMIN_PASSWORD=\nAS_ADMIN_NEWPASSWORD=$password" >> "/tmp/$$";

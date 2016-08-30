@@ -42,7 +42,7 @@ function doSetNeighbors(){
     fi
     echo "$@" > "${nb_path}/$nb_file"
 
-    writeJSONResponceOut "result=>0" "message=>Ok";
+    writeJSONResponseOut "result=>0" "message=>Ok";
 }
 
 
@@ -54,41 +54,45 @@ function doSetNeighbors(){
 function doAddCommonHost(){
     while [[ "$1" != "" ]]; do
         case "$1" in
-            -h|--host ) 
+            -h|--host )
                     shift;
                     host="$1";
                 ;;
         esac
         shift
     done
-    [ -z "$host" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
-    addCommonHostConfig "$host";
-    writeJSONResponceOut "result=>0" "message=>Configuration applied!";
+    [ -z "$host" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
+    laddCommonHostConfig="addCommonHostConfig" #added for backwards compatibility with Openshift cartridge templates
+    isFunction "_add_common_host" && laddCommonHostConfig="_add_common_host" #must be removed after the cartridge support is finished
+    "$laddCommonHostConfig" "$host" && writeJSONResponseOut "result=>0" "message=>Configuration applied!";
     return 0;
 }
 
 function doRemoveCommonHost(){
     while [[ "$1" != "" ]]; do
         case "$1" in
-            -h|--host ) 
+            -h|--host )
                     shift;
                     host="$1";
                 ;;
         esac
         shift
     done
-    [ -z "$host" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
-    removeCommonHostConfig "$host";
-    writeJSONResponceOut "result=>0" "message=>Configuration applied!";
+    [ -z "$host" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
+    lremoveCommonHostConfig="removeCommonHostConfig" #added for backwards compatibility with Openshift cartridge templates
+    isFunction "_remove_common_host" && lremoveCommonHostConfig="_remove_common_host" #must be removed after the cartridge support is finished
+    "$lremoveCommonHostConfig" "$host" && writeJSONResponseOut "result=>0" "message=>Configuration applied!";
     return 0;
 }
 
 function doRebuildCommon(){
-    rebuildCommon ;
+    lrebuildCommon="rebuildCommon" #added for backwards compatibility with Openshift cartridge templates
+    isFunction "_rebuild_common" && lrebuildCommon="_rebuild_common" #must be removed after the cartridge support is finished
+    "$lrebuildCommon" ;
     [ "$?" -eq 0 ] && {
         doAction "firewall" "fwreconfigure";
-        writeJSONResponceOut "result=>0" "message=>Configuration applied!"; return 0; 
-    }|| { writeJSONResponceErr "result=>4999" "message=>Configuration not applied!" ; return 1; }
+        writeJSONResponseOut "result=>0" "message=>Configuration applied!"; return 0;
+    }|| { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
 }
 
 function doAddCluster(){
@@ -105,9 +109,9 @@ function doAddCluster(){
         esac
         shift
     done
-    [ -z "$host" -o -z "$group" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
+    [ -z "$host" -o -z "$group" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; } 
     addHostToGroup "$host" "$group"
-    writeJSONResponceOut "result=>0" "message=>Configuration applied!"; 
+    writeJSONResponseOut "result=>0" "message=>Configuration applied!"; 
     return 0;
 }
 
@@ -121,11 +125,11 @@ function doBuildCluster(){
         esac
         shift
     done
-    [ -z "$group" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
+    [ -z "$group" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; } 
     buildCluster "$group" ;
     [ "$?" -eq 0 ] && {
-        writeJSONResponceOut "result=>0" "message=>Configuration applied!"; return 0;  
-    } || { writeJSONResponceErr "result=>4999" "message=>Configuration not applied!" ; return 1; }
+        writeJSONResponseOut "result=>0" "message=>Configuration applied!"; return 0;  
+    } || { writeJSONResponseErr "result=>4090" "message=>Configuration not applied!" ; return 1; }
 }
 
 function doUnbuildCluster(){
@@ -138,23 +142,64 @@ function doUnbuildCluster(){
         esac
         shift
     done
-    [ -z "$group" ] && { writeJSONResponceErr "result=>4999" "message=>Wrong parameters!" ; return 1; } 
+    [ -z "$group" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; } 
     unbuildCluster "$group" ;
     [ "$?" -eq 0 ] && {
-        writeJSONResponceOut "result=>0" "message=>Configuration applied!"; return 0; 
-    } || { writeJSONResponceErr "result=>4999" "message=>Configuration not applied!" ; return 1; }
+        writeJSONResponseOut "result=>0" "message=>Configuration applied!"; return 0; 
+    } || { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
 }
 
 function doClear(){
-    clearHosts ; 
-    writeJSONResponceOut "result=>0" "message=>Configuration applied!"; 
+    isFunction "clearHosts" && clearHosts ; 
+    writeJSONResponseOut "result=>0" "message=>Configuration applied!"; 
     return 0; 
 }
 
 function doReload(){
-    reloadConfigs ;
-    writeJSONResponceOut "result=>0" "message=>Configuration applied!"; 
+    isFunction "reloadConfigs" && reloadConfigs ;
+    writeJSONResponseOut "result=>0" "message=>Configuration applied!"; 
     return 0; 
+}
+
+function doRebuildConfig(){
+    WEIGHT_CHANGED_FLAG=1;
+    rebuildCommonTrafD && echo "Configuration has been applied!";
+}
+
+function doRefreshWeight(){
+    WEIGHT_CHANGED_FLAG=1;
+    weightChanged;
+    writeJSONResponseOut "result=>0" "message=>Ok";
+}
+
+function doUpdatePortMapping(){
+    rebuildTCPPortMappings ;
+}
+
+function doSetVariables(){
+    setConfigVariables "$@";
+    writeJSONResponseOut "result=>0" "message=>Ok";
+}
+
+#--host HOST
+function doRemoveHost(){
+    removeHostHTD "$@";
+}
+
+#--source HOST --destination HOST
+function doReplaceHost(){
+    swapHostsHTD "$@";
+}
+
+function doAddNewHost(){
+    addNodeHTD "$@";
+}
+function doRemoveSticky(){
+    removeStickyHTD ;
+}
+
+function doAddSticky(){
+    addNginxSticky ; 
 }
 
 function postRebuildCommonCallback(){
@@ -191,7 +236,7 @@ function describeAddCommonHostParameters(){
 }
 
 function describeAddCommonHostOptions(){
-    echo "-h: host";
+    echo "-h: host name or IP";
 }
 
 function describeRemoveCommonHost(){
@@ -203,7 +248,7 @@ function describeRemoveCommonHostParameters(){
 }
 
 function describeRemoveCommonHostOptions(){
-    echo "-h: host";
+    echo "-h: host name or IP";
 }
 
 function describeRebuildCommon(){
@@ -219,7 +264,7 @@ function describeAddClusterParameters(){
 }
 
 function describeAddClusterOptions(){
-    echo "-h: host";
+    echo "-h: host name or IP";
     echo "-g: group name";
 }
 
@@ -253,4 +298,49 @@ function describeReload(){
 
 function describeClear(){
     echo "Clear upsteams hosts"
+}
+
+function describeRebuildConfig(){
+    echo "Rebuild nginx configuration";
+}
+
+function describeRefreshWeight(){
+    echo "Update weight value in nginx configuration";
+}
+
+function describeRemoveHost(){
+    echo "Remove host from nginx configuration";
+}
+
+function describeReplaceHost(){
+    echo "Replace host in nginx configuration";
+}
+
+function describeAddNewHost(){
+    echo "Add new host to nginx configuration";
+}
+
+function describeRemoveHostParameters(){
+    echo "-h|--host <host>";
+}
+
+function describeReplaceHostParameters(){
+    echo "-s|--source <host> -d|--destination <host>";    
+}
+
+function describeAddNewHostParameters(){
+    echo "-h|--host <host>";
+}
+
+function describeRemoveHostOptions(){
+    echo "-h|--host: host name or IP";
+}
+
+function describeReplaceHostOptions(){
+    echo "-s|--source: host name or IP";
+    echo "-d|--destination: host name or IPt";    
+}
+
+function describeAddNewHostOptions(){
+    echo "-h|--host: host name or IP";
 }

@@ -26,7 +26,8 @@ DEFAULT_ACTION="Usage";
 
 $PROGRAM 'iptables';
 $PROGRAM 'tail';
-$PROGRAM 'sort';
+$PROGRAM 'sed';
+$PROGRAM 'grep';
 
 FORWARD_RANGE_START=50000
 FORWARD_RANGE_END=55000
@@ -51,7 +52,7 @@ function getPortByIP() {
 function getDestinationPort() {
 	: ${1?"Missing port param"}
 	local _PORT=${1}
-	echo $($IPTABLES -L PREROUTING -t nat -n | sed -nre "/:${_PORT}\s/{s/.*:([0-9]+)\s*$/\1/;p}")
+	echo $($IPTABLES -L PREROUTING -t nat -n | $SED -nre "/:${_PORT}\s/{s/.*:([0-9]+)\s*$/\1/;p}")
 }
 
 function getFreePort() {
@@ -63,7 +64,7 @@ function getFreePort() {
     done;
     freePorts=($(
 		for key in "${!availablePorts[@]}"; do 
-			[[ ${availablePorts["${key}"]} -eq 0 ]] &&  echo "$key"; done | $SORT -n
+			[[ ${availablePorts["${key}"]} -eq 0 ]] &&  echo "$key"; done | sort -n
 	))
     echo ${freePorts[0]}
 }
@@ -124,7 +125,7 @@ function doForward() {
 
 
     if ! isValidIP $__IP ; then
-		writeJSONResponceErr "result=>99" "message=>Invalid IP specified" ; exit 99;
+		writeJSONResponseErr "result=>4083" "message=>Invalid IP specified" ; exit 1;
     fi
 
 	
@@ -133,18 +134,18 @@ function doForward() {
      local port=$($IPTABLES -L PREROUTING -t nat -vnx | $SED -nre "/($__IP:[0-9]{4,5})/{/$__PROTO/{/:$__PORT\s*$/{s/.*dpt:([0-9]{4,5}).*/\1/;p}}}")
 
     if [[ ! -z ${port} ]] ; then
-		writeJSONResponceErr "result=>4092" "message=>This pair IP:PORT already bind to port $port" "port=>$port"; exit 99;
+		writeJSONResponseErr "result=>4092" "message=>This pair IP:PORT already bind to port $port" "port=>$port"; exit 1;
     fi
 	# }}}
 
     local freeport=$(getFreePort)
     if [[ -z ${freeport} ]] ; then
-		writeJSONResponceErr "result=>99" "message=>Unable to bind IP. There is no free ports"; exit 99;
+		writeJSONResponseErr "result=>4084" "message=>Unable to bind IP. There is no free ports"; exit 1;
 	fi
 
     if $IPTABLES -t nat -A PREROUTING -p $__PROTO --dport ${freeport} -j DNAT --to-destination ${__IP}:${__PORT} ; then
         /etc/init.d/iptables save | $GRAB_OUTPUT;
-        writeJSONResponceOut "result=>0" "message=>Port has been added" "port=>$freeport"; return 0 ;
+        writeJSONResponseOut "result=>0" "message=>Port has been added" "port=>$freeport"; return 0 ;
     fi
 }
 
@@ -170,15 +171,15 @@ function doUnbind() {
 	if [[ ! -z ${__PORT+x} ]] ; then 
 		#single port
 		#TODO: This comparation is buggy. Need to refactor it in future
-#		if ! grep -qP ${__PORT} <<< ${_ports[*]} ; then
+#		if ! $GREP -qP ${__PORT} <<< ${_ports[*]} ; then
 		if [[ -z ${_ports[0]} ]] ; then 
-			writeJSONResponceErr "result=>4091" "message=>there is no bindings for ${__IP}:${__PORT}"; exit 99;
+			writeJSONResponseErr "result=>4091" "message=>there is no bindings for ${__IP}:${__PORT}"; exit 1;
 		fi
 		if $IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j DNAT --to-destination $__IP:$__PORT 2>/dev/null ; then
 			/etc/init.d/iptables save | $GRAB_OUTPUT;
-			writeJSONResponceOut "result=>0" "message=>Port binding has been removed"; return 0 ;
+			writeJSONResponseOut "result=>0" "message=>Port binding has been removed"; return 0 ;
 		 else
-			writeJSONResponceOut "result=>4093" "message=>Port binding has not been removed"; return 1 ;
+			writeJSONResponseOut "result=>4093" "message=>Port binding has not been removed"; return 1 ;
 		fi
 	else 
 		# multiple ports
@@ -190,7 +191,7 @@ function doUnbind() {
 		done
     
 	    /etc/init.d/iptables save | $GRAB_OUTPUT;
-		writeJSONResponceOut "result=>0" "message=>Port bindings for ${__IP} has been removed (${msg} )"; return 0 ;
+		writeJSONResponseOut "result=>0" "message=>Port bindings for ${__IP} has been removed (${msg} )"; return 0 ;
 	fi
 }
 

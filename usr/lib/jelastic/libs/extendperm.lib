@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[ -n "${ESTPERMLIB_VERSION:-}" ] && return 0;
-ESTPERMLIB_VERSION="0.1";
+[ -n "${EXTPERMLIB_VERSION:-}" ] && return 0;
+EXTPERMLIB_VERSION="0.1";
 
 EXTEND_LIST_FILE="/etc/jelastic/extendperm.conf";
 _SSH_ACCESS_GROUP="ssh-access";

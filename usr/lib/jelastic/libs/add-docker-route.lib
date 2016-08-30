@@ -1,0 +1,142 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+[ -n "${ADDROUTESLIB_VERSION:-}" ] && return 0;
+ADDROUTESLIB_VERSION="0.1";
+
+function delAllRoutes(){
+    vzexecRun "ip route show table main | while read -a tmp; do [ \${tmp[0]} == 'default' ] || ip route del table main \$tmp; done"
+}
+
+function delRoutesVia(){
+    vzexecRun "ip route show table main | while read -a tmp; do [ \${tmp[2]} == ${ROUTE_VIA} ] && ip route del table main \$tmp; done"
+}
+
+function addDebianRoute(){
+    ROUTEDIR="/vz/root/${CTID}/etc/network/if-up.d/";
+    ROUTECFG="${ROUTEDIR}/jelnet";
+
+    [ ! -f "$ROUTECFG" ] && {
+        [ ! -d "$ROUTEDIR" ] && mkdir -p ${ROUTEDIR} 2>/dev/null ;
+        echo -en '#!/bin/bash\nexit 0\n' > $ROUTECFG 2>/dev/null && chmod a+x $ROUTECFG ;
+    }
+
+    [ -f "$ROUTECFG" ] && {
+        $SED -i "1 a [ \"x\$IF_ADDRESS\" == \"x${ROUTE_VIA}\" ] && ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null" $ROUTECFG
+        vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null"
+    }
+    return 0;
+}
+
+function addCentosRoute(){
+    VZ_NET_DEVICE='venet0'
+    ROUTECFG="/vz/root/${CTID}/etc/sysconfig/network-scripts/route-${VZ_NET_DEVICE}";
+    echo "${ROUTE_NETWORK} via ${ROUTE_VIA} dev ${VZ_NET_DEVICE}" >> $ROUTECFG 2>/dev/null
+    vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null"
+    return 0;
+}
+
+
+function addAlpineRoute(){
+    ROUTECFG="/vz/root/${CTID}/etc/route.conf" ;
+    vzexecRun "rc-update 2>/dev/null | grep -q staticroute || rc-update add staticroute >/dev/null 2>&1" ;
+
+    echo "net ${ROUTE_NETWORK} gw ${ROUTE_VIA}" >> $ROUTECFG ;
+    vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null" ;
+    return 0;
+}
+
+
+function addSuseRoute(){
+    ROUTECFG="/vz/root/${CTID}/etc/sysconfig/network/routes";
+    echo "${ROUTE_NETWORK%%/*} ${ROUTE_VIA} ${ROUTE_NETWORK##*/}" >> $ROUTECFG 2>/dev/null 
+    vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null" ;
+    return 0;
+}
+
+
+
+function delDebianRoute(){
+    ROUTEDIR="/vz/root/${CTID}/etc/network/if-up.d/";
+    ROUTECFG="${ROUTEDIR}/jelnet";
+
+    if [ -z "${ROUTE_NETWORK}" ] ; then
+        [ -f "$ROUTECFG" ] && {
+	       $SED -i -re "/ via\s+${ROUTE_VIA}/d" $ROUTECFG
+        }
+        delRoutesVia ;
+    else
+        [ -f "$ROUTECFG" ] && {
+	       $SED -i -re "/${ROUTE_NETWORK//\//\\/}\s+via\s+${ROUTE_VIA}/d" $ROUTECFG
+        }
+        vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null"
+    fi
+    return 0;
+}
+
+function delCentosRoute(){
+    VZ_NET_DEVICE='venet0'
+    ROUTECFG="/vz/root/${CTID}/etc/sysconfig/network-scripts/route-${VZ_NET_DEVICE}";
+
+    if [ -z "${ROUTE_NETWORK}" ] ; then
+        [ -f "$ROUTECFG" ] && {
+	       $SED -i -re "/ via\d+${ROUTE_VIA}/d" $ROUTECFG ;
+        }
+        delRoutesVia ;
+    else
+        [ -f "$ROUTECFG" ] && {
+	       $SED -i -re "/${ROUTE_NETWORK//\//\\/}\s+via\s+${ROUTE_VIA}/d" $ROUTECFG ;
+        }
+        vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null"
+    fi
+    return 0;
+}
+
+function delAlpineRoute(){
+    ROUTECFG="/vz/root/${CTID}/${ROUTEDIR}/etc/route.conf" ;
+
+    if [ -z "${ROUTE_NETWORK}" ] ; then
+        [ -f "$ROUTECFG" ] && {
+	       $SED -i -re "/ gw\s+${ROUTE_VIA}/d" $ROUTECFG ;
+        }
+        delRoutesVia ;
+    else
+        [ -f "$ROUTECFG" ] && {
+	       $SED -i -re "/${ROUTE_NETWORK//\//\\/}\s+gw\s+${ROUTE_VIA}/d" $ROUTECFG ;
+        }
+        vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null" ;
+    fi
+    return 0;
+}
+
+function delSuseRoute(){
+    ROUTECFG="/vz/root/${CTID}/etc/sysconfig/network/routes";
+
+    if [ -z "${ROUTE_NETWORK}" ] ; then
+        [ -f "$ROUTECFG" ] && {
+	       $SED -i "/ ${ROUTE_VIA} /d" $ROUTECFG ;
+        }
+        delRoutesVia ;
+    else
+        [ -f "$ROUTECFG" ] && {
+	       $SED -i -re "/${ROUTE_NETWORK%%/*}\s+${ROUTE_VIA}\s+${ROUTE_NETWORK##*/}/d" $ROUTECFG ;
+        }
+        vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null"
+    fi
+    return 0;
+}

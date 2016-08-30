@@ -21,19 +21,19 @@ inherit os;
 include output uninterract;
 
 function doCheckout(){
-    rm -Rf "${WEBROOT}/${PROJECT_NAME}";
+    [ ! -z "$WEBROOT" ] && rm -Rf "${WEBROOT}/${PROJECT_NAME}";
 
     if [[ "$LOGIN" != "__GUEST__"  ]] ; then
-        local repo_proto=$(echo $URL | sed -nre 's/(.*):\/\/(.*)/\1/p');
-        local host_and_uri=$(echo $URL | sed -re 's/(.*:\/\/)(.*)/\2/');
+        local repo_proto=$(echo $URL | $SED -nre 's/(.*):\/\/(.*)/\1/p');
+        local host_and_uri=$(echo $URL | $SED -re 's/(.*:\/\/)(.*)/\2/');
 
-        AUTH=$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+        AUTH=$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
                          -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
                          -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
                          -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
 
         [ ! -z "$PASSWORD" ] && {
-        AUTH=${AUTH}:$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+        AUTH=${AUTH}:$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
                          -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
                          -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
                          -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");
@@ -72,13 +72,14 @@ function doCheckout(){
         [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
             inherit ruby-common;
             bundleInstall;
+	    reloadServiceSilent ${SERVICE} ;
         } || return 0;
     fi
     return 0;
 }
 
 
-function _doUpdate(){
+function updateProject(){
     [ -d "${WEBROOT}/${PROJECT_NAME}" ] && cd "${WEBROOT}/${PROJECT_NAME}";
     [ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
             echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
@@ -91,12 +92,13 @@ function _doUpdate(){
     result=$?; [ $result -ne 0 ] && return $result;
     cd "${WEBROOT}/${PROJECT_NAME}" && runNonInterractive  "$GIT  gc" > /dev/null 2>&1;
     result=$?; [ $result -ne 0 ] && return $result;
-    [ ! -z "$BRANCH" ] && [ "$($GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" branch | grep "$BRANCH" | cut -d" " -f1)" != "*" ] && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" checkout "$BRANCH"  >> "$VCS_UPDATE_LOG" 2>&1;
+    [ ! -z "$BRANCH" ] && [ "$($GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" branch | $GREP "$BRANCH" | cut -d" " -f1)" != "*" ] && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" checkout "$BRANCH"  >> "$VCS_UPDATE_LOG" 2>&1;
 
     [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
         [ -f "${WEBROOT}/ROOT/Gemfile" ] &&  {
                 inherit ruby-common;
                 bundleInstall;
+		reloadServiceSilent ${SERVICE} ;
         }
     }
     return 0;
@@ -104,7 +106,7 @@ function _doUpdate(){
 
 
 function getLastRepoCommit(){
-    [ -e ${WEBROOT}/${PROJECT_NAME}/.git ] && local last_repo_commit=$($GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git rev-parse HEAD)
+    [ -e ${WEBROOT}/${PROJECT_NAME}/.git ] && local last_repo_commit=$($GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git rev-parse HEAD 2>/dev/null)
     [ -z $last_repo_commit ] && LAST_DEPLOYED_COMMIT="00000000000";
     echo $last_repo_commit;
 }
@@ -115,16 +117,16 @@ function getLastRemoteCommit(){
     preparedUrl="${URL}";
     
     if [[ "$LOGIN" != "__GUEST__"  ]] ; then
-        local repo_proto=$(echo $URL | sed -nre 's/(.*):\/\/(.*)/\1/p');
-        local host_and_uri=$(echo $URL | sed -re 's/(.*:\/\/)(.*)/\2/');
+        local repo_proto=$(echo $URL | $SED -nre 's/(.*):\/\/(.*)/\1/p');
+        local host_and_uri=$(echo $URL | $SED -re 's/(.*:\/\/)(.*)/\2/');
 
-        AUTH=$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+        AUTH=$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
                          -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
                          -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
                          -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
 
         [ ! -z "$PASSWORD" ] && {
-                 AUTH=${AUTH}:$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+                 AUTH=${AUTH}:$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
                          -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
                          -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
                          -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");
@@ -138,9 +140,9 @@ function getLastRemoteCommit(){
     fi
 
     if [ "x${LOGIN}" == "xgit" ]; then
-        last_remote_commit=$(git ls-remote git@$URL $BRANCH 2>/dev/null | awk '{print $1}');
+        last_remote_commit=$(git ls-remote git@$URL $BRANCH 2>/dev/null | $AWK '{print $1}');
     else
-        last_remote_commit=$(git ls-remote $preparedUrl $BRANCH | awk '{print $1}');
+        last_remote_commit=$(git ls-remote $preparedUrl $BRANCH | $AWK '{print $1}');
     fi
         [ -z $last_remote_commit ] && last_remote_commit="00000000000";
         echo $last_remote_commit;
@@ -148,15 +150,15 @@ function getLastRemoteCommit(){
 
 function vcsChangeUrl(){
     if [[ "$LOGIN" != "__GUEST__"  ]] ; then
-        local repo_proto=$(echo $URL | sed -nre 's/(.*):\/\/(.*)/\1/p') ;
-        local host_and_uri=$(echo $URL | sed -re 's/(.*:\/\/)(.*)/\2/') ;
-        AUTH=$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+        local repo_proto=$(echo $URL | $SED -nre 's/(.*):\/\/(.*)/\1/p') ;
+        local host_and_uri=$(echo $URL | $SED -re 's/(.*:\/\/)(.*)/\2/') ;
+        AUTH=$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
                          -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
                          -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
                          -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
 
         [ ! -z "$PASSWORD" ] && {
-                 AUTH=${AUTH}:$(sed -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
+                 AUTH=${AUTH}:$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
                          -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
                          -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
                          -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");

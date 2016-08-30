@@ -23,6 +23,7 @@ VERSION="1"
 DEFAULT_ACTION="Usage";
 $PROGRAM 'iptables';
 $PROGRAM 'service';
+$PROGRAM 'grep';
 
 function doUsage() {
     showUsageMessage
@@ -61,7 +62,7 @@ function __iptablesManip() {
             -A)
                 items=("${items[@]#$ip}");
                 items=("${items[@]}" "$ip")
-                if ! "${IPTABLES}" -L INPUT  -n | grep -q "${ip}"; then ${IPTABLES} ${mode} INPUT -s ${ip} -j ACCEPT;fi
+                if ! "${IPTABLES}" -L INPUT  -n | $GREP -q "${ip}"; then ${IPTABLES} ${mode} INPUT -s ${ip} -j ACCEPT;fi
                 ;;
             -D)
                 items=(${items[@]/"$ip"});
@@ -80,7 +81,7 @@ function describeAdd() {
 }
 
 function doAdd() {
-    __iptablesManip --add ${*} && writeJSONResponceOut "result=>0" "message=>Firewall rule added successfully" || writeJSONResponceErr "result=>4068" "message=>Firewall rule added with error" ;
+    __iptablesManip --add ${*} && writeJSONResponseOut "result=>0" "message=>Firewall rule added successfully" || writeJSONResponseErr "result=>4068" "message=>Firewall rule added with error" ;
 }
 
 function describeAddParameters() {
@@ -104,7 +105,7 @@ function describeRemoveOptions() {
 }
 
 function doRemove() {
-    __iptablesManip --remove ${*} && writeJSONResponceOut "result=>0" "message=>Firewall rule removed successfully" || writeJSONResponceErr "result=>4068" "message=>Firewall rule removed with error" ;
+    __iptablesManip --remove ${*} && writeJSONResponseOut "result=>0" "message=>Firewall rule removed successfully" || writeJSONResponseErr "result=>4069" "message=>Firewall rule removed with error" ;
 }
 
 function describeClean() {

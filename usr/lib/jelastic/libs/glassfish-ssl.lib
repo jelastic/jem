@@ -18,7 +18,6 @@
 GLASSFISHSSLLIB_VERSION="0.1";
 
 $PROGRAM 'sed';
-$PROGRAM 'chown';
 _ASADMIN="/opt/glassfish3/bin/asadmin";
 PASS_FILE="/var/lib/jelastic/glalssfish/gfpass";
 DAS_PASS="/var/lib/jelastic/glalssfish/daspassword";
@@ -60,7 +59,7 @@ function enableSSL(){
 	[ ! -f "$GF_KEYSTORE_ORIG" ] && cp "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG";
 	doAction keystore install;
 	mergeGFKeystore;
-	$CHOWN "$DATA_OWNER" "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG" 2>>"$JEM_CALLS_LOG";
+	chown "$DATA_OWNER" "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG" 2>>"$JEM_CALLS_LOG";
 	local ip_bind="0.0.0.0";
 	runAsadminCmd create-http-listener --listeneraddress $ip_bind --listenerport "$SSL_PORT" --defaultvs server --securityenabled=true --enabled=true --target gfcluster http-listener-ssl-${DEFAULT_DOMAIN};
 	runAsadminCmd create-ssl --type http-listener --certname "${DEFAULT_DOMAIN}" --target gfcluster http-listener-ssl-${DEFAULT_DOMAIN};
@@ -73,7 +72,7 @@ function disableSSL(){
 	doAction keystore remove;
 	runAsadminCmd delete-http-listener --target gfcluster http-listener-ssl-${DEFAULT_DOMAIN};
 	[ -f "$GF_KEYSTORE_ORIG" ] && cp "$GF_KEYSTORE_ORIG" "$GF_KEYSTORE";
-	$CHOWN "$DATA_OWNER" "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG" 2>>"$JEM_CALLS_LOG";
+	chown "$DATA_OWNER" "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG" 2>>"$JEM_CALLS_LOG";
 	setModificationDate;	
 	reloadServiceSilent "$SERVICE";
 }

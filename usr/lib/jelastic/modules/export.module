@@ -29,6 +29,7 @@ EXPORT_CONFIGS="no";
 EXPORT_DATA="no";
 VCS_CONFIG_DIR="/var/lib/jelastic/vcs";
 SSL_CONFIG_DIR="/var/lib/jelastic/SSL";
+ROOT_CRON_CONFIG="/var/spool/cron/root";
 HTTP_SERVICE="simplehttpd";
 EXCLUDE_LIST="*.bak
 *.log
@@ -108,6 +109,11 @@ function doRun() {
 		}
 		[ -d "$VCS_CONFIG_DIR" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${VCS_CONFIG_DIR}"; }
 		[ -d "$SSL_CONFIG_DIR" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${SSL_CONFIG_DIR}"; }
+		[ -f "$ROOT_CRON_CONFIG" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${ROOT_CRON_CONFIG}"; }
+        if [[ $COMPUTE_TYPE =~ php$ ]] ; then
+            [ -e /usr/lib64/php/modules ] && modDir=$(readlink -f /usr/lib64/php/modules);
+            INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${modDir}"
+        fi
 	fi
     fi
     if [ ! -z "$EX_LIST_CMD" ] ; then
@@ -124,11 +130,16 @@ function doRun() {
 	[ ! -z "$DB_DATA_DIR" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${DB_DATA_DIR}"; }
 	[ ! -z "$WEBROOT" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${WEBROOT}"; }
         [ -d "$VCS_CONFIG_DIR" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${VCS_CONFIG_DIR}"; }
-	INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${_homedir}";
+	if [ "x$COMPUTE_TYPE" == "xcartridge" ] ; then
+            INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${CARTRIDGE_HOME}";
+        else
+            INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${_homedir}";
+        fi
+	
     fi
     [ -z "$INCLUDE_LIST" ] && { 
 	echo "Empty export list" >> $ACTIONS_LOG; 
-	writeJSONResponceErr "result=>4040" "message=>Export failed" ;
+	writeJSONResponseErr "result=>4040" "message=>Export failed" ;
 	return 1; 
     }
 
@@ -144,15 +155,15 @@ function doRun() {
 
     while read line
     do
-        line=$(sed 's/\//\\\//g' <<< $line);
+        line=$($SED 's/\//\\\//g' <<< $line);
         [ "x$line" == "x" ] && continue ;
-        INCLUDE_LIST1=$(sed "/^$line.\+/d" <<< "$INCLUDE_LIST1");
+        INCLUDE_LIST1=$($SED "/^$line.\+/d" <<< "$INCLUDE_LIST1");
     done <<< "$INCLUDE_LIST"
 
     echo "$INCLUDE_LIST1" >> "$EXPORT_LIST_FILE";
     echo "$EXCLUDE_LIST" >> "$EXCLUDE_LIST_FILE";
 
-    [ ! -d "$DESTINATION" ] && { $MKDIR -p "$DESTINATION";  }
+    [ ! -d "$DESTINATION" ] && { mkdir -p "$DESTINATION";  }
     TAR_OPTS=" --warning=none -P --ignore-failed-read"
 
     stopService ${SERVICE} > /dev/null 2>&1;
@@ -167,15 +178,15 @@ function doRun() {
     if [ $arcresult -eq 0 ] ; then 
 	if [ `$TAR -P -tf "$ARCH_FILE" | wc -l` -eq 0 ] ; then
 	    echo "Empty archive created" >> $ACTIONS_LOG ;
-	    writeJSONResponceErr "result=>4040" "message=>Export failed" ;
+	    writeJSONResponseErr "result=>4040" "message=>Export failed" ;
 	else
-	    $CHOWN ${_UID}:${_GUID} -R "${DESTINATION}" 2>>"$JEM_CALLS_LOG";
+	    chown ${_UID}:${_GUID} -R "${DESTINATION}" 2>>"$JEM_CALLS_LOG";
 	    restartServiceSilent ${HTTP_SERVICE} ;
 	    enableService ${HTTP_SERVICE} > /dev/null 2>&1;
-    	    writeJSONResponceOut "result=>0" "message=>Exported successfully" "name=>${ARCH_FILE_NAME}" ;
+    	    writeJSONResponseOut "result=>0" "message=>Exported successfully" "name=>${ARCH_FILE_NAME}" ;
     	fi
     else
-	writeJSONResponceErr "result=>4040" "message=>Export failed" ;
+	writeJSONResponseErr "result=>4040" "message=>Export failed" ;
 	return $arcresult ;
     fi
     return 0 ;
@@ -191,18 +202,21 @@ function postRunCallback(){
 
 function doRemove() {
     if [ ! -z "$EX_FILENAME" ] ; then
-	ARCH_FILE_NAME="${EX_FILENAME}";
+	   ARCH_FILE_NAME="${EX_FILENAME}";
     else
-	writeJSONResponceErr "result=>4038" "message=>Filename is required" ;
-	return 4038;
+        writeJSONResponseErr "result=>4038" "message=>Filename is required" ;
+        return 1;
     fi
     ARCH_FILE="${DESTINATION}/${ARCH_FILE_NAME}";
     if [ -f "$ARCH_FILE" ] ; then
-	rm -rf "$ARCH_FILE";
-	writeJSONResponceOut "result=>0" "message=>Successfully" ;
+    	rm -rf "$ARCH_FILE";
+    	writeJSONResponseOut "result=>0" "message=>Successfully" ;
+    elif [ -f "$ARCH_FILE.tar.gz" ] ; then
+        rm -rf "$ARCH_FILE.tar.gz";
+        writeJSONResponseOut "result=>0" "message=>Successfully" ;
     else
-	writeJSONResponceErr "result=>4039" "message=>File not found" ;
-	return 4039;
+        writeJSONResponseErr "result=>4039" "message=>File not found" ;
+        return 1;
     fi
 }
 

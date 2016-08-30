@@ -16,7 +16,7 @@
 
 
 
-inherit os output vzexec;
+inherit os output vzexec virtuozzo;
 include log;
 
 DESCRIPTION="Manipulate storage mounts inside specified container";
@@ -27,13 +27,30 @@ $PROGRAM "vzctl"
 $PROGRAM "vzlist"
 $PROGRAM "awk"
 $PROGRAM "ifconfig"
+$PROGRAM "rsync"
+$PROGRAM "grep"
+$PROGRAM "tar"
 
 declare -i _CTID=""
+declare -i CTID=""
+declare -i _MOVEDATA=0
 declare _SOURCE=""
 declare _DESTINATION=""
-declare _DEFAULT_NFS_MOUNT_OPTS="rw,hard,intr,tcp,nolock"
-declare _MOUNTS_STORAGE="/etc/fstab"
+declare _DEFAULT_NFS_MOUNT_OPTS="soft,intr,udp,nolock,vers=3"
+declare CONTAINER_MOUNTS_STORAGE="/etc/fstab"
 declare _IPLIST
+declare -a UNKNOWN_ARG
+declare SAVE_CONFIG="true"
+
+declare TRUE=0
+declare FALSE=1
+
+FORCE_UMOUNT=$TRUE
+FORCE_MOUNT=$FALSE
+
+MOUNTPROG="/sbin/mount.nfs"
+MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-utils.tar.gz"
+_UI_RESULT=0
 
 EXEC="/bin/bash -c "
 
@@ -45,15 +62,27 @@ function onModLoadCallback() {
     log "Preload callback";
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -o c:,s:,d:,l: -l ctid:,source:,destination:,ip: -- params "$@" 2>/dev/null`;
+    local temp=`getopt -o c:,s:,d:,l:,m: -l ctid:,source:,destination:,ip:,movedata:,saveconfig::,force:: -- "$@" 2>/dev/null`;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
     while true ; do
         case "$1" in
+            --force)
+                shift;
+                FORCE_UMOUNT=$TRUE
+                FORCE_MOUNT=$TRUE
+                shift;
+                ;;
+            --saveconfig)
+                shift;
+                SAVE_CONFIG=$1
+                shift;
+                ;;
             -o | --ctid)
                 shift;
                 _CTID=$1
+                CTID=$1
                 EXEC="$VZCTL exec2 ${_CTID}"
                 vzexecSetCTID ${_CTID}
                 shift;
@@ -73,18 +102,28 @@ function onModLoadCallback() {
                 _IPLIST=$1;
                 shift;
                 ;;
+            -m | --movedata)
+                shift;
+                _MOVEDATA=$1;
+                shift;
+                ;;
             --)
                 shift;
                 break;
                 ;;
         esac;
     done;
+    for arg do UNKNOWN_ARG+=("$arg") ; done
+    [[ ! -z "${CTID}" ]] && {
+        MOUNTS_STORAGE="/vz/root/${CTID}${CONTAINER_MOUNTS_STORAGE}"
+    }
+    log "${UNKNOWN_ARG[*]}"
 }
 
 function _isVirtuozzoInstalled() {
     local vzmainconfig="/etc/sysconfig/vz";
     if [ -f "${vzmainconfig}" ] ; then
-        grep -qE "VIRTUOZZO=[\s|\"|']*yes[\s|\"|']*" /etc/sysconfig/vz ; return $?;
+        $GREP -qE "VIRTUOZZO=[\s|\"|']*yes[\s|\"|']*" /etc/sysconfig/vz ; return $?;
     fi
     return 1
 }
@@ -99,13 +138,14 @@ function getTargetIPs() {
 }
 
 function preparePath() {
-    tpath=${1:?"Path required"}
-    hn=${2}
+    local tpath=${1:?"Path required"}
+    local hn=${2}
     if [[ ! -z "${hn}" ]] ; then
         tpath="/vz/root/${_CTID}${tpath}"
+        tpath=$($SED -re 's/\$/\\$/g' -e 's/(`)/\\\1/g' <<< "${tpath}")
     fi
 
-    local cmd="[[ ! -d '${tpath}' ]] && mkdir -p '${tpath}';";
+    local cmd="[[ ! -d '$($SED -re "s/'/\\\'\'/g" <<< "${tpath}")' ]] && mkdir -p \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\"; chmod 0777 \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\"";
     if [[ -z "${hn}" ]] ; then
         log "${cmd}"
         vzexecRun "${cmd}"
@@ -116,27 +156,86 @@ function preparePath() {
     return 0;
 }
 
+function remountPath() {
+    local share=${1}
+    local remountCmd="umount -l ${share} ; mount ${share}"
+    out=$($EXEC "$remountCmd" 2>&1)
+    if [[ -z "${out}" ]] ; then
+       log "$out"
+    fi
+    return $?
+}
+
 function processnfs() {
     local sourceIP=${1:?"Source address required"}
     local sourceMount=${2:?"Source share name required"}
-    local cmdGetShares="$SED -nre '/nfs(3|4)?/{s/([^:]+:)(\S+).*/\1\2/g;p}' \"${_MOUNTS_STORAGE}\";"
-    local aCurrentMounts=($($VZCTL exec ${_CTID} $cmdGetShares))
+    local sourceMountUnEsc=$($SED -re 's/\\(\/|\(|\)|\]|\[|\\)/\1/g' -e 's/\s/\\\\040/g' <<< "$sourceMount")
+    local destinationEsc=$($SED -re 's/\s/\\\\040/g' <<< "${_DESTINATION}" )
+    local running
 
-    if indexOf "${aCurrentMounts[*]}" "${sourceIP}:${sourceMount}" ; then
-        echo "share ${sourceIP}:${sourceMount} already mounted";
-        return 0;
-    fi
+    isContainerRunning ${CTID} ; running=$?
+    [[ $running -ne 0 ]] && {
+        log "Container $CTID is not running. Mounting"
+        $VZCTL mount $CTID > /dev/null 2>&1
+    }
+
+    [[ ! -e "/vz/root/${_CTID}${MOUNTPROG}" ]] && dosetupUtils ${_CTID}
+
+    local aCurrentMounts=($($SED -nre '/nfs(3|4)?/{s/([^:]+:)(\S+).*/\1\2/g;p}' ${MOUNTS_STORAGE}))
+
+    #TODO:
+    # jem storage mount --source 'rw:nfs:node182-env-qqq.dev2.jelastic.com:/storage' --destination '/client2' --ctid '1192' ;
+    #
+    # cat /etc/fstab
+    #node182-env-qqq.dev2.jelastic.com:/storage      /client nfs     hard,intr,tcp,nolock,vers=3     0       0
+    #
+    #if indexOf "${aCurrentMounts[*]}" "${sourceIP}:${sourceMount}" ; then
+    #    echo "share ${sourceIP}:${sourceMount} already mounted";
+    #    return 0;
+    #fi
+
     preparePath "${_DESTINATION}" "${_CTID}"
-    local mntEntry="${sourceIP}:${sourceMount}\t${_DESTINATION}\tnfs\t${_DEFAULT_NFS_MOUNT_OPTS}\t0\t0"
-    local cmdRegisterMount="echo -e \"$mntEntry\" >> ${_MOUNTS_STORAGE};mount -a;"
-    log "registering ${sourceIP}:${sourceMount} in ${_CTID}"
-    out=$($EXEC "$cmdRegisterMount" 2>&1)
-    if [[ -z "${out}" ]] ; then
-        log "$out"
+    local mntEntry="${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")\t${destinationEsc}\tnfs\t${_DEFAULT_NFS_MOUNT_OPTS}\t0\t0"
+    local cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE};"
+
+    if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
+        log "registering ${sourceIP}:${sourceMount} in ${_CTID}"
+        out=$(echo -e $mntEntry >> ${MOUNTS_STORAGE})
+        if [[ ! -z "${out}" ]] ; then
+           log "$out"
+        fi
     fi
-    $EXEC "chkconfig netfs on;"
-    echo "successfuly mounted"
-    return 0;
+
+    msg=""
+    res=0
+    if [[ $running -eq 0 ]] ; then
+        mntcmd="mount \"$($SED -re 's/("\*|\$|\?|\|\^|`|'\'')/\\\1/g' <<< "${_DESTINATION}")\""
+        vzexecRun "${mntcmd}"
+        res="$(vzexecGetLastErrCode)"
+        msg="$(vzexecGetLastStdErr)"
+        if [[ $res -gt "0" ]] && [[ $FORCE_MOUNT -eq $FALSE ]] ; then
+            local mntEntryCheck="${sourceIP}:$($SED -re 's/(\$|\[|\]|\*|\(|\)|\?|\||\^)/\\\1/g' -e 's/\\\\\$/$/g' <<< ${sourceMount})/? on $($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\||\^|`)/\\\1/g' <<< ${destinationEsc})"
+            vzexecRun "mount | $GREP -P \"$mntEntryCheck\""
+            res=$(vzexecGetLastErrCode)
+            if [[ $res -ne $TRUE ]] ; then
+                #remove the /etc/fstab entry
+                cmdUnregisterMount="/$(echo -e $mntEntry | $SED -r -e 's/\t/\\\s+/g;' -e 's/\//\\\//g' -e 's/\./\\./g' -e 's/(\[|\]|\*|\(|\)|\$|\?|\||\^)/\\\1/g')/d"
+                if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
+                    out=$($SED -i -re "$cmdUnregisterMount" ${MOUNTS_STORAGE} 2>&1)
+                fi
+                log $out
+                res=4111
+            else
+                res=0
+            fi
+        fi
+    else
+        log "unmounting"
+        $VZCTL umount $CTID > /dev/null 2>&1
+    fi
+    [[ -z "$msg" ]] && echo "successfuly mounted" || echo $msg
+    [[ "$res" -gt 0 ]] && return 1;
+    return 0
 }
 
 function processlocal() {
@@ -149,8 +248,14 @@ function processlocal() {
         return 1;
     fi
 
+    isContainerRunning ${CTID} ; running=$?
+    [[ $running -ne 0 ]] && {
+        log "Container $CTID is not running. Mounting"
+        $VZCTL mount $CTID > /dev/null 2>&1
+    }
+
     OIFS=${IFS};IFS=$'\n'
-    local aCurrentMounts=($($SED -nre "/none/{/bind/{s/\s*(\S+).*/\1/;p}}" "/vz/root/${_CTID}${_MOUNTS_STORAGE}"))
+    local aCurrentMounts=($($SED -nre "/none/{/bind/{s/\s*(\S+).*/\1/;p}}" "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}"))
     IFS=${OIFS}
 
     log "${aCurrentMounts[@]}"
@@ -168,8 +273,26 @@ function processlocal() {
     preparePath "${_DESTINATION}" 1
     preparePath "${sourceMount}" 1
 
-    echo -e $mntEntry >> "/vz/root/${_CTID}${_MOUNTS_STORAGE}"
+    hnSrcPath=${sourceMount}
+    hnDstPath=${_DESTINATION}
+
+    if [[ "$_CTID" -gt 0 ]] ; then
+        hnDstPath="/vz/root/${_CTID}${hnDstPath}"
+        hnSrcPath="/vz/root/${_CTID}${hnSrcPath}"
+    fi
+
+    if [[ "$_MOVEDATA" -gt 0 ]] ; then
+        $RSYNC -aP --force "${hnDstPath}/" "${hnSrcPath}/" >> $ACTIONS_LOG 2>&1
+        rm -fr "${hnDstPath}/*" >> $ACTIONS_LOG 2>&1
+    fi
+
+    echo -e $mntEntry >> "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}"
     echo $mntEntry
+    if [[ $running -eq 0 ]] ; then
+        vzexecRun "mount ${_DESTINATION}"
+    else
+        $VZCTL umount $CTID > /dev/null 2>&1
+    fi
     res=$?
     if [[ $res -gt 0 ]]; then
         log "error mounting share"
@@ -178,60 +301,149 @@ function processlocal() {
     return 0;
 }
 
+function doRemount() {
+    local shares=(${_DESTINATION})
+    [[ -z ${_DESTINATION} ]] && {
+        shares=($($SED -nre "/\snfs(3|4)?\s/{s/\s*(\S+)\s*(\S+).*/\2/;p}" "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" ))
+    }
+    for share in ${shares[*]} ; do
+        remountPath "$share"
+    done
+    return 0;
+}
+
+function dosetupUtils() {
+    local issue_file="/vz/root/${CTID}/etc/issue";
+    local release_files="/vz/root/${CTID}/etc/*-release";
+
+    if [[ ! -e "${MOUNTPACKAGE}" ]] ; then
+        log "${MOUNTPACKAGE} not found!"
+        exit 1;
+    fi
+    issue_string=$(cat $release_files $issue_file 2>/dev/null);
+    OS=$(detectOS "$issue_string")
+    OS_ver=$(getOSVersion "$issue_string")
+    OS_ver=${OS_ver%%.*}
+
+    #JE-25896
+    if [[ "x$OS" == "xalpine" ]] ; then
+        installCmd=$(installPackageCmd $OS install nfs-utils)
+        vzexecRun "$installCmd"
+        vzexecRun "rc-update add netmount default"
+        return 0
+    fi
+    $TAR zxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
+
+    if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
+        vzexecRun "chkconfig netfs on"
+    fi
+    return 0
+}
+
 function doMount() {
+    [[ -z ${_SOURCE} && -z ${_DESTINATION} ]] && {
+        out=$($EXEC "mount -a" 2>&1)
+        if [[ ! -z "${out}" ]] ; then
+            log "$out"
+        fi
+        return 0;
+    }
     [[ -z ${_SOURCE} ]] && {
-        writeJSONResponceErr "result=>99" "message=>SOURCE required" ;
+        writeJSONResponseErr "result=>4065" "message=>SOURCE required" ;
         return 1;
     }
     [[ -z ${_DESTINATION} ]] && {
-        writeJSONResponceErr "result=>99" "message=>DESTINATION required" ;
+        writeJSONResponseErr "result=>4066" "message=>DESTINATION required" ;
         return 1;
     }
+
     local mtype sourceIP sourceMount
-    [ -f "/vz/root/${_CTID}${_MOUNTS_STORAGE}" ] || touch "/vz/root/${_CTID}${_MOUNTS_STORAGE}" 2>/dev/null
+    [ -f "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" ] || touch "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" 2>/dev/null
 
     # parse connection string
-    eval "$(echo ${_SOURCE} | $SED -rne "s/(([Ll][Oo][Cc][Aa][Ll]|[Nn][Ff][Ss]|[Ww][Ee][Bb][Dd][Aa][Vv]):?(\/){2})?([^:]+):?(.*)/mtype='\2';sourceIP='\4';sourceMount='\5';/g;p")"
+    _SOURCE="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< "$_SOURCE")"
+    eval "$(echo "${_SOURCE}" | $SED -rne "s/(([Rr][Oo]|[Rr][Ww]):?([Ll][Oo][Cc][Aa][Ll]|[Nn][Ff][Ss]|[Ww][Ee][Bb][Dd][Aa][Vv]):?(\/){0,2})?([^:]+):?(.*)/atype=\2\nmtype='\3'\nsourceIP='\5'\nsourceMount='\6';/g;p" | $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
     mtype=${mtype,,}
+    atype=${atype,,}
+    atype=$($SED -re 's/;//g' <<< $atype)
     log "protocol=${mtype} source=${sourceIP} sourceMount=${sourceMount}"
     [[ -z "${mtype}" ]] && mtype="nfs"
 
     # for local mounts (bind)
-    [[ "${mtype}" == "local" ]] && sourceMount="/${sourceIP}"
-    [[ -z "${sourceMount}" ]] && mountpoint="/data"
+    if [ "${mtype}" == "local" -a "x${sourceMount}" == "x" ] ; then
+        sourceMount="/${sourceIP}"
+    fi
+    [[ -z "${sourceMount}" ]] && mountpoint="/volumes"
     [[ -z "${sourceIP}" ]] && {
-        writeJSONResponceErr "result=>99" "message=>invalid source string format." ;
+        writeJSONResponseErr "result=>4067" "message=>invalid source string format." ;
         return 1;
     }
-    msg=$(process${mtype} "${sourceIP}" "${sourceMount}")
-    writeJSONResponceOut "result=>$?" "message=>${msg}" ;
+    _DEFAULT_NFS_MOUNT_OPTS="${_DEFAULT_NFS_MOUNT_OPTS},${atype}"
+    msg=$(process${mtype} "${sourceIP}" "${sourceMount}"); res=$?
+    [[ "$res" -gt 0 ]] && res="4111"
+    writeJSONResponseOut "result=>$res" "message=>${msg}" ;
     return 0
 }
 
 function doUmount() {
-    [[ -z ${_DESTINATION} ]] && {
-        writeJSONResponceErr "result=>99" "message=>DESTINATION required" ;
+    [[ -z ${_DESTINATION} && -z ${UNKNOWN_ARG} ]] && {
+        writeJSONResponseErr "result=>4066" "message=>DESTINATION required" ;
         return 1;
     }
     local rescode retfunc msg="successfully unmounted";
-    vzexecSetCTID $_CTID;
+    local running
+    local -a shares
 
-    if ! vzexecRun "umount ${_DESTINATION};" ; then
-        log "Performing lazy umount"
-        if ! vzexecRun "umount -l ${_DESTINATION};" ; then
-            msg="$(vzexecGetLastStdErr)";
-        else
-            msg="$(vzexecGetLastStdOut)";
+    isContainerRunning ${CTID} ; running=$?
+
+    for i in $(seq 0 $((${#UNKNOWN_ARG[@]}-1))); do
+        if [ ! -z "${UNKNOWN_ARG[$i]}" ] ; then
+            [ ${#shares[*]} -gt 0 ] && shares=("${shares[@]}" "${UNKNOWN_ARG[$i]}") || shares=("${UNKNOWN_ARG[$i]}")
         fi
+    done
+
+    if [[ ! -z ${_DESTINATION} ]] ; then
+        shares+=("${_DESTINATION}")
     fi
-    rescode=$(vzexecGetLastErrCode)
-    if [ $rescode -eq 0 ] ; then
-        local dpath=$($SED -re 's/\//\\\//g' <<< ${_DESTINATION});
-        out=$($EXEC "$SED -i -re \"/nfs/{/${dpath}/d}\" ${_MOUNTS_STORAGE} 2>&1;")
-        [[ ! -z "${out}" ]] && log "${out}";
-        retfunc="writeJSONResponceOut 'result=>0'"
-    else
-        retfunc="writeJSONResponceErr 'result=>99'"
+
+    OIFS=$IFS; IFS=$'\n'
+    for i in $(seq 0 $((${#shares[*]}-1)) ) ; do
+        IFS=$OIFS
+        if [[ $running -eq 0 ]] ; then
+            if ! vzexecRun "umount '${shares[$i]}';" ; then
+                log "Performing lazy umount"
+                if ! vzexecRun "umount -l '${shares[$i]}';" ; then
+                    msg="$(vzexecGetLastStdErr)";
+                else
+                    msg="$(vzexecGetLastStdOut)";
+                fi
+            fi
+            rescode=$(vzexecGetLastErrCode)
+        else
+            $VZCTL mount $CTID > /dev/null 2>&1
+            rescode=0
+        fi
+
+        if [[ $FORCE_UMOUNT -eq 0 ]] ; then
+             rescode=0
+        fi
+
+        if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
+            if [ $rescode -eq 0 ] ; then
+                local dpath="\s+$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+(nfs|none)\s+";
+                out=$($SED -i -re /${dpath}/d ${MOUNTS_STORAGE} 2>&1)
+                [[ ! -z "${out}" ]] && log "${out}";
+                retfunc="writeJSONResponseOut result=>0"
+            else
+                retfunc="writeJSONResponseErr result=>99"
+            fi
+        else
+            retfunc="writeJSONResponseOut result=>$rescode"
+        fi
+    done
+
+    if [[ $running -ne 0 ]] ; then
+        $VZCTL umount $CTID > /dev/null 2>&1
     fi
     $retfunc "message=>$msg";
     return 0;
@@ -239,31 +451,31 @@ function doUmount() {
 
 function doList() {
     msg=$($EXEC "mount | $SED -nre '/nfs(3|4)?/{s/(.*)\s+type.*/\1/g;p}';")
-    writeJSONResponceOut "result=>0" "message=>$msg"
+    writeJSONResponseOut "result=>0" "message=>$msg"
     return 0
 }
 
 
 function doExport() {
     [[ -z ${_SOURCE} ]] && {
-        writeJSONResponceErr "result=>99" "message=>SOURCE required" ;
+        writeJSONResponseErr "result=>4065" "message=>SOURCE required" ;
         return 1;
     }
 
     vzexecSetCTID $_CTID;
     if ! vzexecRun "jem auth add -t ip -l ${_IPLIST};" ; then
-        writeJSONResponceErr "result=>99" "message=>$(vzexecGetLastStdErr)";
+        writeJSONResponseErr "result=>4030" "message=>$(vzexecGetLastStdErr)";
         return $(vzexecGetLastErrCode);
     fi
     if ! vzexecRun "mkdir -p '${_SOURCE}'; chmod 0777 '${_SOURCE}';" ; then
-        writeJSONResponceErr "result=>99" "message=>$(vzexecGetLastStdErr)";
+        writeJSONResponseErr "result=>4030" "message=>$(vzexecGetLastStdErr)";
         return $(vzexecGetLastErrCode);
     fi
     if ! vzexecRun "exportfs -ra;" ; then
-        writeJSONResponceErr "result=>99" "message=>$(vzexecGetLastStdErr)";
+        writeJSONResponseErr "result=>4030" "message=>$(vzexecGetLastStdErr)";
         return $(vzexecGetLastErrCode);
     fi
-    writeJSONResponceOut "result=>0" "message=>success";
+    writeJSONResponseOut "result=>0" "message=>success";
     return 0;
 }
 
@@ -318,3 +530,4 @@ function describeUmountOptions() {
     echo "-o|--ctid: container ID ";
     echo "-d|--destination: destination path";
 }
+

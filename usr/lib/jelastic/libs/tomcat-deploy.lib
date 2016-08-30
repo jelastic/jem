@@ -36,7 +36,7 @@ function applyPostDeploy(){
 	if [ ! -d "$TOMCAT_HOME/temp" ]
     then 
         mkdir -p "$TOMCAT_HOME/temp";
-        $CHOWN -R  $DATA_OWNER "$TOMCAT_HOME/temp" 2>>"$JEM_CALLS_LOG";
+        chown -R  $DATA_OWNER "$TOMCAT_HOME/temp" 2>>"$JEM_CALLS_LOG";
     fi
 }
 

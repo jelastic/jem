@@ -25,7 +25,7 @@ $PROGRAM 'grep';
 
 DESCRIPTION="Jem configuration module";
 VERSION="1";
-DEFAULT_ACTION="usage";
+DEFAULT_ACTION="Usage";
 
 function doUsage() {
     showUsageMessage;
@@ -47,6 +47,55 @@ function doExtIpChanged(){
     inherit $extipchange_module_inherit ;
     inherit sendmailextip ; SendmailExtIp ;
     ipChanged ;
+    writeJSONResponseOut "result=>0" "message=>Ok"
+}
+
+function doOption(){
+    OPTION_ENABLED=0;
+    while [ "$1" != "" ];
+    do
+        case $1 in
+            -o| --option ) shift
+                MANAGE_OPTION=$( tr '[:lower:]' '[:upper:]'  <<< $1 ) ;;
+            -e| --enable ) 
+                OPTION_ENABLED=1 ;;
+            -d| --disable ) 
+                OPTION_ENABLED=0 ;;
+        esac
+        shift
+    done
+    [ -z "$MANAGE_OPTION" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
+
+    [[ -n "${META_FILE}" ]] && [[ -e "${META_FILE}" ]] && {
+        if $GREP -q "${MANAGE_OPTION}_ENABLED" ${META_FILE} ; then
+            $SED -i -re "s/${MANAGE_OPTION}_ENABLED=([0-9]+)/${MANAGE_OPTION}_ENABLED=${OPTION_ENABLED}/g" ${META_FILE};
+        else
+            echo -e "\n${MANAGE_OPTION}_ENABLED=${OPTION_ENABLED}" >> ${META_FILE};
+            $SED -i -re '/^$/d' ${META_FILE};
+        fi;
+    } || {
+        writeJSONResponseErr "result=>4080" "message=>Error: No metadata found!" ;
+        return 80;
+    }
+    if [ "x$MANAGE_OPTION" == "xSENDMAIL" ]; then
+        inherit sendmailextip ; SendmailExtIp ;
+    fi
+    writeJSONResponseOut "result=>0" "message=>Option ${MANAGE_OPTION} configured successfully"
+    return 0;
+}
+
+function describeOption(){
+    echo "Set/unset provided option"
+}
+
+function describeOptionParameters(){
+    echo "--option <option> --enable|--disable"
+}
+
+function describeOptionOptions(){
+    echo "-o|--option <option>: target option";
+    echo "-e|--enable: enable option";
+    echo "-d|--disable: disable option";
 }
 
 function describeExtIpChanged() {

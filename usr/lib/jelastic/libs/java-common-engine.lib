@@ -16,14 +16,14 @@
 
 [ -n "${JAVACOMMONENGINELIB_VERSION:-}" ] && return 0;
 JAVACOMMONENGINELIB_VERSION="0.1";
+$PROGRAM 'grep';
 
 JAVA_COMMON_PATH="/usr/java"
-JAVA6_DIR=$(ls $JAVA_COMMON_PATH | grep jdk1.6 | sort -r | head -n 1) ;
-JAVA7_DIR=$(ls $JAVA_COMMON_PATH | grep jdk1.7 | sort -r | head -n 1) ;
-JAVA8_DIR=$(ls $JAVA_COMMON_PATH | grep jdk1.8 | sort -r | head -n 1) ;
+JAVA6_DIR=$(ls $JAVA_COMMON_PATH | $GREP jdk1.6 | sort -r | head -n 1) ;
+JAVA7_DIR=$(ls $JAVA_COMMON_PATH | $GREP jdk1.7 | sort -r | head -n 1) ;
+JAVA8_DIR=$(ls $JAVA_COMMON_PATH | $GREP jdk1.8 | sort -r | head -n 1) ;
 JAVA_LATEST_DIR="/usr/java/latest"
 JAVA_DEFAULT_DIR="/usr/java/default"
-$PROGRAM 'chown';
 
 
 function switchEngine(){
@@ -32,26 +32,26 @@ function switchEngine(){
 	
 	case $engine_type in
 		"java6" )
-		 local java_dir=$JAVA6_DIR
+		 local java_dir="$JAVA6_DIR"
 	;;
 		"java7" )
-		 local java_dir=$JAVA7_DIR
+		 local java_dir="$JAVA7_DIR"
 	;;
 		"java8" )
-		 local java_dir=$JAVA8_DIR
+		 local java_dir="$JAVA8_DIR"
 	;;
 	*) 	
-	return 4023
+	return 1
 
     esac
 
-	[ -L $JAVA_LATEST_DIR ] && rm $JAVA_LATEST_DIR;
-	[ ! -z $java_dir ] && ln -s $java_dir $JAVA_LATEST_DIR;
+	[ -L "$JAVA_LATEST_DIR" ] && rm "$JAVA_LATEST_DIR";
+	[ ! -z "$java_dir" ] && ln -s "$java_dir" "$JAVA_LATEST_DIR";
 
-	[ -L $JAVA_DEFAULT_DIR ] && rm $JAVA_DEFAULT_DIR;
-    [ ! -z $java_dir ] && ln -s $JAVA_LATEST_DIR $JAVA_DEFAULT_DIR;
+	[ -L "$JAVA_DEFAULT_DIR" ] && rm "$JAVA_DEFAULT_DIR";
+    [ ! -z "$java_dir" ] && ln -s "$JAVA_LATEST_DIR" "$JAVA_DEFAULT_DIR";
 
-	[ -d $JAVA_COMMON_PATH ] && $CHOWN -R $DATA_OWNER $JAVA_COMMON_PATH 2>>"$JEM_CALLS_LOG";
+	[ -d "$JAVA_COMMON_PATH" ] && chown -R "$DATA_OWNER" "$JAVA_COMMON_PATH" 2>>"$JEM_CALLS_LOG";
 
 }
 

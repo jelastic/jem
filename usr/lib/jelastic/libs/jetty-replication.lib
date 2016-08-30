@@ -28,6 +28,7 @@ $PROGRAM 'grep';
 $PROGRAM 'awk';
 $PROGRAM 'sed';
 $PROGRAM 'chkconfig';
+$PROGRAM 'ip';
 
 include os default out;
 
@@ -45,7 +46,7 @@ function setMac(){
 	until [ -n "$mac" ] 
 	do
 		sleep 1
-		mac=$(ip l show tap | sed -n -re '/\s*link/{s/.*ether\s+(\S+)\s+.*/\1/;p}')
+		mac=$( $IP l show tap | $SED -n -re '/\s*link/{s/.*ether\s+(\S+)\s+.*/\1/;p}' )
 	done
 	$SED -i "/^ifconfig/iip \"link set %% addr $mac\";" $VTUND_CONF
 }
@@ -67,7 +68,7 @@ function enableReplication(){
 	sleep 2
         while :
         do
-                CURTAPIP=$( /sbin/ip a l | $GREP tap| $GREP 'inet ' | $AWK '{print $2}'| $SED 's/\/[0-9]*//g' )
+                CURTAPIP=$( $IP a l | $GREP tap| $GREP 'inet ' | $AWK '{print $2}'| $SED 's/\/[0-9]*//g' )
                 [ -n "$CURTAPIP" ] && break || { sleep 2; continue; }
         done
     $CHKCONFIG --level 3 $VTUN_SERVICE on

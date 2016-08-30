@@ -26,6 +26,8 @@ PHP_FPM_BIN_TARGET="/usr/sbin/php-fpm";
 PHP_CGIBIN_TARGET="/usr/bin/php-cgi";
 PHP_CLI_BIN='/usr/bin/php';
 JELASTIC_PHP_BIN_DIR='/usr/lib64/jelastic_php/bin';
+$PROGRAM 'grep';
+
 #  
 #  name: switchEngine
 #  $1 - engine to  switch on
@@ -35,19 +37,22 @@ function switchEngine(){
         local version;
         case $1 in
 		"php5.3")
-		        version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '5.3.[0-9]*' | sort -r | head -n 1);
+		        version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '5\.3\.[0-9]*' | sort -r | head -n 1);
 		;;
 		"php5.4")
-			version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '5.4.[0-9]*' | sort -r | head -n 1);
+			version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '5\.4\.[0-9]*' | sort -r | head -n 1);
 		;;
 		"php5.5")
-			version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '5.5.[0-9]*' | sort -r | head -n 1);
+			version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '5\.5\.[0-9]*' | sort -r | head -n 1);
 		;;
 		"php5.6")
-			version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '5.6.[0-9]*' | sort -r | head -n 1);
+			version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '5\.6\.[0-9]*' | sort -r | head -n 1);
+		;;
+		"php7.0")
+			version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '7\.0\.[0-9]*' | sort -r | head -n 1);
 		;;
 		*) 	 
-		return 4023
+		return 1
         esac
 	PHP_FPM_BIN_SOURCE="${JELASTIC_PHP_EXTENSIONS_DIR}/php${version}/sbin/php-fpm";
 	PHP_CGIBIN_SOURCE="${JELASTIC_PHP_EXTENSIONS_DIR}/php${version}/bin/php-cgi";

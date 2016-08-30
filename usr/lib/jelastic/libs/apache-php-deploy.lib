@@ -19,12 +19,13 @@ APACHEPHPDEPLOYLIB_VERSION="0.1";
 
 HTTPD_ALIASES_FILE="/etc/httpd/conf.d/aliases.conf";
 include os;
+$PROGRAM 'sed';
 
 function setContext(){
     local context=$1;
     
    # Alias /error/ "/var/www/error/"
-   sed -i "/Alias \/${context}/d" $HTTPD_ALIASES_FILE;
+   $SED -i "/Alias\s\{1,\}\/${context}\s\{1,\}.*/d" $HTTPD_ALIASES_FILE;
    echo "Alias /${context} \"${WEBROOT}/${context}\"" >> $HTTPD_ALIASES_FILE;
    reloadService ${SERVICE} > /dev/null 2>&1;
 }
@@ -34,8 +35,8 @@ function delContext(){
     
    # Alias /error/ "/var/www/error/"
    
-   WEBROOT1=$( sed "s/\//\\\\\\\\\\//g" <<< ${WEBROOT} );
-   sed -i "/^Alias\s\{0,\}\/${context}\s\{0,\}\"${WEBROOT1}\/${context}\"/d"  $HTTPD_ALIASES_FILE;
+   WEBROOT1=$( $SED "s/\//\\\\\\//g" <<< ${WEBROOT} );
+   $SED -i "/^Alias\s\{0,\}\/${context}\s\{0,\}\"${WEBROOT1}\/${context}\"/d"  $HTTPD_ALIASES_FILE;
    reloadService ${SERVICE} > /dev/null 2>&1;
 }
 
@@ -43,7 +44,7 @@ function delContext(){
 function rename(){
     local newContext=$1;
     local oldContext=$2;
-    WEBROOT1=$( sed "s/\//\\\\\\\\\\//g" <<< ${WEBROOT} );
-    sed -i "s/^Alias\s\{0,\}\/${oldContext}\s\{0,\}\"${WEBROOT1}\/${oldContext}\"/Alias \/${newContext} \"${WEBROOT1}\/${newContext}\"/" $HTTPD_ALIASES_FILE;
+    WEBROOT1=$( $SED "s/\//\\\\\\//g" <<< ${WEBROOT} );
+    $SED -i "s/^Alias\s\{0,\}\/${oldContext}\s\{0,\}\"${WEBROOT1}\/${oldContext}\"/Alias \/${newContext} \"${WEBROOT1}\/${newContext}\"/" $HTTPD_ALIASES_FILE;
     reloadService ${SERVICE} > /dev/null 2>&1;
 }

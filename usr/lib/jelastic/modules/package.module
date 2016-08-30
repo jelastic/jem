@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Copyright 2016 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+inherit default os output exceptor vzexec;
+
+DESCRIPTION="JEM package installation module";
+VERSION="1";
+DEFAULT_ACTION="Usage";
+
+function doUsage() {
+    showUsageMessage;
+}
+
+function doInstall(){
+        while [ $# -gt 0 ]
+        do
+                case "$1" in
+                        -n| --name)
+                        shift;
+                        local PACKAGES=$1;
+                        ;;
+                       	-c| --ctid)
+                        shift;
+                        CTID=$1;
+                        ;;
+			-| --)
+                        shift;
+                        break;
+                        ;;
+                esac;
+                shift;
+        done
+
+	if [[ -z "${PACKAGES}" ]]
+        then
+                writeJSONResponseErr "result=>4058" "message=>Packages are not specified" ;
+                exit 1
+        fi
+
+	if [[ -z "${CTID}" ]]
+        then
+                writeJSONResponseErr "result=>4058" "message=>CTID is not specified" ;
+                exit 1
+        fi
+
+        local issue_file="/vz/root/${CTID}/etc/issue";
+        local release_files="/vz/root/${CTID}/etc/*-release";
+
+        issue_string=$(cat $release_files $issue_file 2>/dev/null);
+        OS=$(detectOS "$issue_string");
+
+	if [[ -z "$OS" ]] 
+	then
+		writeJSONResponseErr "result=>4097" "message=>Cannot detect OS version" ;
+                exit 1
+	fi
+
+        installCmd=$(installPackageCmd $OS install ${PACKAGES})
+	vzexecSetCTID ${CTID} && vzexecRun "$installCmd";
+}
+
+function describePackage() {
+    echo "Generate and run the installation command for specified packages into the specified container";
+}
+
+function describePackageParameters() {
+    echo "-n|--name <packages> -c|--ctid <container id>";
+}
+
+function describeSetOptions() {
+    echo "-n|--name: packages to be installed";
+    echo "-c|--ctid: target container id";
+}
+

@@ -14,22 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+[ -n "${COMMONEXTIPCHANGENORESTARTLIB_VERSION:-}" ] && return 0;
+COMMONEXTIPCHANGENORESTARTLIB_VERSION="0.1";
 
-[ -n "${USERGATELIB_VERSION:-}" ] && return 0;
-USERGATELIB_VERSION="0.1";
+include os log;
 
-# _getAppUserID
-#       return uid, guid, home_dir of user defined in DATA_OWNER in envinfo.lib (DATA_OWNER=user:group)
-# result:
-#       _UID  user id
-#       _GUID  group id 
-#		_homedir  homedir
-function getAppUserInfo(){
-	local _username=${1};
-
-	[ ! -z "${_username}" ] && {
-		HOME="/home" ;
-		[ -f /etc/default/useradd ] && . /etc/default/useradd
-		_homedir="${HOME}/${_username}"
-	}
+function ipChanged(){
+    VERBOSE=1;
+    log "extIpChange no restart service";
+    return 0;
 }
+

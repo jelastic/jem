@@ -894,7 +894,7 @@ sub start_remote_instance {
             	    my $ssh = Net::SSH::Perl->new( $inst_ip, privileged => 0 );
                 	$ssh->login( 'root', $inst_pass );
                 	$ssh->cmd("echo AS_ADMIN_PASSWORD=$password>/tmp/$string");
-					$ssh->cmd("/opt/glassfish/bin/asadmin  start-local-instance --node $inst_hostname --sync normal $r_instance -u jelastic -W /tmp/$string");	 
+					$ssh->cmd("/opt/glassfish3/bin/asadmin  start-local-instance --node $inst_hostname --sync normal $r_instance -u jelastic -W /tmp/$string");	 
         		}				
 	     		$start_executed = 1;
 			}else {

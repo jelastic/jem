@@ -31,7 +31,6 @@ TMPCONF="/tmp/tmp.conf.$$";
 $PROGRAM 'wget';
 $PROGRAM 'unzip';
 $PROGRAM 'tar';
-$PROGRAM 'chown';  # Is it really necessary? //Andrey
 
 
 [ "x${COMPUTE_TYPE}" == "xcartridge" ] && restoreEnvironmentVariables && {
@@ -78,9 +77,14 @@ function doDeploy(){
 
 	if [[ -z "$package_url" ]]
 	then
-		writeJSONResponceErr "result=>4999" "message=>Wrong arguments for deploy" ; 
+		writeJSONResponseErr "result=>4058" "message=>Wrong arguments for deploy" ; 
 		exit 1
 	fi
+	if [[ -z "$context" ]]
+        then
+                writeJSONResponseErr "result=>4058" "message=>Wrong arguments for deploy" ;
+                exit 1
+        fi
 
     # Contexts validation
 
@@ -97,12 +101,12 @@ function doDeploy(){
 
     if [[ -z $($SED  -nre  "$context_regex" <<< $context ) ]]
     then
-        writeJSONResponceErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
+        writeJSONResponseErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
     fi
 
     [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && {
         if ! $GREP -q ${context} <<< "development production test" ; then
-            writeJSONResponceErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
+            writeJSONResponseErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
         fi
     }
 
@@ -110,15 +114,17 @@ function doDeploy(){
     [ -f "$vcs_project_properties" ] && rm -f "$vcs_project_properties";
 
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
-          deploy "$package_url" "$context" "$ext" >> "$ACTIONS_LOG"  2>&1 &&  service cartridge build >>  "$ACTIONS_LOG"  2>&1  && service cartridge deploy >> "$ACTIONS_LOG"  2>&1 && { writeJSONResponceOut "result=>0" "message=>Application deployed successfully"; return 0 ; } || { writeJSONResponceErr "result=>4060" "message=>Deploy failed"; return 4060; } ;
+        ldeploy="deploy" #added for backwards compatibility with Openshift cartridge templates
+        isFunction "_deploy" && ldeploy="_deploy" #must be removed after the cartridge support is finished
+        "$ldeploy" "$package_url" "$context" "$ext" >> "$ACTIONS_LOG"  2>&1 &&  service cartridge build >>  "$ACTIONS_LOG"  2>&1  && service cartridge deploy >> "$ACTIONS_LOG"  2>&1 && { writeJSONResponseOut "result=>0" "message=>Application deployed successfully"; return 0 ; } || { writeJSONResponseErr "result=>4060" "message=>Deploy failed"; return 1; } ;
     }
 
-    deploy "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" && writeJSONResponceOut "result=>0" "message=>Application deployed successfully" || {
+    deploy "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" && writeJSONResponseOut "result=>0" "message=>Application deployed successfully" || {
 	result=$?;
 	[ $result -eq 156 ] && result=4078;
 	[ $result -eq 56  ] && result=4071;
 	[ -z "$result" ] && [ $result -lt 4000 ] && result=4060; 
-	writeJSONResponceErr "result=>$result" "message=>Deploy failed" ; 
+	writeJSONResponseErr "result=>$result" "message=>Deploy failed" ; 
     };
 }
 
@@ -143,7 +149,9 @@ function doUndeploy(){
         esac;
         shift;
     done;
-    undeploy "$context" &&  writeJSONResponceOut "result=>0" "message=>Application removed sussesfully" || writeJSONResponceErr "result=>4061" "message=>Undeploy failed" ;
+    lUndeploy="undeploy" #added for backwards compatibility with Openshift cartridge templates
+    isFunction "_undeploy" && lUndeploy="_undeploy" #must be removed after the cartridge support is finished
+    "$lUndeploy" "$context" &&  writeJSONResponseOut "result=>0" "message=>Application removed sussesfully" || writeJSONResponseErr "result=>4061" "message=>Undeploy failed" ;
 }
 
 function doRenameContext(){
@@ -172,9 +180,9 @@ function doRenameContext(){
         shift;
     done;
     if [ "x$newContext" == "x$oldContext" ]; then
-        writeJSONResponceOut "result=>0" "message=>Context renamed succesfully";
+        writeJSONResponseOut "result=>0" "message=>Context renamed succesfully";
     else
-        renameContext "$newContext" "$oldContext" && writeJSONResponceOut "result=>0" "message=>Context renamed succesfully" || writeJSONResponceErr "result=>4062" "message=>Context rename failed";
+        renameContext "$newContext" "$oldContext" && writeJSONResponseOut "result=>0" "message=>Context renamed succesfully" || writeJSONResponseErr "result=>4062" "message=>Context rename failed";
     fi
 }
 
@@ -250,7 +258,7 @@ function doInternalCall(){
 }
 
 function doCleanUp(){
-	$glassfish_tools -m cleanup >> "$JEM_CALLS_LOG" && writeJSONResponceOut "result=>0" "message=>Сleanup sussesfully" || writeJSONResponceErr "result=>4070" "message=>Сleanup failed" ;
+	$glassfish_tools -m cleanup >> "$JEM_CALLS_LOG" && writeJSONResponseOut "result=>0" "message=>Сleanup sussesfully" || writeJSONResponseErr "result=>4070" "message=>Сleanup failed" ;
 }
 
 function describeAddToCluster() {

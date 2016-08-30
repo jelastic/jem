@@ -22,6 +22,8 @@ DESCRIPTION="No description available!";
 VERSION="1";
 DEFAULT_ACTION="usage";
 ACTIONS_LOG="/var/log/actions$$.log";
+$PROGRAM 'grep';
+$PROGRAM 'sed';
 
 function describeUsage() {
     echo "Display usage information";
@@ -42,14 +44,14 @@ function showUsageMessage() {
     echo "Standard actions:";
     for action in help usage version; do
         local desc=""
-        action=$(sed 's/\([a-zA-Z0-9]\)\([a-zA-Z0-9]*\)/\u\1\2/g' <<< ${action});
+        action=$($SED 's/\([a-zA-Z0-9]\)\([a-zA-Z0-9]*\)/\u\1\2/g' <<< ${action});
         isFunction "describe${action}" && desc=$(describe${action});
         echo -e "\t${action}\t\t${desc:-(no description)}";
     done
 
     echo -e "\nExtra actions:";
 
-    for action in $(set | sed -n -e '/^do\S\+ ()\s*$/s/^do\(\S\+\).*/\1/p' | grep -v 'Action' | sort); do
+    for action in $(set | $SED -n -e '/^do\S\+ ()\s*$/s/^do\(\S\+\).*/\1/p' | $GREP -v 'Action' | sort); do
         case "${action}" in
             help|usage|version)
                 continue;
@@ -84,7 +86,7 @@ function doHelp() {
         showUsageMessage;
         echo -e "\nActions options:";
         local ifs_save="${IFS}" options
-        for action in $(set | sed -n -e '/^do\S\+ ()\s*$/s/^do\(\S\+\).*/\1/p' | grep -v 'Action' | sort); do
+        for action in $(set | $SED -n -e '/^do\S\+ ()\s*$/s/^do\(\S\+\).*/\1/p' | $GREP -v 'Action' | sort); do
             if isFunction "describe${action}Options"; then
                 options=$(echo "$options"; describe${action}Options);
             fi

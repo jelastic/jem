@@ -21,12 +21,16 @@ include php-common-engine ;
 
 PHP_EXTENSIONS_DIR='/etc/php.ext';
 APACHE2_MODULES_DIR='/etc/httpd/modules';
+APACHE2_CONFIGS_DIR='/etc/httpd/conf.d/';
+PHP_CONF='php.conf';
 APACHE2_PHPMODULE='libphp5.so';
+MAJOR_VERSION=5;
 JELASTIC_PHP_MODULES_DIR='/usr/lib64/jelastic_php/httpd';
 DEFAULT_PHP_EXTENSIONS_DIR='/usr/lib64/php';
 JELASTIC_PHP_EXTENSIONS_DIR='/usr/lib64/jelastic_php';
 PHP_CLI_BIN='/usr/bin/php';
 JELASTIC_PHP_BIN_DIR='/usr/lib64/jelastic_php/bin';
+$PROGRAM 'grep';
 
 #  
 #  name: switchEngine
@@ -38,19 +42,24 @@ function switchEngine(){
 	local version;
 	case $1 in
 	"php5.3")
-	    version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '5.3.[0-9]*' | sort -r | head -n 1);
+	    version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '5\.3\.[0-9]*' | sort -r | head -n 1);
 	;;
 	"php5.4")
-	    version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '5.4.[0-9]*' | sort -r | head -n 1);
+	    version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '5\.4\.[0-9]*' | sort -r | head -n 1);
 	;;
 	"php5.5")
-	    version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '5.5.[0-9]*' | sort -r | head -n 1);
+	    version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '5\.5\.[0-9]*' | sort -r | head -n 1);
 	;;
 	"php5.6")
-	    version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '5.6.[0-9]*' | sort -r | head -n 1);
+	    version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '5\.6\.[0-9]*' | sort -r | head -n 1);
+	;;
+	"php7.0")
+		version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '7\.0\.[0-9]*' | sort -r | head -n 1);
+		MAJOR_VERSION=7;
+		APACHE2_PHPMODULE='libphp7.so';
 	;;
 	*) 	 
-	return 4023
+	return 1
 	esac
 	if [[ -f "$JELASTIC_PHP_MODULES_DIR/libphp$version.so" ]]
 	then
@@ -69,6 +78,8 @@ function switchEngine(){
 	    echo "no PHP extensions are configured for PHP version $version" 1>&2
     	    return 0;
 	fi
+	$SED -i -e "s/php[[:digit:]]_module/php${MAJOR_VERSION}_module/g" -e "s/libphp[[:digit:]].so/libphp${MAJOR_VERSION}.so/g" \
+	    -e "s/php[[:digit:]]-script/php${MAJOR_VERSION}-script/g" ${APACHE2_CONFIGS_DIR}/${PHP_CONF} ;
 	
 	if [[ -f "$JELASTIC_PHP_BIN_DIR/php.$version" ]]
 	then

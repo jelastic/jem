@@ -19,7 +19,6 @@
 [ -n "${RUBYCOMMONENGINELIB_VERSION:-}" ] && return 0;
 RUBYCOMMONENGINELIB_VERSION="0.1";
 
-$PROGRAM 'chown';
 $PROGRAM 'find';
 $PROGRAM 'grep';
 
@@ -32,7 +31,7 @@ inherit ruby-common;
 function switchEngine(){
     	local param=$1;
         local version;
-        case $1 in
+	case $1 in
         "ruby1.9.2")
             full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "1.9.2");
             small_version="1.9.2";
@@ -49,6 +48,14 @@ function switchEngine(){
             full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.1.5");
             small_version="2.1.5";
         ;;
+        "ruby2.1.8")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.1.8");
+            small_version="2.1.8";
+        ;;
+        "ruby2.1.9")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.1.9");
+            small_version="2.1.9";
+        ;;
         "ruby2.2.0")
             full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.2.0");
             small_version="2.2.0";
@@ -57,12 +64,32 @@ function switchEngine(){
             full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.2.2");
             small_version="2.2.2";
         ;;
+        "ruby2.2.3")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.2.3");
+            small_version="2.2.3";
+        ;;
+        "ruby2.2.4")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.2.4");
+            small_version="2.2.4";
+        ;;
+        "ruby2.2.5")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.2.5");
+            small_version="2.2.5";
+        ;;
+        "ruby2.3.0")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.3.0");
+            small_version="2.3.0";
+        ;;
+        "ruby2.3.1")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.3.1");
+            small_version="2.3.1";
+        ;;
         *)
-        return 4023
+        return 1
         esac
 
 	[ -z "$full_version" ] && return 1;
-        if ! /usr/lib/rvm/bin/rvm list | grep -q "$full_version" ; then
+        if ! /usr/lib/rvm/bin/rvm list | $GREP -q "$full_version" ; then
 	    return 1;
         fi
 

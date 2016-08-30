@@ -30,11 +30,12 @@ $PROGRAM 'svn';
 $PROGRAM 'grep';
 $PROGRAM 'git';
 $PROGRAM 'curl';
-$PROGRAM 'chown';    # Is it really necessary? //Andrey
+$PROGRAM 'awk';
+
 VCS_CONFIG_DIR="/var/lib/jelastic/vcs";
 VCS_LOG_DIR="/var/log/jelastic/vcs";
 DEFAULT_LOGIN="__GUEST__";
-USERS_CRONFILE="/var/spool/cron/$(awk  -F ":" '{ print $1 }' <<< $DATA_OWNER )";
+USERS_CRONFILE="/var/spool/cron/$($AWK  -F ":" '{ print $1 }' <<< $DATA_OWNER )";
 ROOT_CRONFILE="/var/spool/cron/root";
 AUTOUPDATE_CRON_STRING="* * * * * jem vcs autoupdate";
 
@@ -63,7 +64,7 @@ function checkVCSDirectories(){
 }
 
 function recoverBrokenMountPoints(){
-        local mount_points=$(mount | grep -o -P '(?<=deleted\)).*(?=type)');
+        local mount_points=$(mount | $GREP -o -P '(?<=deleted\)).*(?=type)');
         [ ! -z "$mount_points" ] && for mount_point in $mount_points
         do
         umount  "$mount_point";
@@ -224,17 +225,16 @@ function doCreateProject(){
   checkVCSDirectories;
   parseArguments "$@"; 
 
-  isValidURL $URL || { writeJSONResponceErr "result=>4050" "message=>URL is not valid!"; return 4050; };
+  isValidURL $URL || { writeJSONResponseErr "result=>4050" "message=>URL is not valid!"; return 1; };
       local incorrect_login_regex="[~\!\#\$%^&\*\(\)\-\+\{\}\\\/=]";
 
-  [[ $LOGIN  =~ $incorrect_login_regex ]] && { writeJSONResponceErr "result=>4051" "message=>Login is not valid!"; return 4051; };
+  [[ $LOGIN  =~ $incorrect_login_regex ]] && { writeJSONResponseErr "result=>4053" "message=>Login is not valid!"; return 1; };
   [ -z $LOGIN ] && LOGIN="$DEFAULT_LOGIN";
   doEnableScheduler;
   writeProjectConfig && {
     [ ${COMPUTE_TYPE} == "apache-ruby" -o ${COMPUTE_TYPE} == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && {
-    PROJECT_NAME=${bundle_type}
-
-  } && [ ! -z $CONTEXT ] &&  [ ! -z $ENVIRONMENT ] && writeJSONResponceOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "environment=>${ENVIRONMENT}" "context=>${CONTEXT}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}" "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" || writeJSONResponceOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}"  "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" "atomic_deploy=>${ATOMIC_DEPLOY}"; }  || { writeJSONResponceErr "result=>4001" "message=>Error while creating project config!"; return 4001; };
+    PROJECT_NAME=${bundle_type}; reloadServiceSilent "$SERVICE";
+  } && [ ! -z $CONTEXT ] &&  [ ! -z $ENVIRONMENT ] && writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "environment=>${ENVIRONMENT}" "context=>${CONTEXT}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}" "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" || writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}"  "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" "atomic_deploy=>${ATOMIC_DEPLOY}"; }  || { writeJSONResponseErr "result=>4001" "message=>Error while creating project config!"; return 1; };
 
 }
 
@@ -242,19 +242,19 @@ function doDeleteProject(){
   parseArguments "$@";
 
   [ -z $PROJECT_NAME ] && {
-    writeJSONResponceErr "result=>4001" "message=>You must specify project name!";
-    return 4001;
+    writeJSONResponseErr "result=>4005" "message=>You must specify project name!";
+    return 1;
   }
   [ -d "${WEBROOT}/${PROJECT_NAME}" ] && rm -Rf ${WEBROOT}/${PROJECT_NAME};
   [[ "$PROJECT_NAME" == "ROOT" ]] && { 
         rm -rf ${WEBROOT}/ROOT; 
-        cd ${WEBROOT}; ROOT_DIRS=$(ls ${WEBROOT} | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$");
+        cd ${WEBROOT}; ROOT_DIRS=$(ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$");
         rm -rf ${ROOT_DIRS} && _deployLog "Removing deprecated ROOT context directories ${ROOT_DIRS}"; 
         mkdir ${WEBROOT}/${PROJECT_NAME}; updateOwnership ${WEBROOT}/${PROJECT_NAME} > /dev/null 2>&1;
         }
   [ -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.key" ] && rm -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.key" ;
-  [ -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties" ] && rm -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties"  && writeJSONResponceOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly deleted" || {
-    writeJSONResponceErr "result=>4002" "message=>Error delete project!"; die -q;
+  [ -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties" ] && rm -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties"  && writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly deleted" || {
+    writeJSONResponseErr "result=>4002" "message=>Error delete project!"; die -q;
   }
 
   [ "`find ${VCS_CONFIG_DIR} -type f`" ] || doDisableScheduler;
@@ -263,53 +263,53 @@ function doDeleteProject(){
 
 function doUpdate(){
   parseArguments "$@";
-  readProjectConfig || { writeJSONResponceErr "result=>4001" "message=>Error while reading project config!"; return 4001; };
+  readProjectConfig || { writeJSONResponseErr "result=>4006" "message=>Error while reading project config!"; return 1; };
   enableVCSLibrary;
   if [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" ] && [ "x${PROJECT_NAME}" == "xROOT" ] && [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
   local NEXT_DIR=ROOT_`date +%Y.%m.%d-%H.%M.%S`;
         if [ -h ${WEBROOT}/ROOT ] ; then
-                local CURRENT_DIR=`readlink ${WEBROOT}/ROOT | grep -o "ROOT_[0-9.-]*"`;
-                [ ! -d ${WEBROOT}/${CURRENT_DIR} ] && CURRENT_DIR=`ls ${WEBROOT} | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1`;
+                local CURRENT_DIR=`readlink ${WEBROOT}/ROOT | $GREP -o "ROOT_[0-9.-]*"`;
+                [ ! -d ${WEBROOT}/${CURRENT_DIR} ] && CURRENT_DIR=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1`;
                 if [ -n "${CURRENT_DIR}" ]
                 then
-                        local PREVIOUS_DIR=`ls ${WEBROOT} | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | grep -v "$CURRENT_DIR" | head -1`;
+                        local PREVIOUS_DIR=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | $GREP -v "$CURRENT_DIR" | head -1`;
                 else
-                        local PREVIOUS_DIR=`ls ${WEBROOT} | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | head -1`;
+                        local PREVIOUS_DIR=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | head -1`;
                 fi
     else
-        CURRENT_DIR=`ls ${WEBROOT} | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1`
+        CURRENT_DIR=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1`
         [ -n "${CURRENT_DIR}" ] && { ln -sfT "${WEBROOT}/${CURRENT_DIR}" ${WEBROOT}/ROOT && _deployLog "Swithing the ROOT context to ${CURRENT_DIR}"; updateOwnership ${WEBROOT}/ROOT; }
         fi
     if [[ -d ${WEBROOT}/ROOT && ! -h ${WEBROOT}/ROOT ]] ; then
       mv -f ${WEBROOT}/ROOT ${WEBROOT}/$NEXT_DIR && _deployLog "Copying content of the ROOT directory to $NEXT_DIR";
     fi
     if [ -z "${PREVIOUS_DIR}" ] ;then 
-        local DIR_AMOUNT=`ls ${WEBROOT} | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | wc -l`;
-        [ ${DIR_AMOUNT} -gt 1 ]  && PREVIOUS_DIR=`ls ${WEBROOT} | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n2 | head -1`; 
+        local DIR_AMOUNT=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | wc -l`;
+        [ ${DIR_AMOUNT} -gt 1 ]  && PREVIOUS_DIR=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n2 | head -1`; 
     fi
         [ -n "${PREVIOUS_DIR}" ] && rm -rf ${WEBROOT}/${PREVIOUS_DIR} && _deployLog "Removing old deprecated context directory ${PREVIOUS_DIR}";
         if [ -n "${CURRENT_DIR}" ] ;then
                 cp -rf ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1  && _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR}";
                 if [ $? -ne 0 ]; then
-                        writeJSONResponceErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR}"; 
+                        writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR}"; 
                         return 1;
                 fi
         fi
         J_OLD_PROJECT_NAME="${PROJECT_NAME}";
         PROJECT_NAME="${NEXT_DIR}"
     if [ -d "${WEBROOT}/${PROJECT_NAME}/.$(toLowerCase ${VCS_TYPE})" ] ; then
-                _doUpdate && { writeJSONResponceOut "result=>0" "message=>Project updated succesfuly";
-                ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; _updateOwnership ${WEBROOT}/ROOT;
+                updateProject 2>>"$VCS_UPDATE_LOG" && { writeJSONResponseOut "result=>0" "message=>Project updated succesfuly";
+                ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; updateOwnership ${WEBROOT}/ROOT;
                 updateOwnership ${WEBROOT}/${PROJECT_NAME};
                 [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}"; 
     writeProjectConfig; }
                 rcode=$?;
                 [ "$rcode" -eq 1 ] && return 0 || return $rcode
-                } || { updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeJSONResponceErr "result=>4000" "message=>Authentication failed or url is incorrect"; return 4000; };
+                } || { updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; return 1; };
         else
-                doCheckout &&  writeJSONResponceOut "result=>0" "message=>Project update completed successfully" || { writeJSONResponceErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; }
+                doCheckout &&  writeJSONResponseOut "result=>0" "message=>Project update completed successfully" || { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; }
                 updateOwnership ${WEBROOT}/${PROJECT_NAME};
-                ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; _updateOwnership ${WEBROOT}/ROOT;
+                ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; updateOwnership ${WEBROOT}/ROOT;
                 [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}"; 
     writeProjectConfig; }
                 rcode=$?;
@@ -317,8 +317,8 @@ function doUpdate(){
         fi
     else
         if [ "x${PROJECT_NAME}" == "xROOT" ] && [ -L ${WEBROOT}/ROOT ]; then
-                TARGET_DIR=`readlink ${WEBROOT}/ROOT | grep -o "ROOT_[0-9.-]*"`;
-                [ ! -d ${WEBROOT}/${TARGET_DIR} ] && local TARGET_DIR=`ls ${WEBROOT} | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1`;
+                TARGET_DIR=`readlink ${WEBROOT}/ROOT | $GREP -o "ROOT_[0-9.-]*"`;
+                [ ! -d ${WEBROOT}/${TARGET_DIR} ] && local TARGET_DIR=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1`;
                 rm -f ${WEBROOT}/ROOT;
                 if [ -n "${TARGET_DIR}" ] ;then
                 if [ ! -d ${WEBROOT}/ROOT ] ;then
@@ -332,22 +332,22 @@ function doUpdate(){
                     mv -f ${WEBROOT}/${TARGET_DIR}/* ${WEBROOT}/ROOT;
                         if [ $? -ne 0 ]; then
                     shopt -u dotglob;
-                          writeJSONResponceErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application to ROOT directory";
+                          writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application to ROOT directory";
                             return 1;
                         fi
                 shopt -u dotglob;
                 fi
-                cd ${WEBROOT}; ROOT_DIRS=`ls ${WEBROOT} | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$"`; 
+                cd ${WEBROOT}; ROOT_DIRS=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$"`; 
         rm -rf ${ROOT_DIRS} && _deployLog "Removing deprecated ROOT context directories ${ROOT_DIRS}"; cd  /;
         fi
         if [ -d "${WEBROOT}/${PROJECT_NAME}/.$(toLowerCase ${VCS_TYPE})" ] ; then
-                _doUpdate && {
-                writeJSONResponceOut "result=>0" "message=>Project updated succesfuly";
-                updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeProjectConfig; return $?;
-                } || { updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeJSONResponceErr "result=>4000" "message=>Authentication failed or url is incorrect"; return 4000; };
+                updateProject 2>>"$VCS_UPDATE_LOG" && {
+                writeJSONResponseOut "result=>0" "message=>Project updated succesfuly";
+                updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeProjectConfig;
+                } || { updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; return 1; };
         else
                 [ -d "${WEBROOT}/${PROJECT_NAME}" ] && rm -Rf "${WEBROOT}/${PROJECT_NAME}/";
-                doCheckout &&  writeJSONResponceOut "result=>0" "message=>Project update completed successfully" || { writeJSONResponceErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; }
+                doCheckout &&  writeJSONResponseOut "result=>0" "message=>Project update completed successfully" || { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; }
                 updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeProjectConfig;
         fi
   fi
@@ -399,7 +399,7 @@ function doAutoUpdate(){
 }
 
 function doEnableScheduler(){
-  [ -f $ROOT_CRONFILE ] && grep -q "\^$AUTOUPDATE_CRON_STRING"  $ROOT_CRONFILE || echo "$AUTOUPDATE_CRON_STRING" >> $ROOT_CRONFILE;
+  [ -f $ROOT_CRONFILE ] && $GREP -q "\^$AUTOUPDATE_CRON_STRING"  $ROOT_CRONFILE || echo "$AUTOUPDATE_CRON_STRING" >> $ROOT_CRONFILE;
 }
 
 function doDisableScheduler(){
@@ -408,15 +408,15 @@ function doDisableScheduler(){
 
 function doGetProject(){
   parseArguments "$@";
-  readProjectConfig || { writeJSONResponceErr "result=>4001" "message=>Error while reading project config!"; return 4001; };
+  readProjectConfig || { writeJSONResponseErr "result=>4006" "message=>Error while reading project config!"; return 1; };
   [ ${COMPUTE_TYPE} == "apache-ruby" -o ${COMPUTE_TYPE} == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && {
     PROJECT_NAME=${bundle_type}
   }
   VAL="project_name=>${PROJECT_NAME} vcs_type=>${VCS_TYPE} url=>${URL} login=>${LOGIN} branch=>${BRANCH} interval=>${UPDATE_INTERVAL} autoupdate=>${AUTOUPDATE} atomicdeploy=>${ATOMIC_DEPLOY}";
   [ ! -z "$CONTEXT" ] &&  [ ! -z "$ENVIRONMENT" ] && { VAL=$VAL" environment=>${ENVIRONMENT} context=>${CONTEXT}" ; }
-  [ ! -z "$AUTHORIZATION_KEY_VAL" ] && { hash=`echo "$AUTHORIZATION_KEY_VAL" | md5sum | awk '{print $1}'`; VAL=$VAL" hash=>$hash"; }
+  [ ! -z "$AUTHORIZATION_KEY_VAL" ] && { hash=`echo "$AUTHORIZATION_KEY_VAL" | md5sum | $AWK '{print $1}'`; VAL=$VAL" hash=>$hash"; }
   [ ! -z $GIT_AUTORESOLVE_CONFLICT ] && { VAL=$VAL" resolveconflict=>${GIT_AUTORESOLVE_CONFLICT}"; }
-  writeJSONResponceOut "result=>0" ${VAL} ;
+  writeJSONResponseOut "result=>0" ${VAL} ;
 }
 
 function doEditProject(){
@@ -431,12 +431,12 @@ function doEditProject(){
   }
   [ ! -z "$AUTHORIZATION_KEY_VAL" ]  && { # ssh key was in params, clean password
         CLEAN_PASSWORD=1;
-        [ "$CLEAN_KEY" -eq 1 ] && { writeJSONResponceErr "result=>4017" "message=>Project edit failed"; return 4001; }
+        [ "$CLEAN_KEY" -eq 1 ] && { writeJSONResponseErr "result=>4017" "message=>Project edit failed"; return 1; }
   }
 
   #[ ! -z $URL ]  &&  repository_url_was_changed="true";
-  isValidURL $URL || { writeJSONResponceErr "result=>4050" "message=>URL is not valid!"; return 4050; };
-  readProjectConfig $OLD_PROJECT_NAME || { writeJSONResponceErr "result=>4001" "message=>Error while reading project config!"; return 4001; };
+  isValidURL $URL || { writeJSONResponseErr "result=>4050" "message=>URL is not valid!"; return 1; };
+  readProjectConfig $OLD_PROJECT_NAME || { writeJSONResponseErr "result=>4006" "message=>Error while reading project config!"; return 1; };
   doEnableScheduler;
   [ ! -z "$URL" ] && OLDURL="$URL";
   [ ! -z "$PASSWORD" ] && OLDPASSWORD="$PASSWORD";
@@ -461,7 +461,11 @@ function doEditProject(){
   [[ "$OLD_PROJECT_NAME" !=  "$PROJECT_NAME" ]] && {
     # doAction deploy rename -o $OLD_PROJECT_NAME -n $PROJECT_NAME > /dev/null 2>&1;
     if [ ! -d "${WEBROOT}/${PROJECT_NAME}/" ]; then
-    [ "x${COMPUTE_TYPE}" != "xmaven" ] && mkdir "${WEBROOT}/${PROJECT_NAME}/";
+        if [ "x${COMPUTE_TYPE}" != "xmaven" ]; then
+                mkdir "${WEBROOT}/${PROJECT_NAME}/";
+        else
+                [ -d "${WEBROOT}/${OLD_PROJECT_NAME}/" ] && mkdir "${WEBROOT}/${PROJECT_NAME}/";
+        fi
     fi
     [ -d "${WEBROOT}/${PROJECT_NAME}/" ] && [ -d "${WEBROOT}/${OLD_PROJECT_NAME}/" ] && { renameContext $PROJECT_NAME $OLD_PROJECT_NAME ; }
     [ "x${PROJECT_NAME}" != "xROOT" ] && ATOMIC_DEPLOY="false";
@@ -481,13 +485,13 @@ function doEditProject(){
                 VAL=$VAL" environment=>${ENVIRONMENT} context=>${CONTEXT} autoupdate=>${AUTOUPDATE} interval=>${UPDATE_INTERVAL}" ;
         fi
         if [ ! -z "$AUTHORIZATION_KEY_VAL" ] ; then
-                hash=`echo $AUTHORIZATION_KEY_VAL | md5sum | awk '{print $1}'`; 
+                hash=`echo $AUTHORIZATION_KEY_VAL | md5sum | $AWK '{print $1}'`; 
                 VAL=$VAL" hash=>$hash";
         fi
-        writeJSONResponceOut "result=>0" "message=>Project edited succesfuly" ${VAL} ;
+        writeJSONResponseOut "result=>0" "message=>Project edited succesfuly" ${VAL} ;
 
   else
-        writeJSONResponceErr "result=>4017" "message=>Project edit failed"; 
+        writeJSONResponseErr "result=>4017" "message=>Project edit failed"; 
  fi
 }
 

@@ -24,8 +24,8 @@ include os;
 
 function setContext(){
   local context=$1;
-  WEBROOT1=$(echo ${WEBROOT} | sed "s/\//\\\\\\\\\\//g");
-  sed -i "/^location\s\{0,\}\/${context}\s\{0,\}{\s\{0,\}alias\s\{0,\}${WEBROOT1}\/${context};\s\{0,\}}/d"  $NGINX_ALIASES_FILE;
+  WEBROOT1=$( $SED "s/\//\\\\\\//g" <<< ${WEBROOT} );
+  $SED -i "/^location\s\{0,\}\/${context}\s\{0,\}{\s\{0,\}alias\s\{0,\}${WEBROOT1}\/${context};\s\{0,\}}/d"  $NGINX_ALIASES_FILE;
   echo "location /${context} { alias ${WEBROOT}/${context}; }" >> $NGINX_ALIASES_FILE;
   reloadServiceSilent nginx || { stopServiceSilent nginx; startServiceSilent nginx; }
 }
@@ -34,9 +34,9 @@ function delContext(){
   local context=$1;
     
    # Alias /error/ "/var/www/error/"
-   
-   WEBROOT1=$(echo ${WEBROOT} | sed "s/\//\\\\\\\\\\//g");
-   sed -i "/^location\s\{0,\}\/${context}\s\{0,\}{\s\{0,\}alias\s\{0,\}${WEBROOT1}\/${context};\s\{0,\}}/d"  $NGINX_ALIASES_FILE;
+
+   WEBROOT1=$( $SED "s/\//\\\\\\//g" <<< ${WEBROOT} );
+   $SED -i "/^location\s\{0,\}\/${context}\s\{0,\}{\s\{0,\}alias\s\{0,\}${WEBROOT1}\/${context};\s\{0,\}}/d"  $NGINX_ALIASES_FILE;
 
    reloadServiceSilent nginx || { stopServiceSilent nginx; startServiceSilent nginx; }
 }
@@ -45,7 +45,7 @@ function delContext(){
 function rename(){
     local newContext=$1;
     local oldContext=$2;
-    WEBROOT1=$(echo ${WEBROOT} | sed "s/\//\\\\\\\\\\//g");
-    sed -i "s/^location\s\{0,\}\/${oldContext}\s\{0,\}{\s\{0,\}alias\s\{0,\}${WEBROOT1}\/${oldContext};\s\{0,\}}/location \/${newContext} { alias ${WEBROOT1}\/${newContext}; }/"  $NGINX_ALIASES_FILE;
+    WEBROOT1=$( $SED "s/\//\\\\\\//g" <<< ${WEBROOT} );
+    $SED -i "s/^location\s\{0,\}\/${oldContext}\s\{0,\}{\s\{0,\}alias\s\{0,\}${WEBROOT1}\/${oldContext};\s\{0,\}}/location \/${newContext} { alias ${WEBROOT1}\/${newContext}; }/"  $NGINX_ALIASES_FILE;
     reloadServiceSilent nginx || { stopServiceSilent nginx; startServiceSilent nginx; }
 }

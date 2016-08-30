@@ -24,6 +24,8 @@ LOG_FILE=/var/log/msqlresetpas.log;
 $PROGRAM 'mysqld_safe';
 $PROGRAM 'mysql';
 $PROGRAM 'chkconfig';
+$PROGRAM 'grep';
+$PROGRAM 'mysqladmin';
 
 function setPassword() {
 
@@ -55,7 +57,7 @@ function setPassword() {
 
 		while [ "$tries" -gt 0 ]
 		do
-			if ! ps aux | grep -v grep | grep -q  mysql ; 
+			if ! ps ax | $GREP -v grep | $GREP -q  mysql ; 
 			then
 				break;
 			fi
@@ -66,7 +68,7 @@ function setPassword() {
 
 		echo "Mysql stopped" >> $LOG_FILE
 
-		if ps aux | grep -v grep | grep -q  mysqld ;  then /usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1; fi
+		if ps ax | $GREP -v grep | $GREP -q  mysqld ;  then /usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1; fi
 		${SERVICE_CMD} ${SERVICE} regenerate-config  >> $LOG_FILE 2>&1
 		eval $MYSQLD_SAFE --skip-grant-tables --user=mysql  --pid-file=$pid >> $LOG_FILE 2>&1 &
 		
@@ -80,7 +82,7 @@ function setPassword() {
 				echo "Time for wait mysqld-safe expired. result 4051" >> $LOG_FILE
 				/usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1;
 				startService ${SERVICE} >>$LOG_FILE 2>&1
-				writeJSONResponceErr "result=>4051" "message=>Could not set password!"; 
+				writeJSONResponseErr "result=>4051" "message=>Could not set password!"; 
 				die -q
 			fi
 		done
@@ -89,6 +91,7 @@ function setPassword() {
 		[ -z "$val" ] && val=0 ;
                if [ "x$COMPUTE_TYPE" == "xmysql" -a $val -ge 57  ] ; then
                        $MYSQL $db --execute="UPDATE user SET authentication_string=PASSWORD('${password}') WHERE user='${user}';"
+        	       $MYSQL $db --execute="UPDATE mysql.user SET password_expired='N' WHERE user='${user}';"
                else
                        $MYSQL $db --execute="UPDATE user SET password=PASSWORD('${password}') WHERE user='${user}';"
                fi
@@ -102,7 +105,7 @@ function setPassword() {
 		echo "Stopping Mysql after set password " >> $LOG_FILE
 		while [ "$tries" -gt 0 ]
 		do
-			if ! ps aux | grep -v grep | grep -q mysql ;
+			if ! ps ax | $GREP -v grep | $GREP -q mysql ;
 			then
 				break;
 			fi
@@ -112,11 +115,18 @@ function setPassword() {
 		done
 		
 		startService ${SERVICE}  >>$LOG_FILE 2>&1
-		if ! ps aux | grep -v grep | grep -q  mysql ;
+		if ! ps ax | $GREP -v grep | $GREP -q  mysql ;
 		then
 			sleep 2
 			startService ${SERVICE}  >>$LOG_FILE 2>&1
 		
+		fi
+		
+		val=$(sed 's/\.//' <<< $COMPUTE_TYPE_FULL_VERSION )
+		[ -z "$val" ] && val=0 ;
+		if [ "x$COMPUTE_TYPE" == "xmysql" -a $val -ge 57  ] ; then
+		    $MYSQL -u "${user}" -p"${password}" $db --execute="SET PASSWORD FOR 'root'@'localhost' = PASSWORD('${password}');" >>$LOG_FILE 2>>$LOG_FILE
+		    $MYSQL -u "${user}" -p"${password}" $db --execute="SET PASSWORD FOR 'root'@'%' = PASSWORD('${password}');" >>$LOG_FILE 2>>$LOG_FILE
 		fi
 		echo "Password updated" >> $LOG_FILE
 		$CHKCONFIG --level 3 ${SERVICE} on >>$LOG_FILE 2>&1

@@ -22,6 +22,8 @@ include log;
 DESCRIPTION="Manipulate memcached";
 VERSION="1"
 DEFAULT_ACTION="SetMem";
+$PROGRAM 'sed';
+$PROGRAM 'grep';
 
 typeset -i __RESERVED_SIZE=20;
 PREFIX='memcached';
@@ -53,13 +55,13 @@ function describeSetMem () {
 function doSetMem() {
     FLOAT_SCALE=0;
     typeset -i memcached_CACHESIZE=$(getMemory MemTotal MB)-${__RESERVED_SIZE};
-    local var_names=$(grep -o -P "${PREFIX}_[a-zA-Z_]*" $BASH_SOURCE) v cpn;
+    local var_names=$($GREP -o -P "${PREFIX}_[a-zA-Z_]*" $BASH_SOURCE) v cpn;
     local config_path=${1:-'/etc/sysconfig/memcached'};
 
     doStop;
     for v in ${var_names} ; do
         cpn=${v:10};
-        sed -i 's/^'${cpn}'=.*$'/${cpn}'="'${!v}'"/g' ${config_path};
+        $SED -i 's/^'${cpn}'=.*$'/${cpn}'="'${!v}'"/g' ${config_path};
         isFunction log && log "Parameter ${cpn} is set to ${!v}";
     done
     doStart;

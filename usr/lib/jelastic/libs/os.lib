@@ -35,11 +35,10 @@ declare +r SERVICE;
 # }}}
 
 $PROGRAM 'ps';
-#$PROGRAM 'grep';
-#$PROGRAM 'sed';
-$PROGRAM 'base64';
 $PROGRAM 'chkconfig';
 $PROGRAM 'ip';
+$PROGRAM 'grep';
+$PROGRAM 'sed';
 
 _FD_STDIN=0;
 _FD_STDOUT=1;
@@ -52,14 +51,14 @@ __AUNITS=(b kb mb gb tb);
 # example call:
 #       funcname $(encodeArr arrayName);
 function encodeArr() {
-    echo "$(${BASE64} -w 0 <<< $(declare -p $1))";
+    echo "$(base64 -w 0 <<< $(declare -p $1))";
 }
 
 # $1 - base64 to decode
 # example call:
 #       eval $(decodeArr $1 varname);
 function decodeArr() {
-    echo "$(${BASE64} -d -i <<< $1 | sed -re "s/(^declare\s+-a\s)([^=]+)=(.*)/\1$2=\3/")";
+    echo "$(base64 -d -i <<< $1 | $SED -re "s/(^declare\s+-a\s)([^=]+)=(.*)/\1$2=\3/")";
 }
 
 # $1 value
@@ -217,7 +216,7 @@ function __getAddr() {
     : ${2:?"Missing param: variable name"};
     : ${3:-"-4"};
     local dev=$1 name=$2 af=$3 alist;
-    alist=$($IP $af addr show dev $dev 2>/dev/null | sed -rne '/inet/{s/.*inet6* //;s/\/.*//;s/peer.*//;p}');
+    alist=$($IP $af addr show dev $dev 2>/dev/null | $SED -rne '/inet/{s/.*inet6* //;s/\/.*//;s/peer.*//;p}');
     [ -z "$alist" ] && {
         eval "$name=''";
         return 1;
@@ -228,7 +227,7 @@ function __getAddr() {
 
 function __getNet() {
     local dev=$1 name=$2 af=$3 alist;
-    alist=$($IP route list dev $dev | sed 's/ .*//;/default/d');
+    alist=$($IP route list dev $dev | $SED 's/ .*//;/default/d');
     [ -z "$alist" ] && {
         eval "$name=''"
         return $?;
@@ -240,7 +239,7 @@ function __getNet() {
 function getIfaceWild() {
     : ${1:?"Missing param: wildcard"};
     local mask=$1;
-    echo $($IP link show | sed -rne "/^[0-9]+:\s+${mask}:/{s/.*:\s+(\S+):.*/\1/g;p}");
+    echo $($IP link show | $SED -rne "/^[0-9]+:\s+${mask}:/{s/.*:\s+(\S+):.*/\1/g;p}");
     return $?
 }
 
@@ -261,7 +260,7 @@ function getNet6() {
 }
 
 #function getNSAddr() {
-#    echo $(sed -rne 's/nameserver\s+(.*)/\1/;/(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/p' /etc/resolv.conf);
+#    echo $($SED -rne 's/nameserver\s+(.*)/\1/;/(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/p' /etc/resolv.conf);
 #    return 0;
 #}
 
@@ -270,11 +269,86 @@ function getNet6() {
 #    for i in ${NS[@]} ; do
 #        isLANIP $i && locNS=(${locNS[@]} $i);
 #    done;
-#    [ -n "${locNS}" ] && { echo "${locNS[@]}" | sed -re 's/\s+/\n/g' | uniq ; return 0; };
+#    [ -n "${locNS}" ] && { echo "${locNS[@]}" | $SED -re 's/\s+/\n/g' | uniq ; return 0; };
 #    return 1;
 #}
 
 function getHostIP() {
     : ${1:?"Missing param: hostname"};
-    echo $(host ${1} | sed '/alias for/d' | sed -re '/NXDOMAIN/d;s/.+\s+(([0-9]{1,3}\.){3}[0-9]{1,3})/\1/' | head -n 1);
+    echo $(host ${1} | $SED '/alias for/d' | $SED -re '/NXDOMAIN/d;s/.+\s+(([0-9]{1,3}\.){3}[0-9]{1,3})/\1/' | head -n 1);
 }
+
+function getOSVersion() {
+    : ${1:?"Missing param: issue_string"}
+    local issue_string=$1
+    local OS_version=$($GREP -h VERSION_ID <<< "$issue_string" 2>/dev/null | $SED -nre 's/.*=\"?([0-9.]*).*/\1/;p;n');
+    if [ -z "$OS_version" ] ; then
+        OS_version=$($GREP -h DISTRIB_RELEASE <<< "$issue_string" 2>/dev/null | $SED -nre 's/.*=\s?\"?([0-9.]*).*/\1/;p;n');
+        if [ -z "$OS_version" ] ; then
+            if $GREP -hqi "jessie" <<< "$issue_string" 2>/dev/null ; then
+                OS_version="8";
+            elif [ -z "$OS_version" ] ; then
+                # for  devopsil/puppet
+                OS_version=$($GREP -m 1 -h "CentOS release" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z ]*\s([0-9.]*).*/\1/;p;n');
+            fi
+            if [ -z "$OS_version" ] ; then
+                OS_version=$($GREP -m 1 -h "Debian" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z\/ ]*\s([0-9.]*).*/\1/;p;n');
+            fi
+            if [ -z "$OS_version" ] ; then
+                OS_version=$($GREP -m 1 -h "Alpine" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z\/ ]*\s([0-9]*).*/\1/;p;n');
+                $GREP -q "Alpine" <<< "$issue_string" && OS_version=3;
+            fi
+            if [ -z "$OS_version" ] ; then
+                #Oracle Linux Server release 6.6
+                OS_version=$($GREP -m 1 -h "release" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z ]*\s([0-9.]*).*/\1/;p;n');
+            fi
+        fi
+    fi
+    echo $OS_version
+}
+
+function detectOS() {
+    : ${1:?"Missing param: issue_string"};
+    local issue_string=$1
+
+    [ -z "$_OS" ] && $GREP -iq "kali" <<< $issue_string && _OS="kali"
+    [ -z "$_OS" ] && $GREP -iq "ubuntu\|mint" <<< $issue_string && _OS="ubuntu"
+    [ -z "$_OS" ] && $GREP -iq "debian" <<< $issue_string && _OS="debian"
+    [ -z "$_OS" ] && $GREP -iq "centos" <<< $issue_string && _OS="centos"
+    [ -z "$_OS" ] && $GREP -iq "Oracle Linux Server" <<< $issue_string && _OS="centos"
+    [ -z "$_OS" ] && $GREP -iq "fedora" <<< $issue_string && _OS="fedora"
+    [ -z "$_OS" ] && $GREP -iq "redhat" <<< $issue_string && _OS="centos"
+    [ -z "$_OS" ] && $GREP -iq "suse" <<< $issue_string && _OS="suse"
+    [ -z "$_OS" ] && $GREP -iq "alpine" <<< $issue_string && _OS="alpine"
+    echo $_OS
+}
+
+function installPackageCmd() {
+    : ${1:?"Missing param: OS"};
+    local OS=$1; shift
+    local pmaction=$1; shift
+    for arg do PKGS="$arg $PKGS"; done
+    case $OS in
+	suse)
+		PM="zypper --quiet --non-interactive"
+	    ;;
+	debian|ubuntu|kali)
+		PM="apt-get -y"
+            ;;
+       	centos|redhat|fedora)
+        	PM="yum -y"
+            ;;
+        alpine)
+            PM="apk"
+            case $pmaction in
+            	install)
+                	pmaction="add -f"
+                    ;;
+                remove)
+                    pmaction="del -f"
+            esac
+            ;;
+    esac
+    echo "$PM $pmaction $PKGS"
+}
+

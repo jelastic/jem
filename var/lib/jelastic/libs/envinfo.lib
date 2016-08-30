@@ -7,7 +7,7 @@
 #~ - DATA_OWNER - for php environment
 
 OVERRIDE_DIR="/var/lib/jelastic/overrides/"
-extipchange_module_inherit="common-extipch";
+extipchange_module_inherit="common-extipch-norestart";
 gw_boost_lib_inherit="user-common";
 DEPLOY_LOG="/dev/null";
 
@@ -25,6 +25,7 @@ case ${COMPUTE_TYPE} in
 		engine_module_inherit="nginx-php-engine";
 		ssl_module_inherit="nginx-php-ssl";
 		setmemory_lib="php-setmem";
+		extipchange_module_inherit="common-extipch";
 		WEBROOT="/var/www/webroot";
 		VCS_UPDATE_LOG="/var/log/nginx/vcs_update.log";
 		VCS_AUTORESOLVE_LOG="/var/log/nginx/vcs_autoresolve.log";
@@ -37,6 +38,7 @@ case ${COMPUTE_TYPE} in
 		engine_module_inherit="apache-php-engine";
 		ssl_module_inherit="apache-php-ssl";
 		setmemory_lib="php-setmem";
+		extipchange_module_inherit="common-extipch";
 		WEBROOT="/var/www/webroot";
 		VCS_UPDATE_LOG="/var/log/httpd/vcs_update.log";
 		VCS_AUTORESOLVE_LOG="/var/log/httpd/vcs_autoresolve.log";
@@ -48,8 +50,8 @@ case ${COMPUTE_TYPE} in
 		deploy_module_inherit="ruby-common-deploy";
 		engine_module_inherit="ruby-common-engine";
 		ssl_module_inherit="apache-php-ssl";
-		setmemory_lib="php-setmem";
 		WEBROOT="/var/www/webroot";
+		extipchange_module_inherit="common-extipch";
 		VCS_UPDATE_LOG="/var/log/httpd/vcs_update.log";
 		VCS_AUTORESOLVE_LOG="/var/log/httpd/vcs_autoresolve.log"
 		RAKE_DEPLOY_LOG="/var/log/httpd/rake_deploy.log";
@@ -62,7 +64,7 @@ case ${COMPUTE_TYPE} in
 		deploy_module_inherit="ruby-common-deploy";
 		engine_module_inherit="ruby-common-engine";
 		ssl_module_inherit="nginx-php-ssl";
-#		setmemory_lib="php-setmem";
+		extipchange_module_inherit="common-extipch";
 		WEBROOT="/var/www/webroot";
 		VCS_UPDATE_LOG="/var/log/nginx/vcs_update.log";
 		VCS_AUTORESOLVE_LOG="/var/log/nginx/vcs_autoresolve.log"
@@ -197,15 +199,6 @@ case ${COMPUTE_TYPE} in
 		default_user="admin";
 	;;
 esac
-
-[ -d "$OVERRIDE_DIR" ] && {
-		[  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -eq 0 ] && return 0;
-		for override_lib in $(ls $OVERRIDE_DIR/*.lib)
-        do
-              source $override_lib;
-        done
-
-}
 
 return 0;
 

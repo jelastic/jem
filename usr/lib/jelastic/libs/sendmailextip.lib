@@ -21,19 +21,31 @@ SENDMAILEXTIPLIB_VERSION="0.1";
 
 include os net;
 SENDMAIL_CONF='/etc/mail/sendmail.cf';
+$PROGRAM 'awk';
+$PROGRAM 'ip';
 $PROGRAM 'sed';
 
 function SendmailExtIp() {
-   if [ -f /usr/sbin/sendmail.sendmail ]; then
-     myip=$(ip route get 1 | awk '{print $NF;exit}')
-     if isLANIP $myip ; then
-         /sbin/chkconfig sendmail off 2>/dev/null 1>/dev/null;
-         [ -f /var/run/sendmail.pid ] && stopServiceSilent sendmail ;
-     else
-         $SED -i 's/#O Timeout.initial=5m/O Timeout.ident=0s/' $SENDMAIL_CONF;
-         enableService sendmail 1>/dev/null 2>/dev/null;
-         [ -f /var/run/sendmail.pid ] || startServiceSilent sendmail ;
-     fi;
-   fi;
-}
+    SM_ENABLED=1;
+    [[ -n "${META_FILE}" ]] && [ -e "${META_FILE}" ] && source ${META_FILE} ;
+    [ -z "$SENDMAIL_ENABLED" ] && {
+        SENDMAIL_ENABLED=0;
+    }
 
+    if [ -f /usr/sbin/sendmail.sendmail ]; then
+        myip=$($IP route get 1 | $AWK '{print $NF;exit}')
+        if isLANIP $myip &&  [ ${SENDMAIL_ENABLED} -eq 0 ] ; then
+            SM_ENABLED=0;
+        fi
+
+        if [ ${SM_ENABLED} -eq 0 ] ; then
+            /sbin/chkconfig sendmail off 2>/dev/null 1>/dev/null;
+            [ -f /var/run/sendmail.pid ] && stopServiceSilent sendmail ;
+        else
+            $SED -i 's/#O Timeout.initial=5m/O Timeout.ident=0s/' $SENDMAIL_CONF;
+            enableService sendmail 1>/dev/null 2>/dev/null;
+            [ -f /var/run/sendmail.pid ] || startServiceSilent sendmail ;
+        fi;
+    fi;
+    return 0;
+}

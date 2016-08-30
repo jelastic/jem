@@ -23,6 +23,8 @@ include output;
 mongo_conf='/etc/mongod.conf'
 $PROGRAM 'sed';
 $PROGRAM 'mongo';
+$PROGRAM 'grep';
+
 if [ "${COMPUTE_TYPE_FULL_VERSION/./}" -ge "26" ] ; then
         ADMINDB='admin'
 else
@@ -52,14 +54,14 @@ function setPassword() {
 
         while [ "$tries" -gt 0 ]
         do
-    	    if ! ps aux | grep -v grep | grep -q  'mongod.conf' ; 
+    	    if ! ps aux | $GREP -v grep | $GREP -q  'mongod.conf' ; 
 	    then
 		break;
 	    fi
 	    sleep 1
 	    tries=$(($tries-1))
 		done
-		if ps aux | grep -v grep | grep -q  mongo ;  then /usr/bin/killall mongo 1>>$LOG_FILE 2>&1; fi
+		if ps aux | $GREP -v grep | $GREP -q  mongo ;  then /usr/bin/killall mongo 1>>$LOG_FILE 2>&1; fi
 		if [ -e $MONGOLOCK ] 
 		then
 	 	   rm -f $MONGOLOCK 1>>$LOG_FILE 2>&1
@@ -93,14 +95,14 @@ function setPassword() {
 		stopService ${SERVICE} >> $LOG_FILE 2>&1
         while [ $tries -gt 0 ]
         do
-    	    if ! ps aux | grep -v grep | grep -q  mongo ; 
+    	    if ! ps aux | $GREP -v grep | $GREP -q  mongo ; 
 	    		then
 				break;
 	    	fi
 	    sleep 1
 	    tries=$(($tries2-1))
 		done
-		if ps aux | grep -v grep | grep -q  mongo ;  then /usr/bin/killall mongo 1>>$LOG_FILE 2>&1; fi
+		if ps aux | $GREP -v grep | $GREP -q  mongo ;  then /usr/bin/killall mongo 1>>$LOG_FILE 2>&1; fi
 		if [ -e $MONGOLOCK ] 
 		then
 	  	  	rm -f $MONGOLOCK 1>>$LOG_FILE 2>&1

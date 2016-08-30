@@ -21,6 +21,7 @@ SVNLIB_VERSION="0.1";
 
 inherit os;
 include output;
+$PROGRAM 'grep';
 
 function doCheckout(){
 	rm  -Rf "${WEBROOT}/${PROJECT_NAME}";
@@ -32,7 +33,6 @@ function doCheckout(){
                 updateOwnership "${WEBROOT}/${PROJECT_NAME}";
 		return $result;
 	}
-	#[[ $? -eq 0 ]] && writeJSONResponceOut "result=>0" "message=>Project checkout completed successfully" || { writeJSONResponceErr "result=>4000" "message=>Authentication failed or url is incorrect"; return 4000; };
 	[ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
                 inherit ruby-common;
                 bundleInstall;
@@ -42,11 +42,10 @@ function doCheckout(){
 
 }
 
-function doUpdate(){
+function updateProject(){
 	echo -n $(date +%D.%k:%M:%S.%N ) >> "$VCS_UPDATE_LOG" 2>&1;
 	$SVN revert -R  "${WEBROOT}/${PROJECT_NAME}" > "${VCS_LOG_DIR}/deploy.log.log";
 	$SVN up "${WEBROOT}/${PROJECT_NAME}" --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force  >> "$VCS_UPDATE_LOG" 2>&1;
-	#[[ $? -eq 0 ]] && writeJSONResponceOut "result=>0" "message=>Project update completed successfully" || { writeJSONResponceErr "result=>4000" "message=>Authentication failed or url is incorrect"; return 4000;  };
         [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
                 inherit ruby-common;
                 bundleInstall;
@@ -57,14 +56,14 @@ function doUpdate(){
 function getLastRepoCommit(){
     readProjectConfig;
     #local project_name="$1";
-    local last_repo_commit=$($SVN --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert info "${WEBROOT}/${PROJECT_NAME}" 2>&1 | grep Revision: |cut -c11-);
+    local last_repo_commit=$($SVN --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert info "${WEBROOT}/${PROJECT_NAME}" 2>&1 | $GREP Revision: |cut -c11-);
         [ -z "${last_repo_commit}" ] && last_repo_commit="00000000000" && LAST_DEPLOYED_COMMIT="00000000000";
         echo $last_repo_commit;
 }
 
 function getLastRemoteCommit(){
         readProjectConfig;
-        last_remote_commit=$($SVN --username ${LOGIN} --password ${PASSWORD} --no-auth-cache --non-interactive --trust-server-cert info ${URL} 2>&1 | grep Revision: |cut -c11-);
+        last_remote_commit=$($SVN --username ${LOGIN} --password ${PASSWORD} --no-auth-cache --non-interactive --trust-server-cert info ${URL} 2>&1 | $GREP Revision: |cut -c11-);
         [ -z "${last_remote_commit}" ] && last_remote_commit="00000000000";
         echo $last_remote_commit;
 }
@@ -73,7 +72,7 @@ function vcsChangeUrl(){
 	mes=$($SVN switch --relocate --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force  "$OLDURL" "$URL" "${WEBROOT}/${PROJECT_NAME}/" >> $ACTIONS_LOG 2>&1);
 	result=$?;
 	if [ $result -ne 0 ] ; then 
-	    { writeJSONResponceErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; };
+	    { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; };
 	fi
 	return $result;
 }

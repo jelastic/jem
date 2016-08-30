@@ -22,7 +22,7 @@ FIRST_RUN_SCENARIO="/var/lib/jelastic/firstrun";
 PATH="/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin";
 
 echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
-echo ": $@" >> ${JEM_CALLS_LOG} 2>&1;
+echo ":[EXEC]      [PID: $$] $@" >> ${JEM_CALLS_LOG} 2>&1;
 
 "unalias" -a;
 unset -f rm;
@@ -76,11 +76,14 @@ function executeFirstRunScenario() {
     [ -f $FIRST_RUN_SCENARIO ]  && bash $FIRST_RUN_SCENARIO > /dev/null 2>&1 && rm -f $FIRST_RUN_SCENARIO;
 }
 
-action=$1;
+[[ -z ${action} ]] && {
+    action=$1;
+    shift;
+}
 
 startJemThreadQueueManager "$@";
 executeFirstRunScenario;
-if [[ -n ${action} ]] ; then 
+if [[ -n ${action} ]] ; then
     if isFunction "_manageDo${action//-/_}"; then
         [[ $# -gt 0 ]] && die -q "Too many parameters";
         _manageDo${action//-/_};

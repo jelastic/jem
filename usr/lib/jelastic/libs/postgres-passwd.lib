@@ -27,6 +27,8 @@ POSTGRESSysCtl="/etc/sysconfig/pgsql/postgresql";
 LOG_FILE="/var/log/postgresreset.log";
 VERBOSE=0;
 POSTGRES_CONF='/var/lib/pgsql/data/pg_hba.conf';
+
+$PROGRAM 'awk';
 $PROGRAM 'sed';
 $PROGRAM 'psql';
 $PROGRAM 'grep';
@@ -54,9 +56,9 @@ function setPassword() {
 
 	INITD=/etc/rc.d/init.d
 	. $INITD/functions
-	PGPORT=$($GREP PGPORT= $INITD/${SERVICE} | awk -F= {'print $2'});
-	PGVERSION=$($GREP PGVERSION= $INITD/${SERVICE} | awk -F= {'print $2'});
-	PGMAJORVERSION=$(echo "$PGVERSION" | sed 's/^\([0-9]*\.[0-9]*\).*$/\1/')
+	PGPORT=$($GREP PGPORT= $INITD/${SERVICE} | $AWK -F= {'print $2'});
+	PGVERSION=$($GREP PGVERSION= $INITD/${SERVICE} | $AWK -F= {'print $2'});
+	PGMAJORVERSION=$(echo "$PGVERSION" | $SED 's/^\([0-9]*\.[0-9]*\).*$/\1/')
 	[ -f $POSTGRESSysCtl ] && . $POSTGRESSysCtl || pidfile=$( ls  /var/run/postmaster-* | head -n 1);
 	[ -z $pidfile ] && pidfile="/var/run/postmaster-${PGMAJORVERSION}.${PGPORT}.pid";
 	

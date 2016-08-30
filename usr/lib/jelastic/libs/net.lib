@@ -18,6 +18,7 @@
 NETLIB_VERSION="0.1";
 
 inherit os log core;
+$PROGRAM 'sed';
 
 __FD_TCP_DOWNLOAD=5;
 
@@ -114,7 +115,7 @@ function isValidIP() {
 #       returns: request hostname
 function __getHostName() {
     local url=${1} result;
-    result=$(sed -re "s/(.*)\/\/([^\/]*)\/(.*)/\2/" <<< ${url});
+    result=$($SED -re "s/(.*)\/\/([^\/]*)\/(.*)/\2/" <<< ${url});
     echo ${result};
 }
 
@@ -123,7 +124,7 @@ function __getHostName() {
 #       returns: request URI path
 function __getURIPath() {
     local url=${1} result;
-    result=$(sed -re "s/(.*)\/\/([^\/]*)\/(.*)/\/\3/" <<< ${url});
+    result=$($SED -re "s/(.*)\/\/([^\/]*)\/(.*)/\/\3/" <<< ${url});
     echo ${result};
 }
 
@@ -132,7 +133,7 @@ function __getURIPath() {
 #       returns: request port
 function __getPort() {
     local url=${1} result;
-    #result=$(sed -re "s/(.*)\/\/([^\/]*)\/(.*)/\2\3/" <<< ${url});
+    #result=$($SED -re "s/(.*)\/\/([^\/]*)\/(.*)/\2\3/" <<< ${url});
     echo ${result:-80};
 }
 
@@ -160,9 +161,9 @@ function getFile() {
 
     eval "exec ${__FD_TCP_DOWNLOAD}<>'/dev/tcp/${purl[__URL_HOSTNAME]}/${purl[__URL_PORT]}'";
     echo -e "GET ${purl[__URL_URI]} HTTP/1.1\r\nHost: ${purl[__URL_HOSTNAME]}\r\nUser-Agent: bash/${BASH_VERSION}\r\n\r\n" >&${__FD_TCP_DOWNLOAD};
-    content=$(cat <&${__FD_TCP_DOWNLOAD} | tee >(sed -e '1,/^.$/d' > "${tempfile}") >&1);
-    [[ -z "${destfile}" ]] && destfile=$(sed -ne '/.*filename="\([^"]\+\)".*/{s/.*filename="\([^"]\+\)".*/\1/i;p;};h;' <<< $content);
-    size=$(sed -ne '/.*Content-Length:\s\+[0-9]\+.*/{s/.*Content-Length:\s\+\([0-9]\+\).*/\1/i;p;};h;' <<< $content);
+    content=$(cat <&${__FD_TCP_DOWNLOAD} | tee >($SED -e '1,/^.$/d' > "${tempfile}") >&1);
+    [[ -z "${destfile}" ]] && destfile=$($SED -ne '/.*filename="\([^"]\+\)".*/{s/.*filename="\([^"]\+\)".*/\1/i;p;};h;' <<< $content);
+    size=$($SED -ne '/.*Content-Length:\s\+[0-9]\+.*/{s/.*Content-Length:\s\+\([0-9]\+\).*/\1/i;p;};h;' <<< $content);
     mv "${tempfile}" "${dest_dir}${destfile}"
     closeFD ${__FD_TCP_DOWNLOAD};
     return 0;
@@ -191,7 +192,7 @@ function wgetFile() {
 }
 
 function getNSAddr() {
-    echo $(sed -rne 's/nameserver\s+(.*)/\1/;/(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/p' /etc/resolv.conf);
+    echo $($SED -rne 's/nameserver\s+(.*)/\1/;/(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/p' /etc/resolv.conf);
     return 0;
 }
 
@@ -200,7 +201,7 @@ function getLocalNSAddr() {
     for i in ${NS[@]} ; do
         isLANIP $i && locNS=(${locNS[@]} $i);
     done;
-    [ -n "${locNS}" ] && { echo "${locNS[@]}" | sed -re 's/\s+/\n/g' | uniq ; return 0; };
+    [ -n "${locNS}" ] && { echo "${locNS[@]}" | $SED -re 's/\s+/\n/g' | uniq ; return 0; };
     return 1;
 }
 
@@ -214,7 +215,7 @@ function getInfraAddresses() {
         return 1;
     }
 
-    domain=$(host ${NSIP} | sed -re '/NXDOMAIN/d;s/.*\s+(rslv[0-9]{0,1}|resolver)\.(\S+)\.$/\2/g;/arpa/d');
+    domain=$(host ${NSIP} | $SED -re '/NXDOMAIN/d;s/.*\s+(rslv[0-9]{0,1}|resolver)\.(\S+)\.$/\2/g;/arpa/d');
     [ -z "${domain}" ] && return 1;
 
     ## TODO: Need to replace to the v4 code {{{

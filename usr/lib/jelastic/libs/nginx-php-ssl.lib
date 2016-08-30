@@ -20,7 +20,6 @@
 NGINXPHPSSLLIB_VERSION="0.1";
 
 $PROGRAM 'sed';
-$PROGRAM 'cat';
 SSL_XML_CONFIG="/etc/nginx/conf.d/ssl.conf";
 DOMAIN_CERTIFICATE_FILE="/var/lib/jelastic/SSL/jelastic.crt";
 CA_CERTIFICATE_FILE="/var/lib/jelastic/SSL/jelastic-ca.crt";
@@ -31,11 +30,11 @@ include output;
 function createChain(){
 [ -f "$DOMAIN_CERTIFICATE_FILE" ] && [ -f "$CA_CERTIFICATE_FILE" ] && 
 	{
-		$CAT "$DOMAIN_CERTIFICATE_FILE" > $CHAIN_CERTIFICATE_FILE;
+		cat "$DOMAIN_CERTIFICATE_FILE" > $CHAIN_CERTIFICATE_FILE;
 		echo "" >> $CHAIN_CERTIFICATE_FILE;
-		$CAT "$CA_CERTIFICATE_FILE" >> $CHAIN_CERTIFICATE_FILE;
+		cat "$CA_CERTIFICATE_FILE" >> $CHAIN_CERTIFICATE_FILE;
 
-	}  ##|| { writeJSONResponceErr "result=>4018" "message=>Not enough information to create chainfile"; exit 4018; }
+	}  ##|| { writeJSONResponseErr "result=>4018" "message=>Not enough information to create chainfile"; exit 4018; }
 }
 
 function removeChain(){

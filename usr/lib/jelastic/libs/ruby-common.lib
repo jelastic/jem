@@ -21,6 +21,7 @@ RUBYCOMMONLIB_VERSION="0.1";
 
 [ -e "${MANAGE_CORE_PATH}/${COMPUTE_TYPE}"-deploy.lib ] && { include ${COMPUTE_TYPE}-deploy; }
 include log ;
+$PROGRAM 'sed';
 
 function bundleInstall(){
     [ -f "/var/lib/jelastic/env" ] && {
@@ -38,13 +39,13 @@ function bundleInstall(){
         envs="development production test";
         [[ -n $bundle_type && $envs =~ $bundle_type ]] && { 
     	    VERBOSE=1;
-            log "${bundle} install --deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) " ;
-            cd ${APPWEBROOT} && ${bundle} install --deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG ;
+            log "${bundle} install --deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) " ;
+            cd ${APPWEBROOT} && ${bundle} install --deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG ;
             resultcode=$? ;
             if [ "${resultcode}" -eq 16 ] ; then
-                log "${bundle} install --no-deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) " ;
-                cd ${APPWEBROOT} && ${bundle} install --no-deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} &&
-                ${bundle} install --deployment --without  $( sed 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} ;
+                log "${bundle} install --no-deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) " ;
+                cd ${APPWEBROOT} && ${bundle} install --no-deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} &&
+                ${bundle} install --deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} ;
                 cd ${APPWEBROOT} && ${bundle} clean >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG ;
             fi
             shopt -s dotglob;

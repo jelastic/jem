@@ -22,15 +22,16 @@ inherit os;
 include output;
 
 $PROGRAM 'expect';
+$PROGRAM 'grep';
 
 function runNonInterractive(){
 	echo -n $(date +%D.%k:%M:%S.%N ) >> "$VCS_UPDATE_LOG" 2>&1;
         F_ERR_HANDLER="/tmp/ERR_HANDLER.tmp";
         command="$@"
-        $EXPECT -c "eval spawn \"$command\" ; expect -timeout 10 -re U { send \r } ; expect -timeout 10 -re "P" { send \r }  ; interact;" | tee -a $VCS_UPDATE_LOG > $F_ERR_HANDLER  2>/dev/null || $EXPECT -c "eval spawn $command >> $VCS_UPDATE_LOG ; " | tee -a $VCS_UPDATE_LOG > $F_ERR_HANDLER  2>/dev/null;
+        $EXPECT -c "eval spawn \"$command\" ; expect -timeout 60 -re U { send \r } ; expect -timeout 60 -re "P" { send \r }  ; interact;" | tee -a $VCS_UPDATE_LOG > $F_ERR_HANDLER  2>/dev/null || $EXPECT -c "eval spawn $command >> $VCS_UPDATE_LOG ; " | tee -a $VCS_UPDATE_LOG > $F_ERR_HANDLER  2>/dev/null;
         [ -f $F_ERR_HANDLER ] && ERR_HANDLER=$(<$F_ERR_HANDLER) && rm $F_ERR_HANDLER;
         [[ $ERR_HANDLER == *fatal* || $ERR_HANDLER == *error* ]] && { 
-    	    grep "fatal" <<< "$ERR_HANDLER"  >> $ACTIONS_LOG 2>/dev/null || grep "error:" <<< "$ERR_HANDLER"  >> $ACTIONS_LOG 2>/dev/null ;
+    	    $GREP "fatal" <<< "$ERR_HANDLER"  >> $ACTIONS_LOG 2>/dev/null || $GREP "error:" <<< "$ERR_HANDLER"  >> $ACTIONS_LOG 2>/dev/null ;
     	
     	    if [ ${COMPUTE_TYPE} == "apache-ruby" -o ${COMPUTE_TYPE} == "nginx-ruby" ] ; then 
         	[ ! -d "${WEBROOT}/${PROJECT_NAME}/" ] && mkdir -p "${WEBROOT}/${PROJECT_NAME}/" 1>/dev/null 2>&1 ; # TODO: add git url validation

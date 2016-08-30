@@ -32,9 +32,15 @@ function deploy(){
     clearCache;
     ensureFileCanBeDownloaded $package_url;
     $WGET --content-disposition --no-check-certificate --directory-prefix=$DOWNLOADS $package_url >> $ACTIONS_LOG 2>&1;
-    [ $? -gt 0 ] && { writeJSONResponceErr "result=>4078" "message=>Error loading file from URL" ; die -q; };
+    [ $? -gt 0 ] && { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q; };
+    package_name=$(ls ${DOWNLOADS});
+    [ ! -s "$DOWNLOADS/$package_name" ] && { 
+        rm -f ${DOWNLOADS}/${package_name};
+        writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
+        die -q;
+    }
 
-    unpack $CARTRIDGE_HOME && echo "Application deployed successfully!" >> $ACTIONS_LOG 2>&1 || { writeJSONResponceErr "result=>4071" "message=>Cannot unpack package!"; die -q; }
+    unpack $CARTRIDGE_HOME && echo "Application deployed successfully!" >> $ACTIONS_LOG 2>&1 || { writeJSONResponseErr "result=>4071" "message=>Cannot unpack package"; die -q; }
     updateOwnership $APPROOT;
     clearCache;
 }

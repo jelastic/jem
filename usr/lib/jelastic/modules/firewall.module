@@ -25,15 +25,21 @@ include cartridge-common;
 
 $PROGRAM 'iptables';
 $PROGRAM 'find';
-$PROGRAM 'sort';
 $PROGRAM 'xargs';
 $PROGRAM 'netstat';
 $PROGRAM 'ip';
 $PROGRAM 'sort';
+$PROGRAM 'sed';
+$PROGRAM 'grep';
+$PROGRAM 'awk';
 $PROGRAM 'iptables-restore';
 
 SAVEFILE='/var/lib/jelastic/firewall';
 CUSTOM_RULES_FILE='/etc/sysconfig/iptables-custom';
+
+# 7755 - file replication (lsync?)
+# 7979 - for export/import
+# 4000,5000,8743 - HA
 DMZ_PORTS="4000,5000,7755,7979,8743";
 
 declare PublicIP;
@@ -55,7 +61,7 @@ function _getnginx_rubyRedirPorts { return 0; }
 
 function _getbalancerPorts() {
     [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
-        echo "$($FIND /etc/nginx/ -type f | $XARGS $SED -rne '/^\s*#/d;/listen[^0-9]+([0-9:\.\*]+);/{s/.*(:|\s+)([0-9]+);/\2/;/[^0-9]+/d;s/\s+//;p}' | $SORT -u) ${FTPPort}";
+        echo "$($FIND /etc/nginx/ -type f | $XARGS $SED -rne '/^\s*#/d;/listen[^0-9]+([0-9:\.\*]+);/{s/.*(:|\s+)([0-9]+);/\2/;/[^0-9]+/d;s/\s+//;p}' | sort -u) ${FTPPort}";
     } || {
         echo "80";
     }
@@ -64,7 +70,7 @@ function _getbalancerPorts() {
 
 function _getcartridgePorts() {
     #restoreEnvironmentVariables;
-    echo $($SED -re 's/"//g'  <<<  $($SED -re 's/Private_Port=//g' <<< $(cat $MANIFEST_EXPORTED | grep "Private_Port=" ))| $SORT -u) ${FTPPort};
+    echo $($SED -re 's/"//g'  <<<  $($SED -re 's/Private_Port=//g' <<< $(cat $MANIFEST_EXPORTED | $GREP "Private_Port=" ))| sort -u) ${FTPPort};
     return 0;
 }
 
@@ -194,7 +200,7 @@ function _isPublicIPv4() {
 
 
 function __getAllIPs() {
-    echo $($IP a l | $SED -rne '/inet/{s/.*inet6.* //;s/\/.*//;s/peer.*//;s/in.*\s+(.*)/\1/; /(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/p}' | $SORT -u | $SED -re ':a;N;$!ba;s/\n/ /g;');
+    echo $($IP a l | $SED -rne '/inet/{s/.*inet6.* //;s/\/.*//;s/peer.*//;s/in.*\s+(.*)/\1/; /(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/p}' | sort -u | $SED -re ':a;N;$!ba;s/\n/ /g;');
 }
 
 function getLANIPs() {
@@ -233,7 +239,9 @@ function onModLoadCallback() {
     CLOSEDPORTS=($(loadConfig "${SAVEFILE}" CLOSEDPORTS))
 
     _isPublicIPv4 && PublicIP=$__TRUE || publicIP=$__FALSE;
-    FTPPort=$($NETSTAT -tnlp | sed -n -re '/ftp/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}');
+    FTPPort=$($NETSTAT -tnlp | $SED -n -re '/ftp/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}');
+    NFSPort=$($NETSTAT -tnlp | $SED -n -re '/nfs/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
+    RPCPort=$($NETSTAT -tnlp | $SED -n -re '/rpc/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
 
     ## TODO: remove "params" garbarge option
     local temp=`getopt -l cp:,op:,rp: -- params "$@" 2>/dev/null` oldifs;
@@ -244,7 +252,7 @@ function onModLoadCallback() {
         case "$1" in
             --cp)
                 # ports to close
-                [[ -z "$(sed -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
+                [[ -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
                 oldifs=$IFS;
                 IFS=',';
                 __closedports=(${2});
@@ -253,7 +261,7 @@ function onModLoadCallback() {
                 ;;
             --op)
                 # ports to open
-                [[ -z "$(sed -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
+                [[ -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
                 oldifs=$IFS;
                 IFS=',';
                 __openports=(${2});
@@ -262,7 +270,7 @@ function onModLoadCallback() {
                 ;;
             --rp)
                 # ports to remove from open ports list
-                [[ -z "$(sed -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
+                [[ -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
                 oldifs=$IFS;
                 IFS=',';
                 __removeports=(${2});
@@ -318,7 +326,7 @@ function doStart() {
     log "Starting firewall";
 
     local cartridge_config="/opt/repo/jelastic/jelastic.conf";
-    [ -f "$cartridge_config"  ] && Firewall_Enabled=$(grep Firewall_Enabled "$cartridge_config" | awk -F "=" '{ print $2 }')
+    [ -f "$cartridge_config"  ] && Firewall_Enabled=$($GREP Firewall_Enabled "$cartridge_config" | $AWK -F "=" '{ print $2 }')
     [ ! -z "${Firewall_Enabled}" ] && FIREWALL_ENABLED=${Firewall_Enabled};  ### Override for cartridges
     [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
     [[ "${COMPUTE_TYPE}" == 'memcached' ]] && return 0;  # memcache has own firewall
@@ -329,11 +337,28 @@ function doStart() {
 
     $IPTABLES -A INPUT -i lo -j ACCEPT;
     $IPTABLES -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT;
+
+    #exports
+    NFSIPS=()
+    [ -e '/etc/exports' ] && NFSIPS=($($SED -re 's/.+(\s|\t)+(([0-9]+\.){3}[0-9]+(\/[0-9]{0,2})?).*/\2/g' -e '/#/d' '/etc/exports' | sort | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'))
+
     # for internal services:
     intips=($(getLANIPs));
     for ip in ${intips[@]} ; do
         $IPTABLES -A INPUT -p tcp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
         $IPTABLES -A INPUT -p udp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
+        if [[ "${#NFSPort}" -gt 0 ]] ; then
+            for nfsip in ${NFSIPS[@]} ; do
+                $IPTABLES -A INPUT -p tcp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
+                $IPTABLES -A INPUT -p udp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
+            done
+        fi
+        if [[ "${#RPCPort}" -gt 0 ]] ; then
+            for rpcip in ${NFSIPS[@]} ; do
+                $IPTABLES -A INPUT -p tcp -m multiport --dports $RPCPort -d $ip -s $rpcip -j ACCEPT;
+                $IPTABLES -A INPUT -p udp -m multiport --dports $RPCPort -d $ip -s $rpcip -j ACCEPT;
+            done
+        fi
     done;
 
     $IPTABLES -A INPUT -m state --state NEW -s 10.0.0.0/27 -j ACCEPT;
@@ -427,7 +452,7 @@ function doFWStart() {
     declare -i result;
     log "FWSTART configuring firewall";
     resultMsg=$(doStart); result=$?;
-    [[ "${result}" -eq "0" ]] && writeJSONResponceOut "result=>${result}" "message=>Firewall has been started" || writeJSONResponceErr "result=>${result}" "message=>${resultMsg}";
+    [[ "${result}" -eq "0" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been started" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}";
     return ${result};
 }
 
@@ -453,13 +478,20 @@ function doFWStop() {
     local resultMsg;
     declare -i result;
     resultMsg=$(doStop); result=$?;
-    [[ "${result}" ]] && writeJSONResponceOut "result=>${result}" "message=>Firewall has been stopped" || writeJSONResponceErr "result=>${result}" "message=>${resultMsg}";
+    [[ "${result}" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been stopped" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}";
 }
 
 function _isFWEnabled() {
     local status=$($SED -rne '/FIREWALL_ENABLED/{s/FIREWALL_ENABLED=([0-1]){1}/\1/;p}' ${META_FILE});
+    local cartridge_config="/opt/repo/jelastic/jelastic.conf";
+    [ -f "$cartridge_config"  ] && status=$($GREP Firewall_Enabled "$cartridge_config" | $AWK -F "=" '{ print $2 }');
+    [ -z "${status}" ] && status="1";
     [[ "${status}" -eq "1" ]] && return 0;
     return 1;
+}
+
+function doisEnabled() {
+    _isFWEnabled
 }
 
 function describeFWStatus() {
@@ -470,13 +502,13 @@ function doFWStatus() {
     local param=${1};
 
     [[ -z ${param} ]] && {
-        _isFWEnabled && writeJSONResponceOut "result=>0" "message=>Firewall enabled" || writeJSONResponceOut "result=>0" "message=>Firewall disabled";
+        _isFWEnabled && writeJSONResponseOut "result=>0" "message=>Firewall enabled" || writeJSONResponseOut "result=>0" "message=>Firewall disabled";
         return 0;
     }
 
     message=$($IPTABLES -vnL INPUT | $SED -re '/INPUT/d;/target/d;s/\s*((\S+)\s+){8}(\S+)\s+(.*)/\4/g' | $SED -rne '/^\s*$/d;/:/{s/.*dpt(s)?:([0-9]+)(:)?([0-9]+)?.*/\2:\4/;p}' | $SED -re ':a;N;$!ba;s/\n/,/g;s/:,/,/g;s/:$//g');
     message="Open ports: ${message}";
-    writeJSONResponceOut "result=>0" "message=>${message}";
+    writeJSONResponseOut "result=>0" "message=>${message}";
     return 0;
 }
 
@@ -534,7 +566,7 @@ function doFWEnable() {
     local resultMsg;
     declare -i result;
     resultMsg=$(doEnable); result=$?;
-    [[ "${result}" ]] && writeJSONResponceOut "result=>${result}" "message=>Firewall has been enabled" || writeJSONResponceErr "result=>${result}" "message=>${resultMsg}";
+    [[ "${result}" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been enabled" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}";
 }
 
 function describeDisable() {
@@ -548,6 +580,8 @@ function doDisable() {
         fi;
         chkconfig iptables off 2>&1 | $GRAB_OUTPUT;
         echo "Firewall disabled";
+        _setDefaultPolicy "ACCEPT";
+        $IPTABLES -F INPUT; service iptables save > /dev/null;
         return 0;
     } || {
         echo "Error: No metadata found!";
@@ -563,7 +597,7 @@ function doFWDisable() {
     local resultMsg;
     declare -i result;
     resultMsg=$(doDisable); result=$?;
-    [[ "${result}" ]] && writeJSONResponceOut "result=>${result}" "message=>Firewall has been disabled" || writeJSONResponceErr "result=>${result}" "message=>${resultMsg}";
+    [[ "${result}" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been disabled" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}";
 }
 
 function describePanic() {

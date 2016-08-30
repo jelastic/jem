@@ -20,26 +20,21 @@ USERCOMMONLIB_VERSION="0.1";
 
 $PROGRAM 'id';
 $PROGRAM 'awk';
-$PROGRAM 'chmod';
-$PROGRAM 'chown';
-$PROGRAM 'mv';
 $PROGRAM 'ssh-keygen';
-$PROGRAM 'mkdir';
-$PROGRAM 'chattr';
 
 function fixRights(){
-    $CHOWN root:root -R /usr/lib/jelastic 2>>"$JEM_CALLS_LOG";
-#    $CHOWN root:root -R /var/lib/jelastic ;
-    $CHMOD 400 /usr/lib/jelastic/libs/* 2>>"$JEM_CALLS_LOG";
-    $CHMOD 400 /usr/lib/jelastic/modules/* 2>>"$JEM_CALLS_LOG";
-    $CHMOD 400 /usr/lib/jelastic/tpls/* 2>>"$JEM_CALLS_LOG";
-    $CHMOD 500 /usr/lib/jelastic/libs 2>>"$JEM_CALLS_LOG";
-    $CHMOD 500 /usr/lib/jelastic/modules 2>>"$JEM_CALLS_LOG";
-    $CHMOD 500 /usr/lib/jelastic/tpls 2>>"$JEM_CALLS_LOG";
-    $CHMOD 511 /usr/bin/jem 2>>"$JEM_CALLS_LOG";
-    $CHOWN root:root /usr/bin/jem 2>>"$JEM_CALLS_LOG";
-    $CHMOD 755 /var/lib/jelastic/libs 2>>"$JEM_CALLS_LOG";
-    $CHMOD 644 /var/lib/jelastic/libs/* 2>>"$JEM_CALLS_LOG";    
+    chown root:root -R /usr/lib/jelastic 2>>"$JEM_CALLS_LOG";
+#    chown root:root -R /var/lib/jelastic ;
+    chmod 400 /usr/lib/jelastic/libs/* 2>>"$JEM_CALLS_LOG";
+    chmod 400 /usr/lib/jelastic/modules/* 2>>"$JEM_CALLS_LOG";
+    chmod 400 /usr/lib/jelastic/tpls/* 2>>"$JEM_CALLS_LOG";
+    chmod 500 /usr/lib/jelastic/libs 2>>"$JEM_CALLS_LOG";
+    chmod 500 /usr/lib/jelastic/modules 2>>"$JEM_CALLS_LOG";
+    chmod 500 /usr/lib/jelastic/tpls 2>>"$JEM_CALLS_LOG";
+    chmod 511 /usr/bin/jem 2>>"$JEM_CALLS_LOG";
+    chown root:root /usr/bin/jem 2>>"$JEM_CALLS_LOG";
+    chmod 755 /var/lib/jelastic/libs 2>>"$JEM_CALLS_LOG";
+    chmod 644 /var/lib/jelastic/libs/* 2>>"$JEM_CALLS_LOG";    
     [ -f /var/lib/jelastic/libs/gitssh.sh ] && { chmod a+x /var/lib/jelastic/libs/gitssh.sh 2>>"$JEM_CALLS_LOG"; }
 }
 
@@ -68,10 +63,10 @@ readonly HISTIGNORE
         do
                 [ ! -f "${_homedir}/${filename}" ] && {
                         touch "${_homedir}/${filename}"
-                        $CHOWN ${DATA_OWNER} "${_homedir}/${filename}"
+                        chown ${DATA_OWNER} "${_homedir}/${filename}"
                 }
 
-                $CHATTR -f +a "${_homedir}/${filename}" 
+                chattr -f +a "${_homedir}/${filename}" 
 
         done
         OIFS="${IFS}"
@@ -79,7 +74,7 @@ readonly HISTIGNORE
 
         IFS="${NIFS}"
         USER_BASHRC="${_homedir}/.bash_profile"
-        [ -f "${USER_BASHRC}" ] && { $CHATTR -a "${USER_BASHRC}"; }
+        [ -f "${USER_BASHRC}" ] && { chattr -a "${USER_BASHRC}"; }
 
         for variable in $bashrcvar
         do
@@ -90,8 +85,8 @@ readonly HISTIGNORE
                 IFS="${NIFS}"
         done
         IFS="${OIFS}"
-        $CHOWN ${DATA_OWNER} "${USER_BASHRC}"
-        $CHATTR -f +a "${USER_BASHRC}"
+        chown ${DATA_OWNER} "${USER_BASHRC}"
+        chattr -f +a "${USER_BASHRC}"
 }
 
 function getAppUserInfo(){
@@ -99,18 +94,18 @@ function getAppUserInfo(){
         [ ! -z "${DATA_OWNER}" ] && {
 		local _appuser=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
 		local _appgroup=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
-		_UID=$($ID -u $_appuser);
-        _GUID=$($ID -g $_appgroup);
+		_UID=$(id -u $_appuser);
+        _GUID=$(id -g $_appgroup);
         case ${COMPUTE_TYPE} in
             memcached )
-                $MKDIR -p "/home/memcached";
+                mkdir -p "/home/memcached";
                 _homedir="/home/memcached";
-                $CHOWN ${_UID}:${_GUID} ${_homedir}
+                chown ${_UID}:${_GUID} ${_homedir}
             ;;
             maven)
-                $MKDIR -p "/opt/maven/";
+                mkdir -p "/opt/maven/";
                 _homedir="/opt/maven/";
-                $CHOWN ${_UID}:${_GUID} ${_homedir}
+                chown ${_UID}:${_GUID} ${_homedir}
 	    ;;
             glassfish)
                 [ -d /var/lib/jelastic/glalssfish ] && {
@@ -167,7 +162,7 @@ function postAddReform(){
     if [ -f "${keyfile}" ] ; then
             _SSH_PRIVATE_KEY=$(cat ${keyfile});
             [ -f "${keyfile}.pub" ] && {
-                    $MV "${keyfile}.pub"  "${_AuthorizedKeysFile}" ;
+                    mv "${keyfile}.pub"  "${_AuthorizedKeysFile}" ;
                     cat "$_AuthorizedKeysFile" >> "$_User_AuthorizedKeysFile"
             } || {
                     authkey=$($SSH_KEYGEN -y -f $keyfile);
@@ -175,13 +170,13 @@ function postAddReform(){
                     cat "$_AuthorizedKeysFile" >> "$_User_AuthorizedKeysFile"
             }
 
-            $CHOWN -fR root:root "${_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
-            $CHMOD -f 600 "${_AuthorizedKeysFile}" 2>>"$JEM_CALLS_LOG";
-            $CHMOD -f 700 "${_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
+            chown -fR root:root "${_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
+            chmod -f 600 "${_AuthorizedKeysFile}" 2>>"$JEM_CALLS_LOG";
+            chmod -f 700 "${_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
 
-            $CHOWN -fR $DATA_OWNER "${_User_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
-            $CHMOD -f 600 "${_User_AuthorizedKeysFile}" 2>>"$JEM_CALLS_LOG";
-            $CHMOD -f 700 "${_User_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
+            chown -fR $DATA_OWNER "${_User_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
+            chmod -f 600 "${_User_AuthorizedKeysFile}" 2>>"$JEM_CALLS_LOG";
+            chmod -f 700 "${_User_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
     fi
 
 }

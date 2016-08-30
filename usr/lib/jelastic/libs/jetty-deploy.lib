@@ -27,25 +27,24 @@ WADI_TEMPLATE='replica.xml'
 TMP_TEMPLATE='/tmp/wadi$$$.xml'
 WORK_DIR="$JETTY_HOME/work"
 $PROGRAM 'wget';
-$PROGRAM 'basename';
 APPLICATION='jetty'
 
 function applyWadiSettings(){
 
 	local context=$1;
-	WADICONF=$($BASENAME ${context}.xml)
+	WADICONF=$(basename ${context}.xml)
 
 	if [[ -s "$JETTY_HOME/$TEMPLATES/$WADI_TEMPLATE" ]]
 	then 
 		cp $JETTY_HOME/$TEMPLATES/$WADI_TEMPLATE $TMP_TEMPLATE
 		if [ "$context" == "root" ]
 		then 
-			sed -i "s/CONTEXTPATH//g" $TMP_TEMPLATE
+			$SED -i "s/CONTEXTPATH//g" $TMP_TEMPLATE
 		else
-			sed -i "s/CONTEXTPATH/$context/g" $TMP_TEMPLATE
+			$SED -i "s/CONTEXTPATH/$context/g" $TMP_TEMPLATE
 		fi
-		RESBASE=$(echo ${APPS}/${context}.war | sed 's,/,\\/,g')
-		sed -i "s/RESOURCEBASE/$RESBASE/g" $TMP_TEMPLATE
+		RESBASE=$(echo ${APPS}/${context}.war | $SED 's,/,\\/,g')
+		$SED -i "s/RESOURCEBASE/$RESBASE/g" $TMP_TEMPLATE
 		mv $TMP_TEMPLATE ${JETTY_HOME}/${CONTEXT_CONF_DIR}/${WADICONF}
 		chown $DATA_OWNER ${JETTY_HOME}/${CONTEXT_CONF_DIR}/${WADICONF}	2>>"$JEM_CALLS_LOG"
        	fi
@@ -54,7 +53,7 @@ function applyWadiSettings(){
 function removeWadiSettings(){
 
 	local context=$1;
-	WADICONF=$($BASENAME ${context}.xml)
+	WADICONF=$(basename ${context}.xml)
 	
 	if [ -f "$JETTY_HOME/$CONTEXT_CONF_DIR/$WADICONF" ]
         then

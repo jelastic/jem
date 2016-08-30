@@ -26,6 +26,7 @@ VERSION="1";
 DEFAULT_ACTION="Usage";
 
 $PROGRAM 'chpasswd';
+$PROGRAM 'grep';
 
 
 function doUsage() {
@@ -49,18 +50,18 @@ function doSet(){
             _setPassword > /dev/null 2>&1; local res=$?;
             export J_OPENSHIFT_APP_ADM_USER=${J_OPENSHIFT_APP_ADM_USER}; 
             #saveEnvironmentVariables;
-            [ $res -eq 0 ] && writeJSONResponceOut "result=>0" "message=>Password set succesfully" "username=>$J_OPENSHIFT_APP_ADM_USER" || { writeJSONResponceErr "result=>4051" "message=>Could not set password!"; return 4051; };
+            [ $res -eq 0 ] && writeJSONResponseOut "result=>0" "message=>Password set succesfully" "username=>$J_OPENSHIFT_APP_ADM_USER" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
             #
             #  Parsing of argument is implemented inside module to avoid extra work for enduser in hook
             #
             return $res;
     } ;
 
-	if echo $@ | grep -qP "\-u"
+	if echo $@ | $GREP -qP "\-u"
 	then
-		setPassword $@ && writeJSONResponceOut "result=>0" "message=>Password set succesfully" || { writeJSONResponceErr "result=>4051" "message=>Could not set password!"; return 4051; };
+		setPassword $@ && writeJSONResponseOut "result=>0" "message=>Password set succesfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
 	else
-		setPassword -u "$default_user" $@ && writeJSONResponceOut "result=>0" "message=>Password set succesfully" || { writeJSONResponceErr "result=>4051" "message=>Could not set password!"; return 4051; };
+		setPassword -u "$default_user" $@ && writeJSONResponseOut "result=>0" "message=>Password set succesfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
 	fi
 }
 
@@ -82,8 +83,10 @@ function doSetos(){
 		  esac
 		  shift
 		done
+	
+		[ -z "$password" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
 
- 		echo "$user:$password" | $CHPASSWD > /dev/null 2>&1 && writeJSONResponceOut "result=>0" "message=>Password set succesfully" || { writeJSONResponceErr "result=>4051" "message=>Could not set password!"; return 4051; };
+ 		echo "$user:$password" | $CHPASSWD > /dev/null 2>&1 && writeJSONResponseOut "result=>0" "message=>Password set succesfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
 
 }
 

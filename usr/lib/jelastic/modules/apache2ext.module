@@ -1,0 +1,31 @@
+#!/bin/bash
+
+inherit default os envinfo;
+VERSION="1";
+DEFAULT_ACTION="Usage";
+DESCRIPTION="Manage Apache2 modules";
+
+APACHE2_CONF='/etc/httpd/conf.d/modules.conf';
+
+function doUsage() {
+    showUsageMessage;
+}
+
+function doEnmod(){
+	local module=$1;
+	sed -i "/^#LoadModule.*$module.*/ s/^#LoadModule/LoadModule/" $APACHE2_CONF;
+	restartServiceSilent ${SERVICE};
+}
+
+function doDismod(){
+	local module=$1;
+	sed -i "/^LoadModule.*$module.*/ s/LoadModule/#LoadModule/" $APACHE2_CONF;
+	restartServiceSilent ${SERVICE};
+}
+function describeEnmod(){
+	echo "<module> enable apache2 module";
+}
+
+function describeDismod(){
+	echo "<module> disable apache2 module";
+}

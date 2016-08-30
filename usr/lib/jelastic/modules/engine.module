@@ -32,22 +32,20 @@ function doUsage() {
 function defaultSwitch(){
 	stopServiceSilent ${SERVICE};
 	[ "x${COMPUTE_TYPE}" == "xcartridge" -o "x${COMPUTE_TYPE}" == "xgate" ] && cartEngineSelector;
-	switchEngine "$version" && writeJSONResponceOut "result=>0" "message=>Engine switched succesfuly" ||  writeJSONResponceErr "result=>4031" "message=>Error occured while switching engine" ;
+	switchEngine "$version" && writeJSONResponseOut "result=>0" "message=>Engine switched succesfuly" ||  writeJSONResponseErr "result=>4031" "message=>Error occured while switching engine" ;
 	startServiceSilent "$SERVICE";
 }
 
 function doSetVersion(){
 	if [ ! -n "$1" ]
 	then
-		[ "x${COMPUTE_TYPE}" == "xnodejs" ] && return 0;
-		echo "Give me please version!";
-		exit;
+		[ "x${COMPUTE_TYPE}" == "xnodejs" ] && return 0 || { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99;}
 	fi
 	local version=$1;
 
 case ${COMPUTE_TYPE} in
 	glassfish)
-		[ ! -f "$GF_PASS_FILE" ] && { switchEngine "$version" && writeJSONResponceOut "result=>0" "message=>Engine switched succesfuly" ||  writeJSONResponceErr "result=>4031" "message=>Error occured while switching engine" ; } || {
+		[ ! -f "$GF_PASS_FILE" ] && { switchEngine "$version" && writeJSONResponseOut "result=>0" "message=>Engine switched succesfuly" ||  writeJSONResponseErr "result=>4031" "message=>Error occured while switching engine" ; } || {
 		    defaultSwitch; 
 		};
 	;;

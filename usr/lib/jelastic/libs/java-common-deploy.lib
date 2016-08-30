@@ -16,9 +16,8 @@
 
 [ -n "${JAVACOMMONDEPLOYLIB_VERSION:-}" ] && return 0;
 JAVACOMMONDEPLOYLIB_VERSION="0.1";
+$PROGRAM 'grep';
 
-$PROGRAM 'chown';
-$PROGRAM 'du';
 
 [ ! -d "$WEBROOT" ] && mkdir -p ${WEBROOT};
 
@@ -44,19 +43,19 @@ function verifyUnpackedContent(){
         };
 
         [ ${COMPUTE_TYPE} == "jetty" ] && { 
-                    local jetty_context_dir=$(ls -1 ${WORKDIR}/ | grep ${context} | head -n 1);
+                    local jetty_context_dir=$(ls -1 ${WORKDIR}/ | $GREP ${context} | head -n 1);
                     [ ! -z $jetty_context_dir  ] &&  content_path="${WORKDIR}/${jetty_context_dir}" || content_path="NoPath";
         };
 
         [ -d $content_path ] && {
 
-            content_size_step1=$($DU -s $content_path);
+            content_size_step1=$(du -s $content_path);
             sleep $pull_inverval_for_content;
-            content_size_step2=$($DU -s $content_path);
+            content_size_step2=$(du -s $content_path);
             [[ $content_size_step1 == $content_size_step2 ]] && return 0;
         } || let $(( attempt_num ++ ));
     sleep $pull_inverval_for_directory;
-    [ $attempt_num -gt $attempt_amount ] && writeJSONResponceErr "result=>4071" "message=>Cannot unpack pakage" && exit 4071;
+    [ $attempt_num -gt $attempt_amount ] && writeJSONResponseErr "result=>4071" "message=>Cannot unpack pakage" && exit 1;
     done
 }
 
@@ -78,12 +77,12 @@ function deploy(){
     fi
     clearCache; 
     ensureFileCanBeDownloaded $package_url;
-    $WGET --no-check-certificate --content-disposition --directory-prefix=${DOWNLOADS} $package_url >> $ACTIONS_LOG 2>&1 || { writeJSONResponceErr "result=>4078" "message=>Error loading file from URL"; die -q; }
+    $WGET --no-check-certificate --content-disposition --directory-prefix=${DOWNLOADS} $package_url >> $ACTIONS_LOG 2>&1 || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
     package_name=$(ls ${DOWNLOADS});
 
     [ ! -s "$DOWNLOADS/$package_name" ] && { 
         rm -f ${DOWNLOADS}/${package_name};
-        writeJSONResponceErr "result=>4078" "message=>Error loading file from URL";
+        writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
         die -q;
     }
     ensureFileCanBeUncompressed ${DOWNLOADS}/${package_name};
@@ -96,11 +95,11 @@ function deploy(){
 
     applyPreDeploy;
 
-    echo $package_name | grep -qP "ear$" && ext="ear" || ext="war";
+    echo $package_name | $GREP -qP "ear$" && ext="ear" || ext="war";
 
     if [[ ${ext} == "ear" ]]
     then 
-        [ ! -d  $APPS_DIR ] && mkdir -p $APPS_DIR && $CHOWN -R  $DATA_OWNER  ${APPS_DIR} 2>>"$JEM_CALLS_LOG";
+        [ ! -d  $APPS_DIR ] && mkdir -p $APPS_DIR && chown -R  $DATA_OWNER  ${APPS_DIR} 2>>"$JEM_CALLS_LOG";
         [ -f "${DOWNLOADS}/${package_name}" ] && mv "${DOWNLOADS}/${package_name}" "${APPS_DIR}/${context}.${ext}";
     else
         [ -f "${DOWNLOADS}/${package_name}" ] && mv "${DOWNLOADS}/${package_name}" "${WEBROOT}/${context}.${ext}";
@@ -145,7 +144,7 @@ function renameContext(){
     [ $(( $war_deploy_result & $ear_deploy_result )) -ne 0  ] && {
 	shopt -u dotglob;
 	startServiceSilent ${SERVICE} ;
-	writeJSONResponceErr "result=>4052" "message=>Context does not exist";
+	writeJSONResponseErr "result=>4052" "message=>Context does not exist";
 	die -q;
     }
 

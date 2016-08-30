@@ -28,28 +28,12 @@ function doUsage() {
 }
 
 function doStop(){
-    [ "x${COMPUTE_TYPE}" == "xnodejs" ] && {
-        [ ! -f "${WEBROOT}/ROOT/server.js" ] && { START_SCRIPT="app.js"; }
-        /bin/su - nodejs -c "PORT=${DEFAULT_PORT} NODE_ENV=production forever --no-colors -a -l $FOREVER_LOG -o $OUT_LOG -e $ERROR_LOG --minUptime 5000 --spinSleepTime 2000 stop ${WEBROOT}/ROOT/${START_SCRIPT} 1>/dev/null 2>/dev/null";
-        local result=0 message="Ok";
-        writeJSONResponceOut "result=>${result}" "message=>${message}";
-        return 0;
-    }
     [ ! -z "$1" ] && SERVICE=$1;
-    stopService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ;  writeJSONResponceOut "result=>$?" "message=>Service been stopped with code $?";
+    stopService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ;  writeJSONResponseOut "result=>$?" "message=>Service been stopped with code $?";
 }
 
 function doRestart(){
     [ -f "/opt/repo/jelastic/jelastic.conf" ] && { source "/opt/repo/jelastic/jelastic.conf"; }
-    [ "x${COMPUTE_TYPE}" == "xnodejs" ] && {
-        [ ! -f "${WEBROOT}/ROOT/server.js" ] && { START_SCRIPT="app.js"; }
-        /bin/su - nodejs -c "cd ${WEBROOT}/ROOT/; npm install 2>&1 | tee $NPM_LOG >> $ACTIONS_LOG";
-        /bin/su - nodejs -c "PORT=${DEFAULT_PORT} NODE_ENV=production forever --no-colors -a -l $FOREVER_LOG -o $OUT_LOG -e $ERROR_LOG --minUptime 5000 --spinSleepTime 2000 stop ${WEBROOT}/ROOT/${START_SCRIPT} 1>/dev/null 2>/dev/null";
-        /bin/su - nodejs -c "PORT=${DEFAULT_PORT} NODE_ENV=production forever --no-colors -a -l $FOREVER_LOG -o $OUT_LOG -e $ERROR_LOG --minUptime 5000 --spinSleepTime 2000 start ${WEBROOT}/ROOT/${START_SCRIPT} 1>/dev/null 2>/dev/null";
-        local result=0 message="Ok";
-        writeJSONResponceOut "result=>${result}" "message=>${message}";
-        return 0;
-    }
     
     [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && {
         [ "x${COMPUTE_TYPE}" == "xcartridge" ] && { WEBROOT=${Webroot_Path}; }
@@ -63,7 +47,7 @@ function doRestart(){
             mv -f "${WEBROOT}/ROOT/rake_deploy" "${WEBROOT}/ROOT/rake_deploy.old" 1>>"$RAKE_DEPLOY_LOG" 2>&1;
             for command in  ${rake_commands}
             do
-               source /usr/lib/rvm/environments/base && cd "${WEBROOT}/ROOT/" && HOME=/ REDMINE_LANG=en RAILS_ENV=${bundle_type} ${bundle} exec rake "$command" >> "$RAKE_DEPLOY_LOG" 2>&1;
+               source /usr/lib/rvm/environments/base && cd "${WEBROOT}/ROOT/" && HOME=/ RAILS_ENV=${bundle_type} ${bundle} exec rake "$command" >> "$RAKE_DEPLOY_LOG" 2>&1;
             done
         fi
         shopt -s dotglob;
@@ -95,21 +79,13 @@ function doRestart(){
     else
         message="Failed to stop $1";
     fi
-    writeJSONResponceOut "result=>${result}" "message=>${message}";
+    writeJSONResponseOut "result=>${result}" "message=>${message}";
     return 0;
 }
 
 function doStart(){
-    [ "x${COMPUTE_TYPE}" == "xnodejs" ] && {
-        [ ! -f "${WEBROOT}/ROOT/server.js" ] && { START_SCRIPT="app.js"; }
-        /bin/su - nodejs -c "cd ${WEBROOT}/ROOT/; npm install 2>&1 | tee $NPM_LOG >> $ACTIONS_LOG";
-        /bin/su - nodejs -c "PORT=${DEFAULT_PORT} NODE_ENV=production forever --no-colors -a -l $FOREVER_LOG -o $OUT_LOG -e $ERROR_LOG --minUptime 5000 --spinSleepTime 2000 start ${WEBROOT}/ROOT/${START_SCRIPT} 1>/dev/null 2>/dev/null";
-        local result=0 message="Ok";
-        writeJSONResponceOut "result=>${result}" "message=>${message}";
-        return 0;
-    }
     [ ! -z "$1" ] && SERVICE=$1;
-    startService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; writeJSONResponceOut "result=>$?" "message=>Service been started with code $?";
+    startService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; writeJSONResponseOut "result=>$?" "message=>Service been started with code $?";
 }
 
 function postRestartCallback(){

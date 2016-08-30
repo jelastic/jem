@@ -45,24 +45,24 @@ function vzexecRun() {
         return 99;
     fi
 
-    buffer=$(
-        { __STDOUT=$( set -f ; $__EXEC $__CTID $* ; ); returncode=$?; } 2>&1
-        printf "#--- separator ---#"
-        printf "%s\n" "$__STDOUT"
-        exit "$returncode"
-    )
+    local _tmperr
+
+    _tmperr=$(mktemp -u --tmpdir=/tmp)
+
+    __STDOUT=$( set -f ; $__EXEC $__CTID "$*" 2>$_tmperr; );
     __ERRCODE=$?
-    __STDOUT=${buffer#*#--- separator ---#}
-    __STDERR=${buffer%#--- separator ---#*}
+    __STDERR=$(<$_tmperr)
+    rm $_tmperr
+    [[ "$VERBOSE" -gt 0 ]] && echo -e "vzexec command: $*\nvzexec stdout:${__STDOUT}\nvzexec stderr:${__STDERR}" >> ${JEM_CALLS_LOG}
     return $__ERRCODE
 }
 
 function vzexecGetLastStdErr() {
-    echo $__STDERR
+    echo "${__STDERR}"
 }
 
 function vzexecGetLastStdOut() {
-    echo $__STDOUT
+    echo "${__STDOUT}"
 }
 
 function vzexecGetLastErrCode() {
