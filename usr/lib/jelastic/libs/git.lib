@@ -72,7 +72,6 @@ function doCheckout(){
         [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
             inherit ruby-common;
             bundleInstall;
-	    reloadServiceSilent ${SERVICE} ;
         } || return 0;
     fi
     return 0;
@@ -98,7 +97,6 @@ function updateProject(){
         [ -f "${WEBROOT}/ROOT/Gemfile" ] &&  {
                 inherit ruby-common;
                 bundleInstall;
-		reloadServiceSilent ${SERVICE} ;
         }
     }
     return 0;

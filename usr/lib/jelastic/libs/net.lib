@@ -215,7 +215,7 @@ function getInfraAddresses() {
         return 1;
     }
 
-    domain=$(host ${NSIP} | $SED -re '/NXDOMAIN/d;s/.*\s+(rslv[0-9]{0,1}|resolver)\.(\S+)\.$/\2/g;/arpa/d');
+    domain=$(host ${NSIP} | $SED -re '/NXDOMAIN/d;s/.*\s+(rslv[0-9]{0,3}|resolver)\.(\S+)\.$/\2/g;/arpa/d');
     [ -z "${domain}" ] && return 1;
 
     ## TODO: Need to replace to the v4 code {{{
@@ -226,6 +226,7 @@ function getInfraAddresses() {
     DB_ADDR="$(getHostIP "db.${domain}")";
     GATE_ADDR="$(getHostIP "gate.${domain}")";
     FQDN="$(hostname | awk -F "." '{print $1}').${domain}";
+    JEL_CORE_ADDR="$( host jelcore.${domain} | sed '/alias for/d' | sed -re '/NXDOMAIN/d;s/.+\s+(([0-9]{1,3}\.){3}[0-9]{1,3})/\1/')";
     ## }}}
 
     return 0;

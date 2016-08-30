@@ -16,7 +16,7 @@
 
 [ -n "${CORELIB_VERSION:-}" ] && return 0;
 CORELIB_VERSION="0.1";
-
+            
 OVERRIDE_DIR="/var/lib/jelastic/overrides/"
 
 DEBUG=${DEBUG:=0};
@@ -230,10 +230,8 @@ function startJemThreadQueueManager(){
 	if [ "x$1" == "xmount" -o "x$1" == "xumount" ]; then
 	    jempidfile="/var/run/jem.86a06296.pid";
 	fi
-    elif [ "x$action" == "xfilemanager" ] ; then
-        jempidfile="/var/run/jem.dc6cbef1.pid"
     elif [ "x$action" == "xdocker" -o "x$action" == "xcommand" ] ; then
-	if [ "x$1" == "xaftercreate" ] ; then
+	if [ "x$1" == "xaftercreate" ] ; then 
 	    jempidfile="/var/run/jem.f55b442$$.pid";
 	else
 	while [ "$1" != "" ]
@@ -264,15 +262,9 @@ function startJemThreadQueueManager(){
     fi
 
     [ -f $jempidfile ] && {
-        echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
-        echo ":[WAITING]   [PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
-
-        while [[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]]; do
-            sleep $sleep_period;
-        done
-
-        echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
-        echo ":[PROCESSING][PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
+          while [[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]]; do
+                sleep $sleep_period;
+          done
     }
 
     echo "$$" > $jempidfile;
@@ -280,8 +272,6 @@ function startJemThreadQueueManager(){
 
 function stopJemThreadQueueManager(){
     [ -f $jempidfile ] && {
-          echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
-          echo ":[CLEANING UP][PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
           rm -f $jempidfile
     }
 }
@@ -334,14 +324,11 @@ function doAction() {
         }
     );
     actionResult=${?};
-    echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
     [[ $actionResult -gt 0 ]] && {
-        echo ":[FAIL]      [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
         # stopJemThreadQueueManager;
         # [[ $actionResult -gt 5000 ]] && _manageDoHelp;
         return ${actionResult};
     };
-    echo ":[SUCCESS]   [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
     return 0; ## For cases if no other problems occured in doAction subshell
 }
 
