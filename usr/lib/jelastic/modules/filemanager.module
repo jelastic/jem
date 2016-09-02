@@ -31,6 +31,7 @@ FS_PATH="";
 FS_USER="";
 FS_SOURCE="";
 FS_DESTINATION="";
+FS_OVERWRITE="false";
 
 function onModLoadCallback(){
     local temp=`getopt -o u:,s:,p:,d: -l user:,destinationpath:,sourcepath:,path: -- "$@" 2>>"$JEM_CALLS_LOG"`
@@ -189,7 +190,9 @@ function doCreate() {
         return $result_code;
     fi
 
-    if [ unitExists "$FS_PATH" -a "${FS_OVERWRITE}" != "true" ]; then
+    unitExists "$FS_PATH"; 
+    unitRes=$?;
+    if [ $unitRes -eq 0 -a "x${FS_OVERWRITE}" != "xtrue" ]; then
         writeJSONResponseErr "result=>4036" "message=>Path $FS_PATH already exists";
         return 36;
     fi
