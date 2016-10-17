@@ -98,7 +98,7 @@ while [ "$1" != "" ]; do
     -au | --autoupdate )        shift;
                                 AUTOUPDATE=$1;
                                 ;;
-    -m  | --updateinverval )    shift;
+    -m  | --updateinverval | -i  | --interval )    shift;
                                 UPDATE_INTERVAL=$1;
                                 ;;                                
   esac
@@ -177,7 +177,7 @@ function doBuild(){
 			[ $? -eq 0 ] && {
 				writeJSONResponseOut "result=>0" "message=>Build success" 	
             } || {
-                writeJSONResponseErr "result=>4060" "message=>Deploy failed, see logs for details" ; return 1 ;
+                writeJSONResponseErr "result=>4060" "message=>Upload failed, see logs for details" ; return 1 ;
             };
         else
             writeJSONResponseErr "result=>4059" "message=>Build failed, see logs for details" ; return 1 ;
@@ -288,7 +288,7 @@ function describeEditProjectOptions() {
     echo "-c|--context: context for deploy";
     echo "-e|--environment: environment name ";
     echo "-l|--login: login ( __GUEST__ )";
-    echo "-m|--updateinverval: interval or autoupdates";
+    echo "-i|--inverval: interval or autoupdates";
     echo "-n|--project-name: project name";
     echo "-o|--old-project-name: old project name";
     echo "-p|--password: password";
