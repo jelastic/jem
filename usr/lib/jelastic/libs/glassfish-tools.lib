@@ -43,7 +43,7 @@ use Config::Auto;
 use File::Temp ();
 use File::Grep qw( fgrep );
 use File::Copy;
-use Net::SSH;
+use Net::OpenSSH;
 use Net::IPAddress::Minimal ('invert_ip', 'num_to_ip');
 use Socket;
 use LWP::Simple;
@@ -238,9 +238,8 @@ sub ipchanged(){
 		# I'm das
 		my $config = &remove_das( build_config(), &get_das_properties() );
 		foreach (@$config) { 
-			my $ssh = Net::SSH->new($$_{ip}, privileged => 0);
-			$ssh->login( 'root', $$_{password});
-			my ($ssh_stdout, $ssh_stderr, $ssh_exit) = $ssh->cmd("/usr/bin/perl /usr/lib/jelastic/libs/glassfish-tools.lib -m ipchanged");
+			my $ssh = Net::OpenSSH->new($$_{ip}, user => 'root', password => $$_{password}, master_opts => [-o => "StrictHostKeyChecking=no", -o => "LogLevel=quiet"] );
+			my $ssh_stdout = $ssh->capture("/usr/bin/perl /usr/lib/jelastic/libs/glassfish-tools.lib -m ipchanged");
 		}
 	
 	}
@@ -263,16 +262,15 @@ sub modify_remote_hostsfile {
 	#$logger->log( message => "modify_remote_hostsfile $$config{ip} $$config{password}| $das->{hostname} $das->{ip} | end") ;
 
 	$logger->log( message => "Modifing hosts records for $$config{hostname} $$config{ip}" );
-	my $ssh = Net::SSH->new( $$config{ip}, privileged => 0 );
-	$ssh->login( 'root', $$config{password} );
+	my $ssh = Net::OpenSSH->new( $$config{ip}, user => 'root', password => $$config{password}, master_opts => [-o => "StrictHostKeyChecking=no", -o => "UserKnownHostsFile=/dev/null", -o => "LogLevel=quiet" ]   );
+	my ( $out, $err ) = $ssh->capture("cat /etc/hosts");
 
-	my ( $out, undef, undef ) = $ssh->cmd("cat /etc/hosts");
 	my @res = split( /\n/, $out );
-	$ssh->cmd("echo '$das->{ip} $das->{hostname}' >> /etc/hosts")
-	  unless scalar grep { /${\($das->{ip})}\s+${\($das->{hostname})}/ } @res;
+	$ssh->system("echo '$das->{ip} $das->{hostname}' >> /etc/hosts")
+	 unless scalar grep { /${\($das->{ip})}\s+${\($das->{hostname})}/ } @res;
 	$logger->log( message => "$das->{ip} $DASPASSWORD" );
-	$ssh->cmd("echo \"$das->{ip} $DASPASSWORD\" > $DAS_PASSWORD_FILE");
-	$ssh->cmd("chkconfig --level 3 glassfish-remote on 2>&1");
+	$ssh->system("echo \"$das->{ip} $DASPASSWORD\" > $DAS_PASSWORD_FILE");
+	$ssh->system("chkconfig --level 3 glassfish-remote on 2>&1");
 
 	#      unless scalar grep { /${\($das->{ip})}\s+${\($das->{hostname})}/ } @res;
 	#TODO send das pas to instances
@@ -408,12 +406,11 @@ sub add_node {
 	);
 
 	my $envname = &get_environment_name( hostname() );	
-	my $ssh = Net::SSH->new( $$node_config{ip}, privileged => 0 );
-	$ssh->login( 'root', $$node_config{password} );
-	$ssh->cmd("[ ! -d \"/opt/glassfish3/glassfish/nodes/\" ] && { mkdir -p \"/opt/glassfish3/glassfish/nodes/node$node_config->{id}.$envname/instance-$node_config->{id}/logs\"; }");
+	my $ssh = Net::OpenSSH->new( $$node_config{ip}, user => 'root', password => $$node_config{password}, master_opts => [-o => "StrictHostKeyChecking=no", -o => "LogLevel=quiet"]  );
+	$ssh->system("[ ! -d \"/opt/glassfish3/glassfish/nodes/\" ] && { mkdir -p \"/opt/glassfish3/glassfish/nodes/node$node_config->{id}.$envname/instance-$node_config->{id}/logs\"; }");
 	$logger->log( message => "[ ! -d \"/opt/glassfish3/glassfish/nodes/\" ] && { mkdir -p \"/opt/glassfish3/glassfish/nodes/node$node_config->{id}.$envname/instance-$node_config->{id}/logs\"; }");
-	$ssh->cmd("/etc/init.d/glassfish-domain1 switch-log");
-	$ssh->cmd("chown glassfish:glassfish  -R /opt/glassfish3/glassfish/");
+	$ssh->system("/etc/init.d/glassfish-domain1 switch-log");
+	$ssh->system("chown glassfish:glassfish  -R /opt/glassfish3/glassfish/");
 	&asadmin(
 		"create-node-ssh --sshuser=root --nodehost $node_config->{ip} node$node_config->{id}.$envname",
 		"AS_ADMIN_SSHPASSWORD=\\\$\\{ALIAS=password-$node_config->{id}\\}"
@@ -468,14 +465,13 @@ sub cleanup_system {
 	my $hostname;my $cur_node;my $das_old_id;
 	foreach $cur_node (@$config) { 
 		$logger->log( message => "$$cur_node{ip}, $$cur_node{id} " );
-		my $ssh = Net::SSH->new($$cur_node{ip}, privileged => 0);
-		$ssh->login( 'root', $$cur_node{password});
-		my ($ssh_stdout, $ssh_stderr, $ssh_exit) = $ssh->cmd("ls ".INSTANCE_PATH." | sed -ne 's/.*node\\([[:digit:]]\\{6,10\\}\\).*/\\1/p;'");
+		my $ssh = Net::OpenSSH->new($$cur_node{ip}, user => 'root', password => $$cur_node{password}, master_opts => [-o => "StrictHostKeyChecking=no", -o => "LogLevel=quiet"] );
+		my $ssh_stdout = $ssh->capture("ls ".INSTANCE_PATH." | sed -ne 's/.*node\\([[:digit:]]\\{6,10\\}\\).*/\\1/p;'");
 		chomp($ssh_stdout);
 		push @ids_hash , $ssh_stdout ; # old node_id
 		push @ids_hash , $$cur_node{id} ;  # new node_id
 ####		&asadmin( "delete-password-alias password-$ssh_stdout");
-		($ssh_stdout, $ssh_stderr, $ssh_exit) = $ssh->cmd("/usr/bin/perl /usr/lib/jelastic/libs/glassfish-tools.lib -m  getenvname"); #
+		$ssh_stdout = $ssh->capture("/usr/bin/perl /usr/lib/jelastic/libs/glassfish-tools.lib -m  getenvname"); #
 		chomp($ssh_stdout);
 		$nodes_names{$$cur_node{id}} = $ssh_stdout ;
 	}
@@ -500,9 +496,8 @@ sub cleanup_system {
 
 	foreach (@$config) { 
 		modify_remote_hostsfile ($_);
-		my $ssh = Net::SSH->new($$_{ip}, privileged => 0);
-		$ssh->login( 'root', $$_{password});
-		$ssh->cmd("/usr/bin/perl /usr/lib/jelastic/libs/glassfish-tools.lib -m  cleanup-remote-instance --idshash ". $ids_string );
+		my $ssh = Net::OpenSSH->new($$_{ip}, user => 'root', password => $$_{password}, master_opts => [-o => "StrictHostKeyChecking=no", -o => "LogLevel=quiet"] );
+		$ssh->system("/usr/bin/perl /usr/lib/jelastic/libs/glassfish-tools.lib -m  cleanup-remote-instance --idshash ". $ids_string );
 	}
 	system "rm -rf ".INSTANCE_PATH."/localhost-domain1/instance-".$das_old_id."/logs/instance-".$das_old_id."/";
 	my @domains_files= ( INSTANCE_PATH."localhost-domain1/".$fl."/config/domain.xml" , "/opt/glassfish3/glassfish/domains/domain1/config/domain.xml" ) ;
@@ -723,16 +718,6 @@ sub replication_on {
 			$tap_ip = $1;	
 		}
 	}	
-#	unless ( $$options{remote} ) {
-#		$logger->log( message => "modifing remote hosts" );
-#		my $das = get_das_properties;
-#		foreach (@$config) {
-#			my $ssh = Net::SSH->new( $$_{ip} , privileged => 0);
-#			$logger->log( message => "processing $$_{ip}" );
-#			$ssh->login( 'root', $$_{password} );
-#			$ssh->cmd("/root/scripts/manage.sh -m replicationon --hostname $$options{hostname} --remote=1");
-#		}
-#	}
 }
 
 sub replication_off {
@@ -746,16 +731,6 @@ sub replication_off {
 	  if fgrep { /ip\s+"link/ } "${\(VTUND_CONF)}";
 	system "sed -i 's/REMOTE_HOST[\=[:digit:]\.]\\{1,\\}/REMOTE_HOST=/' ${\(VTUN_SERVICE)}";
 
-#	unless ( $$options{remote} ) {
-#		$logger->log( message => "modifing remote hosts" );
-#		my $das = get_das_properties;
-#		foreach (@$config) {
-#			my $ssh = Net::SSH->new( $$_{ip} , privileged => 0);
-#			$logger->log( message => "processing $$_{ip}" );
-#			$ssh->login( 'root', $$_{password} );
-#			$ssh->cmd("/root/scripts/manage.sh -m replicationoff --remote=1");
-#		}
-#	}
 }
 
 sub deploy {
@@ -824,9 +799,8 @@ sub migrate {
 	my $config = shift @_;
 
 	foreach (@$config) {
-		my $ssh = Net::SSH->new( $$config{ip}, privileged => 0);
-		$ssh->login( 'root', $$config{password} );
-		$ssh->cmd("chkconfig --level 3 glassfish-remote on 2>&1");
+		my $ssh = Net::OpenSSH->new( $$config{ip}, user => 'root', password => $$config{password}, master_opts => [-o => "StrictHostKeyChecking=no", -o => "LogLevel=quiet"] );
+		$ssh->system("chkconfig --level 3 glassfish-remote on 2>&1");
 	}
 }
 
@@ -891,10 +865,10 @@ sub start_remote_instance {
             	    my @chars = ("A".."Z", "a".."z");
 					my $string;
 					$string .= $chars[rand @chars] for 1..8;
-            	    my $ssh = Net::SSH->new( $inst_ip, privileged => 0 );
+            	    my $ssh = Net::OpenSSH->new( $inst_ip , user => 'root', password => $inst_pass, master_opts => [-o => "StrictHostKeyChecking=no", -o => "LogLevel=quiet"] );
                 	$ssh->login( 'root', $inst_pass );
-                	$ssh->cmd("echo AS_ADMIN_PASSWORD=$password>/tmp/$string");
-					$ssh->cmd("/opt/glassfish3/bin/asadmin  start-local-instance --node $inst_hostname --sync normal $r_instance -u jelastic -W /tmp/$string");	 
+                	$ssh->system("echo AS_ADMIN_PASSWORD=$password>/tmp/$string");
+			$ssh->system("/opt/glassfish3/bin/asadmin  start-local-instance --node $inst_hostname --sync normal $r_instance -u jelastic -W /tmp/$string");	 
         		}				
 	     		$start_executed = 1;
 			}else {
@@ -967,11 +941,9 @@ sub start_instance {
 
 	# print "My instance name: $instance, das ip: $dasip, daspas: $daspas";
 	$logger->log( message => "My instance name: $instance, das ip: $dasip" );
-	my $ssh = Net::SSH->new($dasip, privileged => 0);
-	$ssh->login( 'root', $daspas );
-
+	my $ssh = Net::OpenSSH->new($dasip, user => 'root', password => $daspas, master_opts => [ -o => "StrictHostKeyChecking=no", -o => "LogLevel=quiet"] );
 	#    print "/root/scripts/manage.sh -remote -m start-remote-instance --instname=$instance";
-	$ssh->cmd(" /usr/bin/perl /usr/lib/jelastic/libs/glassfish-tools.lib -m start-remote-instance --instname=$instance");
+	$ssh->system(" /usr/bin/perl /usr/lib/jelastic/libs/glassfish-tools.lib -m start-remote-instance --instname=$instance");
 }
 
 sub stop_instance {
