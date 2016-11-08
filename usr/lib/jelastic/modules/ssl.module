@@ -37,11 +37,8 @@ function doUsage() {
 function doInstall(){
         if [ "x${COMPUTE_TYPE}" ==  "xcartridge" ]
         then
-                [ "x${Node_Mission}" == "xbl" ] && {
-                        [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && _enableSSL && { writeJSONResponseOut "result=>0" "message=>SSL installed succesfully"; return 0; } || { writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"; return 1; }
-                } || { writeJSONResponseOut "result=>0" "message=>SSL installed was skipped"; return 0; }
+               [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && _enableSSL && { writeJSONResponseOut "result=>0" "message=>SSL installed succesfully"; return 0; } || { writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"; return 1; }
         fi
-
         enableSSL && writeJSONResponseOut "result=>0" "message=>SSL installed succesfully" || { writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"; return 1; };
 }
 
