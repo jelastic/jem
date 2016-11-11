@@ -37,7 +37,12 @@ function doUsage() {
 function doInstall(){
         if [ "x${COMPUTE_TYPE}" ==  "xcartridge" ]
         then
-               [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && _enableSSL && { writeJSONResponseOut "result=>0" "message=>SSL installed succesfully"; return 0; } || { writeJSONResponseErr "result=>4116" "Functionality not implemented"; return 1; }
+               if [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] 
+                  then 
+                      source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && _enableSSL && { writeJSONResponseOut "result=>0" "message=>SSL installed succesfully"; return 0; } || { writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"; return 1; };
+                  else 
+                      { writeJSONResponseErr "result=>4116" "message=>SSL installation is not implemented"; return 0; }
+               fi                                          
         fi
         enableSSL && writeJSONResponseOut "result=>0" "message=>SSL installed succesfully" || { writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"; return 1; };
 }
@@ -45,24 +50,22 @@ function doInstall(){
 
 
 function doRemove(){
-   if [ "x${COMPUTE_TYPE}" ==  "xcartridge" ]
-      then
-               [ "x${Node_Mission}" == "xbl" ] && {
-                        [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && _disableSSL && { writeJSONResponseOut "result=>0" "message=>SSL removed succesfully"; return 0; } || { writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"; return 1; }
-             } || { writeJSONResponseOut "result=>0" "message=>SSL cleanup skipped"; return 0; }
-      fi
+
+        if [ "x${COMPUTE_TYPE}" ==  "xcartridge" ]
+        then
+               if [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] 
+                  then 
+                      source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && _disableSSL && { writeJSONResponseOut "result=>0" "message=>SSL removed succesfully"; return 0; } || { writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"; return 1; };
+                  else 
+                      { writeJSONResponseErr "result=>4116" "message=>SSL remove is not implemented!"; return 0; }
+               fi                                          
+        fi
 
       disableSSL && writeJSONResponseOut "result=>0" "message=>SSL removed succesfully" || { writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"; return 1; };
 }
 
 
 function doCheckDomain(){
-  if [ "x${COMPUTE_TYPE}" ==  "xcartridge"  ]
-  then
-    [ "x${Node_Mission}" == "xbl" ] && {
-     [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh";
-    } || { writeJSONResponseOut "result=>0" "message=>SSL check skipped"; return 0; }
-  fi
   doAction keystore checkDomain;
 }
 
