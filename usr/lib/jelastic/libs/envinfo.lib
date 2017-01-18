@@ -12,11 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 [[ -n "${META_FILE}" ]] && [ -e "${META_FILE}" ] && source ${META_FILE} ;
 
 OVERRIDE_DIR="/var/lib/jelastic/overrides/"
-extipchange_module_inherit="common-extipch";
+extipchange_module_inherit="common-extipch-norestart";
 gw_boost_lib_inherit="user-common";
 DEPLOY_LOG="/dev/null";
 
@@ -34,6 +33,7 @@ case ${COMPUTE_TYPE} in
 		engine_module_inherit="nginx-php-engine";
 		ssl_module_inherit="nginx-php-ssl";
 		setmemory_lib="php-setmem";
+		extipchange_module_inherit="common-extipch";
 		WEBROOT="/var/www/webroot";
 		VCS_UPDATE_LOG="/var/log/nginx/vcs_update.log";
 		VCS_AUTORESOLVE_LOG="/var/log/nginx/vcs_autoresolve.log";
@@ -46,6 +46,7 @@ case ${COMPUTE_TYPE} in
 		engine_module_inherit="apache-php-engine";
 		ssl_module_inherit="apache-php-ssl";
 		setmemory_lib="php-setmem";
+		extipchange_module_inherit="common-extipch";
 		WEBROOT="/var/www/webroot";
 		VCS_UPDATE_LOG="/var/log/httpd/vcs_update.log";
 		VCS_AUTORESOLVE_LOG="/var/log/httpd/vcs_autoresolve.log";
@@ -57,8 +58,8 @@ case ${COMPUTE_TYPE} in
 		deploy_module_inherit="ruby-common-deploy";
 		engine_module_inherit="ruby-common-engine";
 		ssl_module_inherit="apache-php-ssl";
-		setmemory_lib="php-setmem";
 		WEBROOT="/var/www/webroot";
+		extipchange_module_inherit="common-extipch";
 		VCS_UPDATE_LOG="/var/log/httpd/vcs_update.log";
 		VCS_AUTORESOLVE_LOG="/var/log/httpd/vcs_autoresolve.log"
 		RAKE_DEPLOY_LOG="/var/log/httpd/rake_deploy.log";
@@ -71,13 +72,29 @@ case ${COMPUTE_TYPE} in
 		deploy_module_inherit="ruby-common-deploy";
 		engine_module_inherit="ruby-common-engine";
 		ssl_module_inherit="nginx-php-ssl";
-#		setmemory_lib="php-setmem";
+		extipchange_module_inherit="common-extipch";
 		WEBROOT="/var/www/webroot";
 		VCS_UPDATE_LOG="/var/log/nginx/vcs_update.log";
 		VCS_AUTORESOLVE_LOG="/var/log/nginx/vcs_autoresolve.log"
 		RAKE_DEPLOY_LOG="/var/log/nginx/rake_deploy.log";
 		BUNDLE_INSTALL_LOG="/var/log/nginx/bundle_install.log";
 		RVM_PATH="/usr/lib/rvm";
+	;;
+	nodejs)
+		DATA_OWNER='nodejs:nodejs';
+		SERVICE='nodejs';
+		deploy_module_inherit="nodejs-common-deploy";
+		engine_module_inherit="nodejs-common-engine";
+		WEBROOT="/var/www/webroot";
+		NPM_SERVICE_LOG="/opt/nodejs/logs/nodejs_service.log"
+		VCS_UPDATE_LOG="/opt/nodejs/logs/vcs_update.log";
+		VCS_AUTORESOLVE_LOG="/opt/nodejs/logs/vcs_autoresolve.log"
+		FOREVER_LOG="/opt/nodejs/logs/forever.log";
+		ERROR_LOG="/opt/nodejs/logs/stderr.log";
+		OUT_LOG="/opt/nodejs/logs/stdout.log";
+		NPM_LOG="/opt/nodejs/logs/npm.log";
+		START_SCRIPT="server.js";
+		DEFAULT_PORT=8080;
 	;;
 	tomcat | tomee)
 		DATA_OWNER='tomcat:nobody';
@@ -174,26 +191,22 @@ case ${COMPUTE_TYPE} in
 		extipchange_module_inherit="cartridge-extipch";
 		cartridge_sdk="/var/lib/jelastic/libs/cartridge-sdk.lib";
 		RAKE_DEPLOY_LOG="/opt/repo/log/rake_deploy.log";
-	        CARTRIDGE_HOME="/opt/repo";
-    		default_user="admin";
-	        RUNAS="jelastic";
-    		VCS_UPDATE_LOG="$CARTRIDGE_HOME/logs/vcs_update.log";
-	        VCS_AUTORESOLVE_LOG="$CARTRIDGE_HOME/logs/vcs_autoresolve.log";
-	        BUNDLE_INSTALL_LOG="$CARTRIDGE_HOME/log/bundle_install.log";
+        CARTRIDGE_HOME="/opt/repo";
+        default_user="admin";
+        RUNAS="jelastic";
+        VCS_UPDATE_LOG="$CARTRIDGE_HOME/logs/vcs_update.log";
+        VCS_AUTORESOLVE_LOG="$CARTRIDGE_HOME/logs/vcs_autoresolve.log";
+        BUNDLE_INSTALL_LOG="$CARTRIDGE_HOME/log/bundle_install.log";
 	;;
 	gate)
 		gw_boost_lib_inherit="usermanage-gate";
 	;;
+    dummy)
+		passwd_module_inherit="dummy-passwd";
+		dumper_module_inherit="dummy-dumper";
+		default_user="admin";
+	;;
 esac
-
-[ -d "$OVERRIDE_DIR" ] && {
-		[  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -eq 0 ] && return 0;
-		for override_lib in $(ls $OVERRIDE_DIR/*.lib)
-        do
-              source $override_lib;
-        done
-
-}
-
+[ -e "/var/lib/jelastic/overrides/envinfo.lib" ] && source /var/lib/jelastic/overrides/envinfo.lib ;
 return 0;
 
