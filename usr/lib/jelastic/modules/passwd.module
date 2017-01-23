@@ -18,7 +18,7 @@
 
 inherit default os envinfo;
 include "$passwd_module_inherit";
-include output cartridge-common;
+include output cartridge-common decrypt-passwd;
 inherit extendperm;
 
 DESCRIPTION="JEM Password Manager module";
@@ -33,9 +33,12 @@ function doUsage() {
     showUsageMessage;
 }
 
+function preSetCallback(){
+    decryptPassword $@
+}
 
 function doSet(){
-
+	set -- ${JEM_PARAMS[@]}
 	[ "x${COMPUTE_TYPE}" == "xcartridge" ] &&  restoreEnvironmentVariables && {
             export J_OPENSHIFT_APP_ADM_USER=$Admin_App_User;
             [ -f "${CARTRIDGE_HOME}/jelastic/scripts/reset_password.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/reset_password.sh";
@@ -55,7 +58,7 @@ function doSet(){
             #  Parsing of argument is implemented inside module to avoid extra work for enduser in hook
             #
             return $res;
-    } ;
+	} ;
 
 	if echo $@ | $GREP -qP "\-u"
 	then
@@ -69,8 +72,12 @@ function postSetCallback(){
     ExtendPerm ;
 }
 
-function doSetos(){
+function preSetosCallback(){
+    decryptPassword $@
+}
 
+function doSetos(){
+	set -- ${JEM_PARAMS[@]}
 		while [ "$1" != "" ];
 		do
 		  case $1 in

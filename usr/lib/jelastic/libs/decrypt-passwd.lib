@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+[ -n "${DECPASSWDLIB_VERSION:-}" ] && return 0;
+STRINGLIB_VERSION="0.1";
+
+declare -a JEM_PARAMS
+function getPassword(){
+        if [ -z "$1" ] ; then
+                log "empty password string.";
+                return 99;
+        fi
+        local passwString="$1";
+        local rsaKey="/root/.ssh/id_rsa" ;
+        local decType=${passwString%%\:*};
+        local passwordEncrypted=${passwString#*\:};
+        local keyString='';
+        case ${decType,,} in
+                'rsa' )
+                        [ -f "$rsaKey" ] && keyString=$( cat $rsaKey );
+                        ;;
+                'static' )
+                        keyString='TFVhBKDOSBspeSXesw8fElCcOzbJzYed';
+                        ;;
+                'envId' )
+                        if [ -z "$__CTID" ] ; then
+                                log "unknown __CTID. Please set it via vzexecSetCTID first";
+                                return 99;
+                        fi
+                        keyString=$(cat $(vzlist -Ho private)/.vza/eid.conf 2>/dev/null)
+
+                        ;;
+                * ) 
+                        echo "$passwString";
+                        exit 0;
+                        ;;
+        esac
+        echo $passwordEncrypted | openssl enc -d -a -aes-128-cbc -nosalt -pass "pass:$keyString" 2>> $ACTIONS_LOG || {  writeJSONResponseErr "result=>4087" "message=>Could not decrypt password!!"; die -q; }
+}
+
+
+
+function decryptPassword(){
+    local index=0;
+    JEM_PARAMS=( $@ )
+
+    for arg in ${JEM_PARAMS[@]}
+    do
+	let "index+=1"
+	case $arg in
+	    -p|--password)
+	    JEM_PARAMS[$index]=$( getPassword ${JEM_PARAMS[$index]} );
+	    ;;
+	esac
+    done
+}

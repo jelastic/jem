@@ -17,7 +17,7 @@
 
 
 inherit default os envinfo;
-include output;
+include output decrypt-passwd;
 
 DESCRIPTION="Enables SSL for application stack";
 VERSION="1";
@@ -53,6 +53,8 @@ declare -x MAVEN_OPTS=$(getMavenParam $free_mem)
 
 function parseArguments() {
 
+    decryptPassword $@;
+    set -- ${JEM_PARAMS[@]};
 while [ "$1" != "" ]; do
   case $1 in
 
@@ -183,7 +185,7 @@ function doBuild(){
 			[ $? -eq 0 ] && {
 				writeJSONResponseOut "result=>0" "message=>Build success"; return 0;	
             } || {
-                writeJSONResponseErr "result=>4060" "message=>Upload failed, see logs for details" ; return 1 ;
+                writeJSONResponseErr "result=>4049" "message=>Upload failed, see logs for details" ; return 1 ;
             };
         else
             writeJSONResponseErr "result=>4059" "message=>Build failed, see logs for details" ; return 1 ;

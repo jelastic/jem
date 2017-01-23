@@ -16,7 +16,7 @@
 
     inherit default os envinfo;
     include ${deploy_module_inherit} php-common-deploy;
-    include output git log net cartridge-common;
+    include output git log net cartridge-common decrypt-passwd;
     [ -f "$cartridge_sdk" ] && source $cartridge_sdk;
 
     DESCRIPTION="\tJEM Cartridge Manager module";
@@ -36,7 +36,12 @@
     function doUsage() {
         showUsageMessage;
     }
-
+    
+    function onModLoadCallback(){
+	decryptPassword $@
+    
+    }
+    
     function checkCartridgeDirectory(){
         [ ! -d  $CARTRIDGE_HOME ] && mkdir -p $CARTRIDGE_HOME;
     }
@@ -67,6 +72,7 @@
 
 
     function doInstall(){
+        set -- ${JEM_PARAMS[@]}
         parseArguments $@;
         checkCartridgeDirectory;
         NO_EXPECT="true";
@@ -91,6 +97,7 @@
 
 
     function doConfigure(){
+        set -- ${JEM_PARAMS[@]}
         parseArguments $@;
         configureEnvironment;
         generateCartDATA; 

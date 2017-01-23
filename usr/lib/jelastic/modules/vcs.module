@@ -18,7 +18,7 @@
 
 inherit default os envinfo;
 include uninterract output php-common-deploy string net;
-include cartridge-common;
+include cartridge-common decrypt-passwd;
 
 
 DESCRIPTION="Operations with VCS";
@@ -74,7 +74,8 @@ function recoverBrokenMountPoints(){
 }
 
 function parseArguments() {
-
+    decryptPassword $@
+    set -- ${JEM_PARAMS[@]}
   while [ "$1" != "" ]; do
     case $1 in
 

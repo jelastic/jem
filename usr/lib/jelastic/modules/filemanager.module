@@ -34,7 +34,7 @@ FS_DESTINATION="";
 FS_OVERWRITE="false";
 
 function onModLoadCallback(){
-    local temp=`getopt -o u:,s:,p:,d: -l user:,destinationpath:,sourcepath:,path: -- "$@" 2>>"$JEM_CALLS_LOG"`
+    local temp=`getopt -o u:,s:,p:,d:,o -l user:,destinationpath:,sourcepath:,path:,overwrite -- "$@" 2>>"$JEM_CALLS_LOG"`
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp"
     while true ; do
@@ -57,7 +57,7 @@ function onModLoadCallback(){
                 ;;
 	    -o|--overwrite)
                 FS_OVERWRITE="true"
-                shift 2;
+                shift ;
                 ;;
 
             --)
@@ -117,7 +117,8 @@ function doList(){
     fi
 
     val=$( su - $FS_USER -c "$JFINFO $(printf '%q' "${FS_PATH}") 2>/dev/null" 2>>${JEM_CALLS_LOG} );
-    writeJSONResponseOut "result=>0" "message=>Ok" "files=>[""${val%%,}""]"
+    writeJSONResponseOut "result=>0" "message=>Ok" "files=>[""$( $SED -re 's/\\/\\\\/g' <<<  ${val%%,})""]"
+
 }
 
 # FS_PATH:
@@ -189,10 +190,10 @@ function doCreate() {
     if [ "$result_code" -gt 0 ] ; then
         return $result_code;
     fi
-
     unitExists "$FS_PATH"; 
     unitRes=$?;
     if [ $unitRes -eq 0 -a "x${FS_OVERWRITE}" != "xtrue" ]; then
+
         writeJSONResponseErr "result=>4036" "message=>Path $FS_PATH already exists";
         return 36;
     fi
