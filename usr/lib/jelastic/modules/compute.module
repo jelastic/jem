@@ -23,7 +23,7 @@ DESCRIPTION="Compute node operations";
 
 [ -n "$deploy_module_inherit" ] && inherit "$deploy_module_inherit";
 [ -n "$replication_module_inherit" ] && include "$replication_module_inherit";
-include cartridge-common;
+include cartridge-common decrypt-passwd;
 
 DOWNLOADS='/var/cache/downloads';
 TMPCONF="/tmp/tmp.conf.$$";

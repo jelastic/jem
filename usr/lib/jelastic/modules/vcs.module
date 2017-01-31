@@ -74,8 +74,6 @@ function recoverBrokenMountPoints(){
 }
 
 function parseArguments() {
-    decryptPassword $@
-    set -- ${JEM_PARAMS[@]}
   while [ "$1" != "" ]; do
     case $1 in
 
@@ -124,6 +122,7 @@ function parseArguments() {
     esac
     shift
   done
+  PASSWORD=$(getPassword $PASSWORD);
   [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && {
     [ ! -z "$PROJECT_NAME" ] && { bundle_type="${PROJECT_NAME}" ;  PROJECT_NAME="ROOT"; } ;
   }
