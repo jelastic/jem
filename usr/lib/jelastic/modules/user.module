@@ -19,6 +19,7 @@
 inherit default config envinfo os;
 inherit ${gw_boost_lib_inherit};
 inherit extendperm;
+inherit vzexec;
 
 DESCRIPTION="Manipulate ssh keys, users";
 VERSION="1"
@@ -113,11 +114,35 @@ function __injected() {
 }
 
 function __processVDS(){
-    local envid=$1
-    CTID=$($GREP "$1" /vz/private/*/.vza/eid.conf |  $SED -re 's;/vz/private/([0-9]+)/.*;\1;')
+    CTID=$1
     inject doAdd 3i "return 0;"
     inject getAppUserInfo 3i "return 0;"
     inject doAdd 3i "__injected $CTID;"
+    return 0
+}
+
+function __injected_not_vds_add() {
+    CTID=$1
+    vzexecSetCTID ${CTID}
+    #vzctl exec ${_CTID} "jem user add"
+    vzexecRun jem user add
+    if [ "$(vzexecGetLastErrCode)" -eq 0 ]; then
+        _homedir="${prefix}$(vzexecGetLastStdOut | $SED -rn 's/.*["]homedir["]:[[:blank:]]*["]([^"]+)["].*/\1/p')"
+        DATA_OWNER="$(vzexecGetLastStdOut | $SED -rn 's/.*["]data_owner["]:[[:blank:]]*["]([^"]+)["].*/\1/p')"
+        _UID=${DATA_OWNER/:*}
+        _GUID=${DATA_OWNER/*:}
+        [ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
+        bashRestricts 2>>"$JEM_CALLS_LOG" && vzexecGetLastStdOut && return 0 || { writeJSONResponseErr "result=>4119" "message=>Can not fix user rights"; return 4119; }
+    else
+        writeJSONResponseErr "result=>4045" "message=>${vzexecGetLastStdErr}"
+    fi    
+}
+
+function __processNotVDS(){
+    CTID=$1
+    inject doAdd 3i "return 0;"
+    inject getAppUserInfo 3i "return 0;"
+    inject doAdd 3i "__injected_not_vds_add $CTID;"
     return 0
 }
 
@@ -152,10 +177,8 @@ function preAddCallback(){
 				-n|--new) _REGENERATE_KEY="yes";;
 				(--) shift; break;;
 				-e|--eid)
-				    __processVDS $2
-				    _UID=0
-				    _GUID=0
-				    shift;shift;break;;
+				    _EID="$2";
+				    shift;shift;;
 		    	esac
 	        	shift
 		done
@@ -163,6 +186,28 @@ function preAddCallback(){
 		log "Compute Type not gate."
 		_USERADD_OPT=" -M ";
 		_SUPPLEMENTARY_GROUPS="$_SSH_ACCESS_GROUP";
+        
+        if [ ! -z "${_EID}" ]; then
+            _CTID=$($GREP "${_EID}" /vz/private/*/.vza/eid.conf |  $SED -re 's;/vz/private/([0-9]+)/.*;\1;')
+            [[ -z "${_CTID}" ]] && {
+                writeJSONResponseErr "result=>4105" "message=>Container not found"
+                die -q
+            }
+            prefix=$($VZLIST $_CTID -Ho root)
+            [[ -z "${prefix}" ]] && {
+                writeJSONResponseErr "result=>4105" "message=>Container root dir not found"
+                die -q
+            }
+            if [ ! -f ${prefix}/etc/jelastic/metainf.conf ]; then
+                __processVDS ${_CTID}
+                _UID=0
+                _GUID=0
+            else
+                __processNotVDS ${_CTID}
+                _UID=700
+                _GUID=700
+            fi
+        fi
 	fi
 	isFunction "getAppUserInfo" && { log "Call getAppUserInfo"; "getAppUserInfo" "${_USER_NAME}"; } || {  writeJSONResponseErr "result=>4048" "message=>Can not get user info!"; die -q; };
 	[ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
@@ -205,7 +250,7 @@ function doAdd() {
 		result_code=$?;
 		if [ "$result_code" -eq 0 ]; then
 			#writeJSONResponseOut "result=>0" "message=>${_SSH_PRIVATE_KEY}"
-			echo "{\"result\":\"0\",\"message\":\"${_SSH_PRIVATE_KEY}\"}"
+			echo "{\"result\":\"0\",\"message\":\"${_SSH_PRIVATE_KEY}\", \"homedir\":\"${_homedir}\", \"data_owner\":\"${_UID}:${_GUID}\"}"
 		else
 			writeJSONResponseErr "result=>4106" "message=>${_REFORM_MESSAGE}"
 		fi

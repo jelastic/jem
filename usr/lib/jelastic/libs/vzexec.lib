@@ -40,10 +40,10 @@ function vzexecSetCTID() {
 # otherwise returns a code from called program
 function vzexecRun() {
     local buffer;
-    if [ -z "$__CTID" ] ; then
-        log "unknown __CTID. Please set it via vzexecSetCTID first";
-        return 99;
-    fi
+ #   if [ -z "$__CTID" ] ; then
+ #       log "unknown __CTID. Please set it via vzexecSetCTID first";
+ #       return 99;
+ #   fi
 
     local _tmperr
 
@@ -52,9 +52,25 @@ function vzexecRun() {
     __STDOUT=$( set -f ; $__EXEC $__CTID "$*" 2>$_tmperr; );
     __ERRCODE=$?
     __STDERR=$(<$_tmperr)
-    rm $_tmperr
+    rm -f $_tmperr
     [[ "$VERBOSE" -gt 0 ]] && echo -e "vzexec command: $*\nvzexec stdout:${__STDOUT}\nvzexec stderr:${__STDERR}" >> ${JEM_CALLS_LOG}
     return $__ERRCODE
+}
+
+#All needed defined variables should be passed
+#example:
+#> vzexecFunction function_ExtendPerm
+#or
+#> vzexecFunction function_ExtendPerm prefix=$prefix JEM_CALLS_LOG=/tmp/tmp.jem.log
+vzexecFunction(){
+    local functionname=${1//function_}
+    shift;
+    if isFunction "$functionname"; then
+        local funct="$(declare -f "$functionname")"
+        ( vzexecRun "$@; $funct; $functionname" )
+    else
+        return 255
+    fi
 }
 
 function vzexecGetLastStdErr() {

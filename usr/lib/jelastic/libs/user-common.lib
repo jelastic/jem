@@ -66,7 +66,7 @@ readonly HISTIGNORE
                         chown ${DATA_OWNER} "${_homedir}/${filename}"
                 }
 
-                chattr -f +a "${_homedir}/${filename}" 
+                chattr -f +a "${_homedir}/${filename}" || true
 
         done
         OIFS="${IFS}"
@@ -74,7 +74,7 @@ readonly HISTIGNORE
 
         IFS="${NIFS}"
         USER_BASHRC="${_homedir}/.bash_profile"
-        [ -f "${USER_BASHRC}" ] && { chattr -a "${USER_BASHRC}"; }
+        [ -f "${USER_BASHRC}" ] && { chattr -a "${USER_BASHRC}"; } || true
 
         for variable in $bashrcvar
         do
@@ -86,7 +86,7 @@ readonly HISTIGNORE
         done
         IFS="${OIFS}"
         chown ${DATA_OWNER} "${USER_BASHRC}"
-        chattr -f +a "${USER_BASHRC}"
+        chattr -f +a "${USER_BASHRC}" || true
 }
 
 function getAppUserInfo(){
