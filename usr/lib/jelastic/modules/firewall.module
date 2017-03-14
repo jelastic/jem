@@ -431,7 +431,7 @@ function doStart() {
 	echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
     log "saving rules";
-    /sbin/service iptables save | $GRAB_OUTPUT;
+    /sbin/service iptables save 2>/dev/null | $GRAB_OUTPUT;
     return 0;
 }
 
