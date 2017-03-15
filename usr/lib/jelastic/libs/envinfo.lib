@@ -211,6 +211,7 @@ case ${COMPUTE_TYPE} in
 		passwd_module_inherit="dummy-passwd";
 		dumper_module_inherit="dummy-dumper";
 		default_user="admin";
+	;;
 	storage)
 		MOUNT_DIR="/data";
 	;;
@@ -218,3 +219,4 @@ esac
 [ -e "/var/lib/jelastic/overrides/envinfo.lib" ] && source /var/lib/jelastic/overrides/envinfo.lib ;
 return 0;
 
+111
