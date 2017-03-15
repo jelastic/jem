@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -n "${VSFTPDLIB_VERSION:-}" ] && return 0;
+VSFTPDLIB_VERSION="0.1";
+
+
+include log;
+include output;
+
+PEM_KEY=/etc/vsftpd/vsftpd.pem
+STATE="US";
+CITY="Palo Alto";
+ORG="Jelastic, Inc";
+FTP_USERNAME="jelastic-ftp"; 
+SHELLS_FILE="/etc/shells";
+
+
+function setvsFtpCert(){
+[ -f "$PEM_KEY" ] && return 0;
+APPSERVER_USER_UID=$(id -u jelastic 2>/dev/null || echo 700 )
+chown -R  $APPSERVER_USER_UID $MOUNT_DIR 2>/dev/null;
+umask 77 ; echo "$COUNTRY
+$STATE
+$CITY
+$ORG
+$UNIT
+$HOST
+$IP
+$IP
+$EMAIL" |  openssl req -x509 -nodes -days 1826 -newkey rsa:1024  -keyout $PEM_KEY -out $PEM_KEY >> "$ACTIONS_LOG"  2>&1;
+        grep -q "/bin/false" "$SHELLS_FILE" || echo "/bin/false" >> $SHELLS_FILE ;
+        /usr/sbin/adduser -o --uid $APPSERVER_USER_UID --home-dir $MOUNT_DIR --shell /bin/false $FTP_USERNAME 2>/dev/null;
+        /sbin/chkconfig --add vsftpd --level 345 2>&1 1>/dev/null
+        chown root:root /etc/vsftpd/ -R >/dev/null  2>&1
+        /sbin/chkconfig  vsftpd on >/dev/null  2>&1
+        /sbin/service vsftpd restart;
+return 0;
+}

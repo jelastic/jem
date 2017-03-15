@@ -90,8 +90,12 @@ function doSetos(){
 		  esac
 		  shift
 		done
-	
+
 		[ -z "$password" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
+                [ "$user" == "jelastic-ftp" -a -d "/etc/vsftpd/" ] && {
+			include vsftpd;
+			setvsFtpCert;
+                }
 
  		echo "$user:$password" | $CHPASSWD > /dev/null 2>&1 && writeJSONResponseOut "result=>0" "message=>Password set succesfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
 
