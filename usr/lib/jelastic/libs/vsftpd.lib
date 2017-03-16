@@ -41,7 +41,7 @@ $UNIT
 $HOST
 $IP
 $IP
-$EMAIL" |  openssl req -x509 -nodes -days 1826 -newkey rsa:1024  -keyout $PEM_KEY -out $PEM_KEY >> "$ACTIONS_LOG"  2>&1;
+$EMAIL" |  openssl req -x509 -nodes -days 1826 -newkey rsa:1024  -keyout $PEM_KEY -out $PEM_KEY >/dev/null 2>&1;
         grep -q "/bin/false" "$SHELLS_FILE" || echo "/bin/false" >> $SHELLS_FILE ;
         /usr/sbin/adduser -o --uid $APPSERVER_USER_UID --home-dir $MOUNT_DIR --shell /bin/false $FTP_USERNAME 2>/dev/null;
         /sbin/chkconfig --add vsftpd --level 345 2>&1 1>/dev/null
