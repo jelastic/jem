@@ -18,6 +18,7 @@ OVERRIDE_DIR="/var/lib/jelastic/overrides/"
 extipchange_module_inherit="common-extipch-norestart";
 gw_boost_lib_inherit="user-common";
 DEPLOY_LOG="/dev/null";
+MOUNT_DIR="/var/ftp";
 
 case ${COMPUTE_TYPE} in
 	balancer)
