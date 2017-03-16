@@ -18,8 +18,7 @@
 VSFTPDLIB_VERSION="0.1";
 
 
-include log;
-include output;
+include log output os;
 
 PEM_KEY=/etc/vsftpd/vsftpd.pem
 STATE="US";
@@ -47,6 +46,6 @@ $EMAIL" |  openssl req -x509 -nodes -days 1826 -newkey rsa:1024  -keyout $PEM_KE
         /sbin/chkconfig --add vsftpd --level 345 2>&1 1>/dev/null
         chown root:root /etc/vsftpd/ -R >/dev/null  2>&1
         /sbin/chkconfig  vsftpd on >/dev/null  2>&1
-        /sbin/service vsftpd restart;
+        restartServiceSilent vsftpd ;
 return 0;
 }
