@@ -28,18 +28,27 @@ FTP_USERNAME="jelastic-ftp";
 SHELLS_FILE="/etc/shells";
 
 
+
+
+
+
 function setvsFtpCert(){
-[ -f "$PEM_KEY" ] && return 0;
-APPSERVER_USER_UID=$(id -u jelastic 2>/dev/null || echo 700 )
-chown -R  $APPSERVER_USER_UID $MOUNT_DIR 2>/dev/null;
+    APPSERVER_USER_UID=$(id -u jelastic 2>/dev/null || echo 700 )
+    chown -R  $APPSERVER_USER_UID $MOUNT_DIR 2>/dev/null;
+
+    [ -d "/var/ftp/pub" ]  && rmdir "/var/ftp/pub/" >/dev/null 2>&1;
+    [ -f /usr/lib/systemd/system/vsftpd.service ] && rm -f /usr/lib/systemd/system/vsftpd.service >/dev/null 2>&1;
+    [ -f /usr/lib/systemd/system/vsftpd.target ] && rm -f /usr/lib/systemd/system/vsftpd.target >/dev/null 2>&1;
+    [ -f /usr/lib/systemd/system/vsftpd@.service ] && rm -f /usr/lib/systemd/system/vsftpd@.service >/dev/null 2>&1;
+    systemctl daemon-reload > /dev/null ;
+    cp -f /etc/vsftpd/vsftpd.conf.tpl /etc/vsftpd/vsftpd.conf;
+
 umask 77 ; echo "$COUNTRY
 $STATE
 $CITY
 $ORG
 $UNIT
 $HOST
-$IP
-$IP
 $EMAIL" |  openssl req -x509 -nodes -days 1826 -newkey rsa:1024  -keyout $PEM_KEY -out $PEM_KEY >/dev/null 2>&1;
         grep -q "/bin/false" "$SHELLS_FILE" || echo "/bin/false" >> $SHELLS_FILE ;
         /usr/sbin/adduser -o --uid $APPSERVER_USER_UID --home-dir $MOUNT_DIR --shell /bin/false $FTP_USERNAME 2>/dev/null;
