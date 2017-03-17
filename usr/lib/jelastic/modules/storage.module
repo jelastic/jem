@@ -36,7 +36,7 @@ declare -i CTID=""
 declare -i _MOVEDATA=0
 declare _SOURCE=""
 declare _DESTINATION=""
-declare _DEFAULT_NFS_MOUNT_OPTS="soft,intr,udp,nolock,vers=3"
+declare _DEFAULT_NFS_MOUNT_OPTS="soft,timeo=120,retrans=3,udp,nolock,vers=3"
 declare CONTAINER_MOUNTS_STORAGE="/etc/fstab"
 declare _IPLIST
 declare -a UNKNOWN_ARG

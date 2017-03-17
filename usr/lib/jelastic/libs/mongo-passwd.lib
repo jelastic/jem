@@ -68,8 +68,15 @@ function setPassword() {
 	 	   echo "rm $MONGOLOCK 1 " 1>>$LOG_FILE 2>&1
 	    
 		fi
-		$SED -i 's/^auth\s*=\s*true/\#auth = true/' $mongo_conf
+		val=$(sed 's/\.//' <<< $COMPUTE_TYPE_FULL_VERSION )
+		[ -z "$val" ] && val=0 ;
+		if [ "x$COMPUTE_TYPE" == "xmongodb" -a $val -ge 32  ] ; then
+		    $SED -i  '/authorization:/s/\s*enabled/ disabled/' $mongo_conf
+		else
+		    $SED -i 's/^auth\s*=\s*true/\#auth = true/' $mongo_conf
+		fi
 		startService ${SERVICE} >> $LOG_FILE  2>&1
+
 		sleep 1
 		for ADB in $ADMINDB
 		do
@@ -108,8 +115,11 @@ function setPassword() {
 	  	  	rm -f $MONGOLOCK 1>>$LOG_FILE 2>&1
 	  	  	echo "rm $MONGOLOCK 1 " 1>>$LOG_FILE 2>&1
 		fi
-
-		$SED -i 's/^\#auth\s*=\s*true/auth = true/' $mongo_conf
+		if [ "x$COMPUTE_TYPE" == "xmongodb" -a $val -ge 32  ] ; then
+		    $SED -i '/authorization:/s/\s*disabled/ enabled/' $mongo_conf
+		else
+		    $SED -i 's/^\#auth\s*=\s*true/auth = true/' $mongo_conf
+		fi
 		startService ${SERVICE} >> $LOG_FILE 2>&1
 }
 

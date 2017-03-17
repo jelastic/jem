@@ -162,7 +162,8 @@ function doRun() {
 
     echo "$INCLUDE_LIST1" >> "$EXPORT_LIST_FILE";
     echo "$EXCLUDE_LIST" >> "$EXCLUDE_LIST_FILE";
-
+    [ -z "${_homedir}" ] || echo "${_homedir}/.ssh/*" >> "$EXCLUDE_LIST_FILE";
+    
     [ ! -d "$DESTINATION" ] && { mkdir -p "$DESTINATION";  }
     TAR_OPTS=" --warning=none -P --ignore-failed-read"
 

@@ -424,7 +424,7 @@ function doStart() {
 
     $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited;
     [ ${COMPUTE_TYPE} == "cartridge" ] && {
-    [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh";
+    [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" >>$JEM_CALLS_LOG 2>&1;
     }
 
     [ -f "${CUSTOM_RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${CUSTOM_RULES_FILE}" 2>>$ACTIONS_LOG ;

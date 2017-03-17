@@ -22,8 +22,10 @@ NODEJS010_DIR="/opt/jelastic-nodejs0.10";
 NODEJS012_DIR="/opt/jelastic-nodejs0.12";
 NODEJS42_DIR="/opt/jelastic-nodejs4.2";
 NODEJS43_DIR="/opt/jelastic-nodejs4.3";
+NODEJS45_DIR="/opt/jelastic-nodejs4.5";
 NODEJS51_DIR="/opt/jelastic-nodejs5.1";
-NODEJS56_DIR="/opt/jelastic-nodejs5.6"; 
+NODEJS56_DIR="/opt/jelastic-nodejs5.6";
+NODEJS65_DIR="/opt/jelastic-nodejs6.5";
 
 NODEJS_DEFAULT_CLI="/usr/bin/node";
 NODEJS_DEFAULT_NMP="/usr/bin/npm";
@@ -46,11 +48,17 @@ function switchEngine(){
                 "nodejs4.3" )
                  local nodejs_dir=$NODEJS43_DIR;
         ;;
-	        "nodejs5.1" )
+                "nodejs4.5" )
+                 local nodejs_dir=$NODEJS45_DIR;
+        ;;
+                "nodejs5.1" )
                  local nodejs_dir=$NODEJS51_DIR;
         ;;
                 "nodejs5.6" )
                  local nodejs_dir=$NODEJS56_DIR;
+        ;;
+                "nodejs6.5" )
+                 local nodejs_dir=$NODEJS65_DIR;
         ;;
         *)
         return 1
@@ -60,8 +68,10 @@ function switchEngine(){
         [ -d "$NODEJS012_DIR" ] && chown -R ${DATA_OWNER} "$NODEJS012_DIR" 2>>"$JEM_CALLS_LOG";
         [ -d "$NODEJS42_DIR" ] && chown -R ${DATA_OWNER} "$NODEJS42_DIR" 2>>"$JEM_CALLS_LOG";
         [ -d "$NODEJS43_DIR" ] && chown -R ${DATA_OWNER} "$NODEJS43_DIR" 2>>"$JEM_CALLS_LOG";
-	[ -d "$NODEJS51_DIR" ] && chown -R ${DATA_OWNER} "$NODEJS51_DIR" 2>>"$JEM_CALLS_LOG";
+        [ -d "$NODEJS45_DIR" ] && chown -R ${DATA_OWNER} "$NODEJS45_DIR" 2>>"$JEM_CALLS_LOG";
+        [ -d "$NODEJS51_DIR" ] && chown -R ${DATA_OWNER} "$NODEJS51_DIR" 2>>"$JEM_CALLS_LOG";
         [ -d "$NODEJS56_DIR" ] && chown -R ${DATA_OWNER} "$NODEJS56_DIR" 2>>"$JEM_CALLS_LOG";
+        [ -d "$NODEJS65_DIR" ] && chown -R ${DATA_OWNER} "$NODEJS65_DIR" 2>>"$JEM_CALLS_LOG";
 
         nodejs_bin="${nodejs_dir}/bin/node";
         [ -L "$NODEJS_DEFAULT_CLI" ] && rm "$NODEJS_DEFAULT_CLI";
@@ -72,7 +82,7 @@ function switchEngine(){
         [ -L "$NODEJS_DEFAULT_NMP" ] && rm "$NODEJS_DEFAULT_NMP";
         [ -d "$nodejs_dir" ] && ln -sf "${nodejs_npm}" "$NODEJS_DEFAULT_NMP";
         ln -sf  "${nodejs_dir}/lib/node_modules/supervisor/lib/cli-wrapper.js"   "/usr/bin/supervisor"
-	restartServiceSilent $SERVICE;
+        restartServiceSilent $SERVICE;
 }
 
 

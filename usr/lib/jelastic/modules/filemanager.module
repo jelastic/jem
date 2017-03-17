@@ -117,7 +117,7 @@ function doList(){
     fi
 
     val=$( su - $FS_USER -c "$JFINFO $(printf '%q' "${FS_PATH}") 2>/dev/null" 2>>${JEM_CALLS_LOG} );
-    writeJSONResponseOut "result=>0" "message=>Ok" "files=>[""$( $SED -re 's/\\/\\\\/g' <<<  ${val%%,})""]"
+    writeJSONResponseOut "result=>0" "message=>Ok" "files=>[""$( $SED -re 's/\\([^"])/\\\\\1/g'  <<<  ${val%%,})""]"
 
 }
 

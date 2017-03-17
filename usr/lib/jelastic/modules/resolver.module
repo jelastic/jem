@@ -35,6 +35,7 @@ SLB_MYSQL_HOST="${SLB_MYSQL_HOST:="127.0.0.1"}"
 ZONE_TYPE='both';
 
 $PROGRAM 'grep'
+$PROGRAM 'curl'
 
 function checkParams() {
     local params=($*)
@@ -152,6 +153,14 @@ function doRemoveZone() {
 
     restartNamed
     return 0;
+}
+
+function doDelUpstream() {
+    local requiredParqams=("ZONE_NAME")
+    local msg=$(checkParams ${requiredParqams[@]})
+
+    msg=$($CURL -X DELETE "http://127.0.0.1:8666/upstream/${ZONE_NAME}")
+    return 0
 }
 
 defineBigInline ZONE_EXTERNAL_TPL <<'EOF'

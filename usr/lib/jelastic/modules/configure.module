@@ -16,7 +16,7 @@
 
 
 
-inherit default os envinfo;
+inherit default os envinfo vzexec virtuozzo;
 include output net;
 
 $PROGRAM 'sed';
@@ -29,6 +29,42 @@ DEFAULT_ACTION="Usage";
 
 function doUsage() {
     showUsageMessage;
+}
+
+function checkParams() {
+    local params=($*)
+    local result=""
+    for p in ${params[*]} ; do
+        eval "[[ -z \"\$$p\" ]] && { result=\"$p $result\";}"
+    done
+    [[ -z "$result" ]] && return 0;
+    echo $result;
+    return 1;
+}
+
+function onModLoadCallback() {
+    log "Preload callback";
+
+    local temp=`getopt -o c: -l ctid: -- "$@" 2>/dev/null`;
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp";
+
+    while true ; do
+        case "$1" in
+            -c | --ctid)
+                shift;
+                CTID=$1
+                vzexecSetCTID ${CTID}
+                shift;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+    done;
+    for arg do UNKNOWN_ARG+=("$arg") ; done
+    log "${UNKNOWN_ARG[*]}"
 }
 
 function doSetTechEmail(){
@@ -50,6 +86,33 @@ function doExtIpChanged(){
     writeJSONResponseOut "result=>0" "message=>Ok"
 }
 
+function doIpChanged() {
+    local vzcomment='# Auto-generated hostname. Please do not remove this comment.'
+    local requiredParqams=("CTID")
+    local msg=$(checkParams ${requiredParqams[@]})
+    [[ ! -z "${msg}" ]] && { writeJSONResponseErr "result=>4099" "message=>Missing param $msg" ; return 99; }
+
+    #remove line after "VZMarker"
+    vzexecRun 'sed -i -re "/'$vzcomment'/{N;d}" /etc/hosts'
+
+    #get new ip address
+    vzexecRun 'ip r get 8.8.8.8 | sed -rne "/src/s/(.*)src\ (.*)/\2/p"'
+    newIp=$(vzexecGetLastStdOut)
+
+    #get hosname
+    vzexecRun 'hostname -f'
+    fullHostname=$(vzexecGetLastStdOut)
+    vzexecRun 'hostname -s'
+    shortHostname=$(vzexecGetLastStdOut)
+    newHostsLine="$vzcomment\n$newIp $fullHostname $shortHostname\n"
+    echo -e $newHostsLine >> "/vz/root/${CTID}/etc/hosts"
+
+    #cleanup empty lines :)
+    vzexecRun 'sed -i -e "/^$/d" /etc/hosts'
+
+    writeJSONResponseOut "result=>0" "message=>Ok"
+}
+
 function doOption(){
     OPTION_ENABLED=0;
     while [ "$1" != "" ];
@@ -57,9 +120,9 @@ function doOption(){
         case $1 in
             -o| --option ) shift
                 MANAGE_OPTION=$( tr '[:lower:]' '[:upper:]'  <<< $1 ) ;;
-            -e| --enable ) 
+            -e| --enable )
                 OPTION_ENABLED=1 ;;
-            -d| --disable ) 
+            -d| --disable )
                 OPTION_ENABLED=0 ;;
         esac
         shift

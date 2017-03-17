@@ -40,10 +40,6 @@ function vzexecSetCTID() {
 # otherwise returns a code from called program
 function vzexecRun() {
     local buffer;
- #   if [ -z "$__CTID" ] ; then
- #       log "unknown __CTID. Please set it via vzexecSetCTID first";
- #       return 99;
- #   fi
 
     local _tmperr
 
