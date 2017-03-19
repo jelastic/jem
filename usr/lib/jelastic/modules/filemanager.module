@@ -95,6 +95,11 @@ function dirRead(){
     return 0;
 }
 
+function doExtendPerm(){
+    ExtendPerm;
+    return 0;
+}
+
 function doList(){
     ExtendPerm ;
     checkUser ;
