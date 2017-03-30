@@ -28,6 +28,8 @@ include cartridge-common decrypt-passwd;
 DOWNLOADS='/var/cache/downloads';
 TMPCONF="/tmp/tmp.conf.$$";
 
+sourceOverride;
+
 $PROGRAM 'wget';
 $PROGRAM 'unzip';
 $PROGRAM 'tar';
@@ -257,8 +259,9 @@ function doSetAdminPassword(){
     set -- ${JEM_PARAMS[@]}
 
     local password=$1;
-    doAction passwd set "$password";
+    doAction passwd set -p "$password";
 }
+
 function doInternalCall(){
 	$glassfish_tools $@ ;
 }

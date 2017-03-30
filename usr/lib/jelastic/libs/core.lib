@@ -285,6 +285,16 @@ function stopJemThreadQueueManager(){
           rm -f $jempidfile
     }
 }
+function sourceOverride(){
+    [ -d "$OVERRIDE_DIR" ] && [  $(ls -1 ${OVERRIDE_DIR}/*.lib 2>/dev/null | wc -l ) -gt 0 ] && {
+    # [  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -eq 0 ] && return 0;
+        for override_lib in $(ls ${OVERRIDE_DIR}/*.lib)
+        do
+            source $override_lib;
+        done
+    }
+}
+
 
 function doAction() {
     local action="${1##--}" modfile="" subaction="${2##--}" ;
@@ -314,13 +324,7 @@ function doAction() {
             [[ -z ${subaction} ]] && die -q "Action ${subaction} unknown";
             # [[ "$@" == "help" ]] && { "showActionHelp" "$subaction"; return 0; }
             [[ "$@" == "help" ]] && { isFunction "showActionHelp" && "showActionHelp" "$subaction"; return 0; }
-            [ -d "$OVERRIDE_DIR" ] && [  $(ls -1 ${OVERRIDE_DIR}/*.lib 2>/dev/null | wc -l ) -gt 0 ] && {
-                # [  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -eq 0 ] && return 0;
-                for override_lib in $(ls ${OVERRIDE_DIR}/*.lib)
-                do
-                    source $override_lib;
-                done
-            }
+	    sourceOverride;
             isFunction "pre${subaction}Callback" && "pre${subaction}Callback" "$@";
             checkDo "do${subaction}" "$@";
             result=$?;
