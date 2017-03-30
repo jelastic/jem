@@ -19,7 +19,7 @@ JAVACOMMONDEPLOYLIB_VERSION="0.1";
 $PROGRAM 'grep';
 
 
-[ ! -d "$WEBROOT" ] && mkdir -p ${WEBROOT};
+[ ! -z "$WEBROOT" -a ! -d "$WEBROOT" ] && mkdir -p ${WEBROOT};
 
 [ ${COMPUTE_TYPE} == "tomee" ] && COMPUTE_TYPE="tomcat" ;
 [ -e "${MANAGE_CORE_PATH}/${COMPUTE_TYPE}"-deploy.lib ] && { include ${COMPUTE_TYPE}-deploy; }
