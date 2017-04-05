@@ -36,7 +36,7 @@ declare -i CTID=""
 declare -i _MOVEDATA=0
 declare _SOURCE=""
 declare _DESTINATION=""
-declare _DEFAULT_NFS_MOUNT_OPTS="soft,timeo=120,retrans=3,udp,nolock,vers=3"
+declare _DEFAULT_NFS_MOUNT_OPTS="soft,timeo=120,retrans=3,udp,nolock,vers=3,_netdev"
 declare CONTAINER_MOUNTS_STORAGE="/etc/fstab"
 declare _IPLIST
 declare -a UNKNOWN_ARG
@@ -332,7 +332,7 @@ function dosetupUtils() {
         vzexecRun "rc-update add netmount default"
         return 0
     fi
-    $TAR zxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
+    $TAR hzxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
 
     if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
         vzexecRun "chkconfig netfs on"
