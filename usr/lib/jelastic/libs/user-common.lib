@@ -90,7 +90,7 @@ readonly HISTIGNORE
 }
 
 function getAppUserInfo(){
-	# return 0;
+	skipBashRestricts=$1;
         [ ! -z "${DATA_OWNER}" ] && {
 		local _appuser=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
 		local _appgroup=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
@@ -117,7 +117,7 @@ function getAppUserInfo(){
                 _homedir=$( getent passwd "${_appuser}" | cut -d: -f6 )
             ;;
         esac
-        bashRestricts;
+        [ "x${skipBashRestricts}" == "xskipBashRestricts" ] || bashRestricts;
 		#check if not empty
 	}
 	# || retern error

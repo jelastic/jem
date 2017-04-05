@@ -125,7 +125,7 @@ function doRun() {
 	done
 	IFS=$OLDIFS
     fi
-    getAppUserInfo ;
+    getAppUserInfo skipBashRestricts;
     if [ "x$EXPORT_DATA" == "xyes" ]; then
 	[ ! -z "$DB_DATA_DIR" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${DB_DATA_DIR}"; }
 	[ ! -z "$WEBROOT" ] && { INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${WEBROOT}"; }
