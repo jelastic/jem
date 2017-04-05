@@ -581,7 +581,7 @@ function doDisable() {
         chkconfig iptables off 2>&1 | $GRAB_OUTPUT;
         echo "Firewall disabled";
         _setDefaultPolicy "ACCEPT";
-        $IPTABLES -F INPUT; service iptables save > /dev/null;
+        $IPTABLES -F INPUT; service iptables save &> /dev/null;
         return 0;
     } || {
         echo "Error: No metadata found!";
