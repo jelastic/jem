@@ -312,7 +312,7 @@ function doAction() {
     actiontimeout=3600
     _moduleaction="${action}${subaction}"
     #read the timeouts from config file
-    eval "$($SED -re '/(^\s*$)/d;s/(.*)/declare -x \L\1/g' '/etc/jelastic/timeouts.conf')"
+    eval "$($SED -re '/^#/d;/^(\s*)$/d;s/(.*)/declare -x \L\1/g' '/etc/jelastic/timeouts.conf')"
     eval "actiontimeout_cfg=\$${_moduleaction}"
     if [ ! -z "${actiontimeout_cfg}" ] ; then
        actiontimeout="${actiontimeout_cfg}"
