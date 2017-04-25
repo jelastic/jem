@@ -17,7 +17,7 @@
 [ -n "${CORELIB_VERSION:-}" ] && return 0;
 CORELIB_VERSION="0.1";
 
-OVERRIDE_DIR="/var/lib/jelastic/overrides/"
+declare -x OVERRIDE_DIR="/var/lib/jelastic/overrides/"
 
 DEBUG=${DEBUG:=0};
 PROGRAM='searchProg';
@@ -308,8 +308,17 @@ function doAction() {
         MANAGE_COMMAND="${MANAGE_BINARY_NAME##*/}";
     }
     declare -x result;
+    #default timeout for all actions is 1hr
+    actiontimeout=3600
+    _moduleaction="${action}${subaction}"
+    #read the timeouts from config file
+    eval "$($SED -re '/(^\s*$)/d;s/(.*)/declare -x \L\1/g' '/etc/jelastic/timeouts.conf')"
+    eval "actiontimeout_cfg=\$${_moduleaction}"
+    if [ ! -z "${actiontimeout_cfg}" ] ; then
+       actiontimeout="${actiontimeout_cfg}"
+    fi
     modfile=$(_manageFindModule "${action}");
-    (
+    timeout $actiontimeout cat <(
 
         source "$MANAGE_DEFAULT_ACTIONS" 2>/dev/null || die "Couldn't source ${MANAGE_DEFAULT_ACTIONS}";
         source "${modfile}" 2>/dev/null || die "Couldn't source ${modfile}";
@@ -343,6 +352,7 @@ function doAction() {
         echo ":[FAIL]      [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
         # stopJemThreadQueueManager;
         # [[ $actionResult -gt 5000 ]] && _manageDoHelp;
+        [[ $actionResult -eq 124 ]] && echo "{\"result\":99, \"Message\": \"Execution timed out\"}"
         return ${actionResult};
     };
     echo ":[SUCCESS]   [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
