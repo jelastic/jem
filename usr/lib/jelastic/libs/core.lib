@@ -17,7 +17,7 @@
 [ -n "${CORELIB_VERSION:-}" ] && return 0;
 CORELIB_VERSION="0.1";
 
-OVERRIDE_DIR="/var/lib/jelastic/overrides/"
+declare -x OVERRIDE_DIR="/var/lib/jelastic/overrides/"
 
 DEBUG=${DEBUG:=0};
 PROGRAM='searchProg';
@@ -285,6 +285,15 @@ function stopJemThreadQueueManager(){
           rm -f $jempidfile
     }
 }
+function sourceOverride(){
+    [ -d "$OVERRIDE_DIR" ] && [  $(ls -1 ${OVERRIDE_DIR}/*.lib 2>/dev/null | wc -l ) -gt 0 ] && {
+    # [  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -eq 0 ] && return 0;
+        for override_lib in $(ls ${OVERRIDE_DIR}/*.lib)
+        do
+            source $override_lib;
+        done
+    }
+}
 
 function doAction() {
     local action="${1##--}" modfile="" subaction="${2##--}" ;
@@ -298,8 +307,17 @@ function doAction() {
         MANAGE_COMMAND="${MANAGE_BINARY_NAME##*/}";
     }
     declare -x result;
+    #default timeout for all actions is 1hr
+    actiontimeout=3600
+    _moduleaction="${action}${subaction}"
+    #read the timeouts from config file
+    eval "$($SED -re '/^#/d;/^(\s*)$/d;s/(.*)/declare -x \L\1/g' '/etc/jelastic/timeouts.conf')"
+    eval "actiontimeout_cfg=\$${_moduleaction}"
+    if [ ! -z "${actiontimeout_cfg}" ] ; then
+       actiontimeout="${actiontimeout_cfg}"
+    fi
     modfile=$(_manageFindModule "${action}");
-    (
+    timeout $actiontimeout cat <(
 
         source "$MANAGE_DEFAULT_ACTIONS" 2>/dev/null || die "Couldn't source ${MANAGE_DEFAULT_ACTIONS}";
         source "${modfile}" 2>/dev/null || die "Couldn't source ${modfile}";
@@ -314,13 +332,7 @@ function doAction() {
             [[ -z ${subaction} ]] && die -q "Action ${subaction} unknown";
             # [[ "$@" == "help" ]] && { "showActionHelp" "$subaction"; return 0; }
             [[ "$@" == "help" ]] && { isFunction "showActionHelp" && "showActionHelp" "$subaction"; return 0; }
-            [ -d "$OVERRIDE_DIR" ] && [  $(ls -1 ${OVERRIDE_DIR}/*.lib 2>/dev/null | wc -l ) -gt 0 ] && {
-                # [  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -eq 0 ] && return 0;
-                for override_lib in $(ls ${OVERRIDE_DIR}/*.lib)
-                do
-                    source $override_lib;
-                done
-            }
+	    sourceOverride;
             isFunction "pre${subaction}Callback" && "pre${subaction}Callback" "$@";
             checkDo "do${subaction}" "$@";
             result=$?;
@@ -339,6 +351,7 @@ function doAction() {
         echo ":[FAIL]      [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
         # stopJemThreadQueueManager;
         # [[ $actionResult -gt 5000 ]] && _manageDoHelp;
+        [[ $actionResult -eq 124 ]] && echo "{\"result\":99, \"Message\": \"Execution timed out\"}"
         return ${actionResult};
     };
     echo ":[SUCCESS]   [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
