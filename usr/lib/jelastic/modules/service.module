@@ -88,6 +88,11 @@ function doStart(){
     startService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; writeJSONResponseOut "result=>$?" "message=>Service been started with code $?";
 }
 
+function doEnable(){
+    [ ! -z "$1" ] && SERVICE=$1;
+    enableService "$SERVICE" 2345 0 >> "$ACTIONS_LOG"  2>&1 ; writeJSONResponseOut "result=>$?" "message=>Service been started with code $?";
+}
+
 function postRestartCallback(){
     ExtendPerm ;
 }
