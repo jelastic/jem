@@ -90,7 +90,7 @@ function doRebuildCommon(){
     isFunction "_rebuild_common" && lrebuildCommon="_rebuild_common" #must be removed after the cartridge support is finished
     "$lrebuildCommon" ;
     [ "$?" -eq 0 ] && {
-        doAction "firewall" "fwreconfigure";
+        msg=$(doAction "firewall" "fwreconfigure");
         writeJSONResponseOut "result=>0" "message=>Configuration applied!"; return 0;
     }|| { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
 }
