@@ -52,7 +52,6 @@ function getMavenParam() {
 declare -x MAVEN_OPTS=$(getMavenParam $free_mem)
 
 function parseArguments() {
-
     decryptPassword $@;
     set -- ${JEM_PARAMS[@]};
 while [ "$1" != "" ]; do

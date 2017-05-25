@@ -217,6 +217,7 @@ case ${COMPUTE_TYPE} in
 		MOUNT_DIR="/data";
 	;;
 esac
+
 [ -e "/var/lib/jelastic/overrides/envinfo.lib" ] && source /var/lib/jelastic/overrides/envinfo.lib ;
 return 0;
 

@@ -17,6 +17,8 @@
 [ -n "${GLASSFISHSSLLIB_VERSION:-}" ] && return 0;
 GLASSFISHSSLLIB_VERSION="0.1";
 
+[ -e /etc/jelastic/metainf.conf ] && source /etc/jelastic/metainf.conf
+
 $PROGRAM 'sed';
 _ASADMIN="/opt/glassfish3/bin/asadmin";
 PASS_FILE="/var/lib/jelastic/glalssfish/gfpass";
@@ -28,9 +30,9 @@ DEFAULT_DOMAIN="jelastic";
 CLUSTER_ROLE_FILE="/root/scripts/role";
 JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:bin/java::");
 _KEYTOOL="${JAVA_HOME}/bin/keytool";
-GF_KEYSTORE="/opt/glassfish3/glassfish/domains/domain1/config/keystore.jks";
-GF_KEYSTORE_ORIG="/opt/glassfish3/glassfish/domains/domain1/config/keystore.jks.orig";
-DAS_MAIN_CONFIG="/opt/glassfish3/glassfish/domains/domain1/config/domain.xml"
+GF_KEYSTORE="/opt/glassfish${COMPUTE_TYPE_VERSION}/glassfish/domains/domain1/config/keystore.jks";
+GF_KEYSTORE_ORIG="/opt/glassfish${COMPUTE_TYPE_VERSION}/glassfish/domains/domain1/config/keystore.jks.orig";
+DAS_MAIN_CONFIG="/opt/glassfish${COMPUTE_TYPE_VERSION}/glassfish/domains/domain1/config/domain.xml"
 
 
 function runAsadminCmd(){

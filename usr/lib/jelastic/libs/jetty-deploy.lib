@@ -74,7 +74,7 @@ function applyPreDeploy(){
 }
 
 function applyPostDeploy(){
-	applyWadiSettings $context;
+	[ ${COMPUTE_TYPE_VERSION} == "6" ] && applyWadiSettings $context;
 }
 
 function applyPreUndeploy(){
@@ -84,8 +84,8 @@ function applyPreUndeploy(){
 
 function applyPostUndeploy(){
 	rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${context}*
-        rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_*/webapp/${context}.war ;
-	removeWadiSettings $context;
+    rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_*/webapp/${context}.war ;
+	[ ${COMPUTE_TYPE_VERSION} == "6" ] && removeWadiSettings $context;
 }
 
 function applyPreRename(){
@@ -97,6 +97,6 @@ function applyPreRename(){
 function applyPostRename(){
 	rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}.war*
 	rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}*
-	removeWadiSettings $oldContext;
-	applyWadiSettings $newContext;
+	[ ${COMPUTE_TYPE_VERSION} == "6" ] &&  removeWadiSettings $oldContext;
+	[ ${COMPUTE_TYPE_VERSION} == "6" ] &&  applyWadiSettings $newContext;
 }

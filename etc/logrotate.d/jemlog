@@ -1,5 +1,6 @@
 /var/log/jem.log {
     missingok
+    size 100M
     compress
     weekly
     rotate 4

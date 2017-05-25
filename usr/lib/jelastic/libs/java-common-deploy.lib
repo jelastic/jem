@@ -42,7 +42,7 @@ function verifyUnpackedContent(){
                     content_path="${WEBROOT}/${context}";
         };
 
-        [ ${COMPUTE_TYPE} == "jetty" ] && { 
+        [ ${COMPUTE_TYPE} == "jetty" ] && [ ${COMPUTE_TYPE_VERSION} == "6" ] && { 
                     local jetty_context_dir=$(ls -1 ${WORKDIR}/ | $GREP ${context} | head -n 1);
                     [ ! -z $jetty_context_dir  ] &&  content_path="${WORKDIR}/${jetty_context_dir}" || content_path="NoPath";
         };

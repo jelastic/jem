@@ -307,6 +307,7 @@ function doAction() {
         MANAGE_COMMAND="${MANAGE_BINARY_NAME##*/}";
     }
     declare -x result;
+
     #default timeout for all actions is 1hr
     actiontimeout=3600
     _moduleaction="${action}${subaction}"

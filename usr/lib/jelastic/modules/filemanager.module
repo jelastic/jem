@@ -95,6 +95,11 @@ function dirRead(){
     return 0;
 }
 
+function doExtendPerm(){
+    ExtendPerm;
+    return 0;
+}
+
 function doList(){
     ExtendPerm ;
     checkUser ;
@@ -116,9 +121,7 @@ function doList(){
         fi
     fi
 
-    val=$( su - $FS_USER -c "$JFINFO $(printf '%q' "${FS_PATH}") 2>/dev/null" 2>>${JEM_CALLS_LOG} );
-    writeJSONResponseOut "result=>0" "message=>Ok" "files=>[""$( $SED -re 's/\\/\\\\/g' <<<  ${val%%,})""]"
-
+    su - $FS_USER -c "$JFINFO $(printf '%q' "${FS_PATH}") 2>/dev/null" 2>>${JEM_CALLS_LOG};
 }
 
 # FS_PATH:
@@ -190,7 +193,7 @@ function doCreate() {
     if [ "$result_code" -gt 0 ] ; then
         return $result_code;
     fi
-    unitExists "$FS_PATH"; 
+    unitExists "$FS_PATH";
     unitRes=$?;
     if [ $unitRes -eq 0 -a "x${FS_OVERWRITE}" != "xtrue" ]; then
 

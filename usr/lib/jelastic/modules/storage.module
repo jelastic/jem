@@ -36,7 +36,7 @@ declare -i CTID=""
 declare -i _MOVEDATA=0
 declare _SOURCE=""
 declare _DESTINATION=""
-declare _DEFAULT_NFS_MOUNT_OPTS="soft,intr,udp,nolock,vers=3"
+declare _DEFAULT_NFS_MOUNT_OPTS="soft,timeo=120,retrans=3,udp,nolock,vers=3,_netdev"
 declare CONTAINER_MOUNTS_STORAGE="/etc/fstab"
 declare _IPLIST
 declare -a UNKNOWN_ARG
@@ -224,6 +224,7 @@ function processnfs() {
                     out=$($SED -i -re "$cmdUnregisterMount" ${MOUNTS_STORAGE} 2>&1)
                 fi
                 log $out
+                msg="${msg}. Server IP is: $(host ${sourceIP}), RPC connection: $(timeout 1 bash -c "cat < /dev/null > /dev/tcp/${sourceIP}/111"; echo $?)"
                 res=4111
             else
                 res=0
@@ -332,7 +333,7 @@ function dosetupUtils() {
         vzexecRun "rc-update add netmount default"
         return 0
     fi
-    $TAR zxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
+    $TAR hzxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
 
     if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
         vzexecRun "chkconfig netfs on"

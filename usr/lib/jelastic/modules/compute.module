@@ -21,8 +21,8 @@ VERSION="1";
 DEFAULT_ACTION="Usage";
 DESCRIPTION="Compute node operations";
 
-[ -n "$deploy_module_inherit" ] && inherit "$deploy_module_inherit";
-[ -n "$replication_module_inherit" ] && include "$replication_module_inherit";
+inherit "$deploy_module_inherit";
+include "$replication_module_inherit";
 include cartridge-common decrypt-passwd;
 
 DOWNLOADS='/var/cache/downloads';
@@ -119,17 +119,13 @@ function doDeploy(){
         "$ldeploy" "$package_url" "$context" "$ext" >> "$ACTIONS_LOG"  2>&1 &&  service cartridge build >>  "$ACTIONS_LOG"  2>&1  && service cartridge deploy >> "$ACTIONS_LOG"  2>&1 && { writeJSONResponseOut "result=>0" "message=>Application deployed successfully"; return 0 ; } || { writeJSONResponseErr "result=>4060" "message=>Deploy failed"; return 1; } ;
     }
 
-    if isFunction "deploy"; then
-         deploy "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" && writeJSONResponseOut "result=>0" "message=>Applicat    ion deployed successfully" || {
-         result=$?;
-         [ $result -eq 156 ] && result=4078;
-         [ $result -eq 56  ] && result=4071;
-         [ -z "$result" ] && [ $result -lt 4000 ] && result=4060;
-         writeJSONResponseErr "result=>$result" "message=>Deploy failed" ;
+    deploy "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" && writeJSONResponseOut "result=>0" "message=>Application deployed successfully" || {
+	result=$?;
+	[ $result -eq 156 ] && result=4078;
+	[ $result -eq 56  ] && result=4071;
+	[ -z "$result" ] && [ $result -lt 4000 ] && result=4060; 
+	writeJSONResponseErr "result=>$result" "message=>Deploy failed" ; 
     };
-    else
-        result=4114; writeJSONResponseErr "result=>$result" "message=>Deploy is not defined" ;
-    fi
 }
 
 function doUndeploy(){
@@ -155,11 +151,7 @@ function doUndeploy(){
     done;
     lUndeploy="undeploy" #added for backwards compatibility with Openshift cartridge templates
     isFunction "_undeploy" && lUndeploy="_undeploy" #must be removed after the cartridge support is finished
-    if isFunction ${lUndeploy}; then
-         "$lUndeploy" "$context" &&  writeJSONResponseOut "result=>0" "message=>Application removed sussesfully" || write    JSONResponseErr "result=>4061" "message=>Undeploy failed" ;
-    else
-         result=4115; writeJSONResponseErr "result=>$result" "message=>Undeploy is not defined" ;
-    fi
+    "$lUndeploy" "$context" &&  writeJSONResponseOut "result=>0" "message=>Application removed sussesfully" || writeJSONResponseErr "result=>4061" "message=>Undeploy failed" ;
 }
 
 function doRenameContext(){
@@ -256,7 +248,6 @@ function doCleanUpCluster(){
 }
 
 function doBuildCluster(){
-    chown 0:0 /etc/sudoers.d/; chown 0:0 /etc/sudoers.d/jelastic;
     $glassfish_tools -m build;
     restartServiceSilent iptables ;
 }

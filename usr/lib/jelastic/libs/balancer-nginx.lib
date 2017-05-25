@@ -241,7 +241,7 @@ function updateUpstreamSection(){
   if [[ $CHECK_LINE == *$2* ]]; then
     LINE=( $($GREP -n UPSTREAMPROTO ${NGINX_CONFIG} | $GREP -w $2 | tail -n 1 | $AWK -F: '{print $1}') )
     $SED -i  "$LINE c $UPSTREAM_LINE" $NGINX_CONFIG
-  elif [[ $UPSTREAM_LINE == *.* ||  $WEIGHT_CHANGED_FLAG -eq 1 ]]; then
+  elif [[ $UPSTREAM_LINE == *server* ||  $WEIGHT_CHANGED_FLAG -eq 1 ]]; then
     LINE=( $( $GREP -n UPSTREAMPROTO $NGINX_CONFIG | tail -n 1 | $AWK -F: '{print $1}' ) )
     $SED -i "$LINE a $UPSTREAM_LINE" $NGINX_CONFIG
     [ ! -z "$WEIGHT_CHANGED_FLAG" ] && { [ "$WEIGHT_CHANGED_FLAG" -eq 1 ] && $SED -i "$LINE a $DISCLIMER_LINE" $NGINX_CONFIG ; } 
@@ -254,7 +254,7 @@ function updateMappingsSection(){
   if [[ $CHECK_LINE == *$2* ]]; then
   	LINE=( $( $GREP -n MAPPROTO ${NGINX_CONFIG} | $GREP -w $2 | tail -n 1 | $AWK -F: '{print $1}') )
     $SED -i "$LINE c $MAPPING_LINE" $NGINX_CONFIG 
-  elif [[ $MAPPING_LINE == *.* ]]; then
+  elif [[ $MAPPING_LINE == *:* ]]; then
   	LINE=( $( $GREP -n MAPPROTO $NGINX_CONFIG | tail -n 1 | $AWK -F: '{print $1}') )
     $SED -i "$LINE a $MAPPING_LINE" $NGINX_CONFIG 
   fi
@@ -266,7 +266,7 @@ function updateDefaultUpstreamSection(){
   if [[ $CHECK_LINE == *$2* ]]; then
     LINE=( $( $GREP -n DEFUPPROTO ${NGINX_CONFIG} | $GREP -w $2 | tail -n 1 | $AWK -F: '{print $1}') ) 
     $SED -i "$LINE c $UPSTREAM_LINE" $NGINX_CONFIG 
-  elif [[ $UPSTREAM_LINE == *.* ]]; then
+  elif [[ $UPSTREAM_LINE == *server* ]]; then
     LINE=( $( $GREP -n DEFUPPROTO $NGINX_CONFIG | tail -n 1 | $AWK -F: '{print $1}') )
     $SED -i "$LINE a $UPSTREAM_LINE" $NGINX_CONFIG 
     [ ! -z "$WEIGHT_CHANGED_FLAG" ] && { [ "$WEIGHT_CHANGED_FLAG" -eq 1 ] && $SED -i "$LINE a $DISCLIMER_LINE" $NGINX_CONFIG ; } 

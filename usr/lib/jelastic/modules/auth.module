@@ -40,6 +40,7 @@ NFS_BACKEND="Native"  #posible values native,ganesha
 
 MOUNTPROG="/sbin/unfsd"
 MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-server.tar.gz"
+METAINFOFILE="/etc/jelastic/metainf.conf"
 
 $PROGRAM "tar"
 
@@ -99,6 +100,14 @@ function dosetupUtils() {
     local issue_file="/vz/root/${CTID}/etc/issue";
     local release_files="/vz/root/${CTID}/etc/*-release";
 
+    isContainerRunning ${CTID} && {
+        local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
+        if [[ "xstorage" == "x$computetype" ]] ; then
+		vzexecRun "systemctl enable nfs-server"
+    		return $TRUE
+        fi
+    }
+
     if [[ ! -e "${MOUNTPACKAGE}" ]] ; then
         log "${MOUNTPACKAGE} not found!"
         exit 1;
@@ -107,7 +116,7 @@ function dosetupUtils() {
     OS=$(detectOS "$issue_string")
     OS_ver=$(getOSVersion "$issue_string")
     OS_ver=${OS_ver%%.*}
-    installCmd=$(installPackageCmd $OS install rpcbind)
+    installCmd=$(installPackageCmd $OS install rpcbind libtirpc)
     #JE-25896
     if [ "x$OS" == "xalpine" ] ; then
         echo "Alpine linux is not supported"
@@ -122,7 +131,7 @@ function dosetupUtils() {
         return $FALSE
     fi
 
-    $TAR zxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
+    $TAR hzxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
 
     # install systemD unit
     [[ -d "/vz/root/${CTID}/lib/systemd/system" ]] && echo "$SystemDUnit" > "/vz/root/${CTID}/lib/systemd/system/unfsd.service"
@@ -203,7 +212,15 @@ function _adjustFirewall() {
 function _checkConfigs() {
     local UNFSDBIN='/sbin/unfsd'
     [[ ! -e "/vz/root/${CTID}/etc/exports" ]] && return 1
+
     isContainerRunning ${CTID} && {
+	local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
+	if [[ "xstorage" == "x$computetype" ]] ; then
+            if [[ ! -e "/vz/root/${CTID}$MOUNTPROG" ]] ; then
+                return $TRUE
+            fi
+	fi
+
        vzexecRun "$UNFSDBIN -T"
        errCode=$(vzexecGetLastErrCode)
        [[ "$errCode" -ne 0 ]] && return $FALSE
@@ -214,10 +231,24 @@ function _checkConfigs() {
 function _nfsReexport() {
     log "ReExporting shares"
     _checkConfigs || {
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" ; return 99;
-        return $FALSE
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" ;
+        return 99;
     }
     _adjustFirewall
+
+    isContainerRunning ${CTID} && {
+	local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
+        if [[ "xstorage" == "x$computetype" ]] ; then
+            if [[ ! -e "/vz/root/${CTID}$MOUNTPROG" ]] ; then
+		vzexecRun "exportfs -ra"
+		local err=$(vzexecGetLastStdErr)
+		[[ -z "${err// }" ]] && return $TRUE
+		writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" ;
+		return 99;
+            fi
+        fi
+    }
+
     PID=$(vzctl exec ${CTID} pgrep unfsd)
     if [[ ! -z "${PID}" ]] ; then
          vzctl exec ${CTID} kill -HUP $PID > /dev/null 2>&1
@@ -370,13 +401,18 @@ function _addNativeip() {
     fi
 
     if [ -e "${EXPORTS_FILE}" ] ; then
-        dPath="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< $destinationPath)\s+"
+        dPath="\"$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< $destinationPath)\"\s+"
         aCurrentIPs=($(grep -E "$dPath" "${EXPORTS_FILE}" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])(\/[0-9]{2})?'))
     fi
 
     log "Adding IPs to exports file (${EXPORTS_FILE})"
     for i in "${IPLIST[@]}" ; do
         isValidIP $i || continue
+        if [[ -f "/vz/root/${CTID}${destinationPath}" ]] ; then
+            writeJSONResponseOut "result=>4112" "message=>Exporting regular file is not supported" ;
+            return $FALSE
+        fi
+
         [[ ! -d "/vz/root/${CTID}${destinationPath}" ]] && {
             mkdir -p "/vz/root/${CTID}${destinationPath}"
             chmod 0777 "/vz/root/${CTID}${destinationPath}"

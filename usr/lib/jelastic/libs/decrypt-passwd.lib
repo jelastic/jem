@@ -16,7 +16,7 @@
 
 
 [ -n "${DECPASSWDLIB_VERSION:-}" ] && return 0;
-STRINGLIB_VERSION="0.1";
+DECPASSWDLIB_VERSION="0.1";
 
 declare -a JEM_PARAMS
 function getPassword(){
@@ -36,15 +36,15 @@ function getPassword(){
                 'static' )
                         keyString='TFVhBKDOSBspeSXesw8fElCcOzbJzYed';
                         ;;
-                'envId' )
+                'envid' )
                         if [ -z "$__CTID" ] ; then
                                 log "unknown __CTID. Please set it via vzexecSetCTID first";
                                 return 99;
                         fi
-                        keyString=$(cat $(vzlist -Ho private)/.vza/eid.conf 2>/dev/null)
+                        keyString=$(cat $(vzlist $__CTID -Ho private)/.vza/eid.conf 2>/dev/null)
 
                         ;;
-                * ) 
+                * )
                         echo "$passwString";
                         exit 0;
                         ;;

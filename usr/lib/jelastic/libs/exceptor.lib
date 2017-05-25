@@ -48,7 +48,7 @@ function ensureFileCanBeUncompressed(){
     [ -z ${resource_data_dize} ] && { resource_data_dize=0; freebytesleft=$(( 1024 *  $(df  2>/dev/null | $GREP "/$" | $AWK '{ print $4 }' | head -n 1 2>/dev/null)-1024*1024)); }
     local uncompressed_size;
 
-    mimeType=$($FILE --mime-type ${fileToUncompress} | $AWK '{print $2}')
+    mimeType=$($FILE --mime-type "${fileToUncompress}" | $AWK '{print $2}')
     
     case ${mimeType} in
         "application/x-bzip2")

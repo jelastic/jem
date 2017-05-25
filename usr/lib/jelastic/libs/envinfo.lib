@@ -18,7 +18,6 @@ OVERRIDE_DIR="/var/lib/jelastic/overrides/"
 extipchange_module_inherit="common-extipch-norestart";
 gw_boost_lib_inherit="user-common";
 DEPLOY_LOG="/dev/null";
-MOUNT_DIR="/var/ftp";
 
 case ${COMPUTE_TYPE} in
 	balancer)
@@ -143,8 +142,7 @@ case ${COMPUTE_TYPE} in
 		passwd_module_inherit="mysql-passwd";
 		dumper_module_inherit="mysql-dumper";
 		default_user="root";
-		DB_DATA_DIR="/var/lib/mysql";
-		MOUNT_DIR="/var/lib/jelastic";
+		DB_DATA_DIR="/var/lib/mysql"
 	;;
 	mysql)
 		DATA_OWNER='mysql:mysql';
@@ -152,16 +150,14 @@ case ${COMPUTE_TYPE} in
 		passwd_module_inherit="mysql-passwd";
 		dumper_module_inherit="mysql-dumper";
 		default_user="root";
-		DB_DATA_DIR="/var/lib/mysql";
-		MOUNT_DIR="/var/lib/jelastic";
+		DB_DATA_DIR="/var/lib/mysql"
 	;;
 	mongodb)
 		DATA_OWNER='mongod:mongod';
 		SERVICE='mongod';
 		passwd_module_inherit="mongo-passwd";
 		default_user="admin";
-		DB_DATA_DIR="/var/lib/mongo/";
-		MOUNT_DIR="/var/lib/jelastic";
+		DB_DATA_DIR="/var/lib/mongo/"
 	;;
 	postgres)
 		DATA_OWNER='postgres:postgres';
@@ -169,16 +165,14 @@ case ${COMPUTE_TYPE} in
 		passwd_module_inherit="postgres-passwd";
 		dumper_module_inherit="postgres-dumper";
 		default_user="webadmin";
-		DB_DATA_DIR="/var/lib/pgsql/";
-		MOUNT_DIR="/var/lib/jelastic";
+		DB_DATA_DIR="/var/lib/pgsql/"
 	;;
 	couchdb)
 		DATA_OWNER='couchdb:couchdb';
 		SERVICE='couchdb';
 		passwd_module_inherit="couchdb-passwd";
 		default_user="admin";
-		DB_DATA_DIR="/var/lib/couchdb/";
-		MOUNT_DIR="/var/lib/jelastic";
+		DB_DATA_DIR="/var/lib/couchdb/"
 	;;
 	memcached)
 		DATA_OWNER='memcached:memcached';
@@ -203,7 +197,6 @@ case ${COMPUTE_TYPE} in
         VCS_UPDATE_LOG="$CARTRIDGE_HOME/logs/vcs_update.log";
         VCS_AUTORESOLVE_LOG="$CARTRIDGE_HOME/logs/vcs_autoresolve.log";
         BUNDLE_INSTALL_LOG="$CARTRIDGE_HOME/log/bundle_install.log";
-        MOUNT_DIR="/opt/repo";
 	;;
 	gate)
 		gw_boost_lib_inherit="usermanage-gate";
@@ -213,11 +206,7 @@ case ${COMPUTE_TYPE} in
 		dumper_module_inherit="dummy-dumper";
 		default_user="admin";
 	;;
-	storage)
-		MOUNT_DIR="/data";
-	;;
 esac
 [ -e "/var/lib/jelastic/overrides/envinfo.lib" ] && source /var/lib/jelastic/overrides/envinfo.lib ;
 return 0;
 
-111

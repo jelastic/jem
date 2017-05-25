@@ -54,7 +54,12 @@ function switchEngine(){
 	    version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '5\.6\.[0-9]*' | sort -r | head -n 1);
 	;;
 	"php7.0")
-		version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | grep -o '7\.0\.[0-9]*' | sort -r | head -n 1);
+		version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '7\.0\.[0-9]*' | sort -r | head -n 1);
+		MAJOR_VERSION=7;
+		APACHE2_PHPMODULE='libphp7.so';
+	;;
+	"php7.1")
+		version=$(ls $JELASTIC_PHP_EXTENSIONS_DIR | $GREP -o '7\.1\.[0-9]*' | sort -r | head -n 1);
 		MAJOR_VERSION=7;
 		APACHE2_PHPMODULE='libphp7.so';
 	;;

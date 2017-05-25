@@ -1,28 +1,30 @@
 #!/bin/bash
 export LC_ALL=en_US.UTF-8
-MANAGE_VERSION="1";
-MANAGE_PROGRAM_NAME="jem";
-MANAGE_BINARY_NAME="$0";
-MANAGE_KILL_TARGET="$$";
+export MANAGE_VERSION="1";
+export MANAGE_PROGRAM_NAME="jem";
+export MANAGE_BINARY_NAME="$0";
+export MANAGE_KILL_TARGET="$$";
 
-MANAGE_DATA_PATH="${MANAGE_DATA_PATH:="/usr/lib/jelastic"}";
-MANAGE_DEFAULT_MODULES_PATH="${MANAGE_DATA_PATH}/modules";
-MANAGE_MODULES_PATH=($MANAGE_DEFAULT_MODULES_PATH);
-MANAGE_CORE_PATH="${MANAGE_CORE_PATH:="/usr/lib/jelastic/libs"}";
-MANAGE_DEFAULT_ACTIONS="${MANAGE_CORE_PATH}/default.lib";
-MANAGE_APP_TEMPLATES="${MANAGE_APP_TEMPLATES:="/usr/lib/jelastic/tpls"}";
+export MANAGE_DATA_PATH="${MANAGE_DATA_PATH:="/usr/lib/jelastic"}";
+export MANAGE_DEFAULT_MODULES_PATH="${MANAGE_DATA_PATH}/modules";
+export MANAGE_MODULES_PATH=($MANAGE_DEFAULT_MODULES_PATH);
+export MANAGE_CORE_PATH="${MANAGE_CORE_PATH:="/usr/lib/jelastic/libs"}";
+export MANAGE_DEFAULT_ACTIONS="${MANAGE_CORE_PATH}/default.lib";
+export MANAGE_APP_TEMPLATES="${MANAGE_APP_TEMPLATES:="/usr/lib/jelastic/tpls"}";
 
 DEBUG=${DEBUG:="0"};
 
 
-META_FILE="/etc/jelastic/metainf.conf";
-JEM_CALLS_LOG="${JEM_CALLS_LOG:="/var/log/jem.log"}";
+export META_FILE="/etc/jelastic/metainf.conf";
+export JEM_CALLS_LOG="${JEM_CALLS_LOG:="/var/log/jem.log"}";
 
-FIRST_RUN_SCENARIO="/var/lib/jelastic/firstrun";
-PATH="/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin";
+export FIRST_RUN_SCENARIO="/var/lib/jelastic/firstrun";
+export PATH="/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin";
 
 echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
 echo ":[EXEC]      [PID: $$] $@" >> ${JEM_CALLS_LOG} 2>&1;
+
+chmod 600 ${JEM_CALLS_LOG};
 
 "unalias" -a;
 unset -f rm;
