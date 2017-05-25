@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Copyright 2015 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.B
+
+inherit default os config envinfo;
+include output net;
+
+$PROGRAM 'sed';
+$PROGRAM 'grep';
+$PROGRAM 'find';
+$PROGRAM 'perl';
+CONF_FILE="/etc/jelastic/settings.conf";
+ERB_DIR="/etc/jelastic/erb/";
+
+DESCRIPTION="Jem discovery module";
+VERSION="1";
+DEFAULT_ACTION="usage";
+APPLY_PL='/var/lib/jelastic/overrides/apply.pl'
+ROUTEFIXER='/root/scripts/routefixer/routefixer.sh'
+
+function dousage() {
+    showUsageMessage;
+}
+
+function doGather(){
+    [ ! -f "$CONF_FILE" ] && { writeJSONResponseErr "result=>4039" "message=>File not found"; }
+    loadINISection "$CONF_FILE" "provide";
+    VERBOSE=${ENV_VERBOSE:-1}
+
+
+    for ((n=0; n < ${#iniVarNames[@]}; n++))
+    do
+        var='';
+        log  "Module: $action Action: $subaction index: $n element: ${iniVarNames[$n]}" ;
+        fName=$( sed -re 's/_all$//' -e 's/.*_(.*)/\1/' <<< ${iniVarNames[$n]} ) ;
+        isFunction "$fName" && { 
+            var=$($fName) ;
+            sed -i "s|${iniVarNames[$n]}\s*=.*|${iniVarNames[$n]}=${var}|" ${CONF_FILE} ;
+        } || { 
+            echo "Extra gather for $fName" >>$JEM_CALLS_LOG ; 
+            isFunction "extraGather" && {
+                extraGather "${iniVarNames[$n]}"
+            }
+        }
+    done
+    writeJSONResponseOut "result=>0" "message=>Ok";
+}
+
+
+function doApply(){
+    VERBOSE=${ENV_VERBOSE:-1}
+    local localResult
+    log "In Module: $action Action: $subaction "
+    isFunction internalip && { internalIp=$(internalip); export internalIp=$internalIp; }
+    isFunction externalip && { externalIp=$(externalip); export externalIp=$externalIp; }
+    TPL_LIST=$($FIND ${ERB_DIR} -mindepth 1 -type f  -printf '%P\n' | sort ) 
+    for tpl in ${TPL_LIST}
+    do
+        log "TPL file: $tpl";
+        permString=$( head ${ERB_DIR}/${tpl} | grep rights -m1 |  cut -d= -f2 );
+        tplUser=$( cut -d: -f1 <<< ${permString} ); #TODO: if defined but not exists
+        tplGroupUser=$( cut -d: -f2 <<< ${permString} );
+        tplPermissions=$( cut -d: -f3 <<< ${permString} );
+
+        log "File: ${ERB_DIR}/${tpl} User:$tplUser Group:$tplGroupUser Permissions:$tplPermissions" ;
+        $PERL $APPLY_PL ${ERB_DIR}/${tpl} /${tpl} >> "$ACTIONS_LOG"  2>&1
+        localResult=$?
+        chown ${tplUser:-root}:${tplGroup:-root} "/${tpl}" >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
+        chmod "${tplPermissions:-644}" "/${tpl}" >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
+        [ -f "/${tpl}" ] && head -n 1 /${tpl} | ${GREP} -q "^#rights=" && $SED -ri '1,1'd /${tpl} >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
+    done
+    isFunction postApply && postApply ;
+    isFunction fixresolvconf && fixresolvconf ;
+    [ -f "${ROUTEFIXER}" ] && [ ! -z "$externalIp" ] && bash ${ROUTEFIXER}
+    if [ $localResult == 0 ]
+    then
+        writeJSONResponseOut "result=>0" "message=>Ok";
+    else
+        writeJSONResponseErr "result=>${localResult}" "message=>Apply failed";
+    fi
+}
+
+function doSet(){
+    if isFunction setVariables; then
+    setVariables;
+    else
+    echo no;
+    fi
+    
+}
