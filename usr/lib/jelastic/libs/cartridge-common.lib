@@ -46,6 +46,7 @@ $PROGRAM 'ip'
         $SED -e 's/:[^:\/\/]/="/g;s/$/"/g;s/ *=/=/g' $MANIFEST | $GREP -E "[a-zA-Z0-9]" | $GREP -i "name\|private\|version=" | $SED  's/^-//g' | $SED 's/-/_/g' | $SED 's/ _//g' | $SED  's/ //g'  | $SED "s/\"'/\"/g"  | $SED "s/\"'/\"/g" | $SED "s/'\"/\"/g" | $SED 's/.x_/.x-/g' > $MANIFEST_EXPORTED;
         echo action_reset_password_hook=$($GREP -A 100 "Subscribes" "$MANIFEST" | $GREP -B1 ":reset-password" | head -n1 | $SED 's/://g' | $SED 's/ //g') >> $MANIFEST_EXPORTED;
         [ -f $MANIFEST_EXPORTED ] && source $MANIFEST_EXPORTED;
+        [ "xGlassFish" == "x$Name" ] &&  Name=${Name,,};
         [ -f ${CARTRIDGE_HOME}/jelastic/jelastic.conf ] && source ${CARTRIDGE_HOME}/jelastic/jelastic.conf;
     }
 
