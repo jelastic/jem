@@ -45,7 +45,7 @@ function removeChain(){
 function enableSSL(){
 	local err;
 	stopServiceSilent "$SERVICE";
-	doAction keystore DownloadKeys;
+	local msg=$(doAction keystore DownloadKeys);
 	err=$?; [[ ${err} -gt 0 ]] && exit "$err";
 	createChain;
 	[ -f "${SSL_XML_CONFIG}.disabled" ] && mv "${SSL_XML_CONFIG}.disabled" "$SSL_XML_CONFIG";
@@ -55,7 +55,7 @@ function enableSSL(){
 function disableSSL(){
 	local err;
 	stopServiceSilent "$SERVICE" ;
-	doAction keystore remove;
+	local msg=$(doAction keystore remove);
 	err=$?; [[ ${err} -gt 0 ]] && exit "$err";
 	removeChain;
 	[ -f "$SSL_XML_CONFIG" ] && mv "${SSL_XML_CONFIG}" "${SSL_XML_CONFIG}.disabled";

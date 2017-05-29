@@ -23,6 +23,6 @@ function ipChanged(){
     VERBOSE=1;
     log "extIpChange restart service";
     VERBOSE=0;
-    doAction service restart >> $JEM_CALLS_LOG ;
+    local msg=$(doAction service restart >> $JEM_CALLS_LOG );
 }
 

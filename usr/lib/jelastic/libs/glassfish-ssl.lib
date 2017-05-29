@@ -59,7 +59,7 @@ function setModificationDate(){
 function enableSSL(){
 	[ ! -f "$PASS_FILE" ] && return 0;
 	[ ! -f "$GF_KEYSTORE_ORIG" ] && cp "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG";
-	doAction keystore install;
+	local msg=$(doAction keystore install);
 	mergeGFKeystore;
 	chown "$DATA_OWNER" "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG" 2>>"$JEM_CALLS_LOG";
 	local ip_bind="0.0.0.0";
@@ -71,7 +71,7 @@ function enableSSL(){
 
 function disableSSL(){
 	[ ! -f "$PASS_FILE" ] && return 0;
-	doAction keystore remove;
+	local msg=$(doAction keystore remove);
 	runAsadminCmd delete-http-listener --target gfcluster http-listener-ssl-${DEFAULT_DOMAIN};
 	[ -f "$GF_KEYSTORE_ORIG" ] && cp "$GF_KEYSTORE_ORIG" "$GF_KEYSTORE";
 	chown "$DATA_OWNER" "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG" 2>>"$JEM_CALLS_LOG";

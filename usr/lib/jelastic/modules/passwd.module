@@ -103,7 +103,7 @@ function doSetos(){
 
 function postSetosCallback() {
     [ -n "$FIREWALL_ENABLED" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && [ "${FIREWALL_ENABLED}" -eq "1" ] && {
-        doAction "firewall" "Start";
+        local msg=$(doAction "firewall" "Start");
     }
     return 0;
 }

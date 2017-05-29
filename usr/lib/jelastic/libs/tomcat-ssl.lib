@@ -26,7 +26,7 @@ START_SECTION_PATTERN="PROTO_Dl231aIDsW4";
 END_SECTION_PATTERN="PROTO_Dl541aINsMx";
 
 function enableSSL(){
-        doAction keystore install;
+        local msg=$(doAction keystore install);
         stopServiceSilent "$SERVICE" ;
         $SED -i '/<!--/d' $SERVER_XML_CONFIG;
         $SED -i '/-->/d' $SERVER_XML_CONFIG;
@@ -34,7 +34,7 @@ function enableSSL(){
 }
 
 function disableSSL(){
-        doAction keystore remove;
+        local msg=$(doAction keystore remove);
         stopServiceSilent "$SERVICE" ;
         $SED  -i '1i  <!--' $SERVER_XML_CONFIG;
         $SED  -i '$a  -->' $SERVER_XML_CONFIG;

@@ -21,7 +21,7 @@ $PROGRAM 'sed';
 SERVER_XML_CONFIG="/opt/jetty/etc/jetty-ssl.xml";
 
 function enableSSL(){
-	doAction keystore install;
+	local msg=$(doAction keystore install);
 	stopServiceSilent "$SERVICE";
 	$SED -i '/<!--/d' $SERVER_XML_CONFIG;
 	$SED -i '/-->/d' $SERVER_XML_CONFIG;
@@ -29,7 +29,7 @@ function enableSSL(){
 }
 
 function disableSSL(){
-	doAction keystore remove;
+	local msg=$(doAction keystore remove);
 	stopServiceSilent "$SERVICE";
 	$SED  -i '/\Configure id/a  <!--' $SERVER_XML_CONFIG;
 	$SED  -i '/\/Configure/i  -->' $SERVER_XML_CONFIG;

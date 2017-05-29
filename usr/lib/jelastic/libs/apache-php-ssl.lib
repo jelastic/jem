@@ -26,16 +26,16 @@ function enableSSL(){
 	local default_httpd_conf="/etc/sysconfig/httpd"
 	$GREP -q "OPENSSL_NO_DEFAULT_ZLIB" $default_httpd_conf || echo "export OPENSSL_NO_DEFAULT_ZLIB=1" >>  $default_httpd_conf;
 	local err;
-	doAction keystore DownloadKeys;
+	local msg=$(doAction keystore DownloadKeys);
 	err=$?; [[ ${err} -gt 0 ]] && exit "$err";
 	$SED -i 's/SSLEngine=\"off\"/SSLEnabled=\"on\"/g' $SERVER_XML_CONFIG;
-	doAction apache2ext enmod ssl > /dev/null 2>&1 ||  { writeJSONResponseErr "result=>4020" "message=>Cannot enable SSL module!"; return 1; };
+	msg=$(doAction apache2ext enmod ssl > /dev/null 2>&1) ||  { writeJSONResponseErr "result=>4020" "message=>Cannot enable SSL module!"; return 1; };
 }
 
 function disableSSL(){
 	local err;
-	doAction keystore remove;
+	local msg=$(doAction keystore remove);
 	err=$?; [[ ${err} -gt 0 ]] && exit "$err";
 	$SED -i 's/SSLEngine=\"on\"/SSLEnabled=\"off\"/g' $SERVER_XML_CONFIG;
-	doAction apache2ext dismod ssl > /dev/null 2>&1 ||  { writeJSONResponseErr "result=>4021" "message=>Cannot disable SSL module!"; return 1; };
+	msg=$(doAction apache2ext dismod ssl > /dev/null 2>&1) ||  { writeJSONResponseErr "result=>4021" "message=>Cannot disable SSL module!"; return 1; };
 }
