@@ -80,6 +80,10 @@ function switchEngine(){
             full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.2.6");
             small_version="2.2.6";
         ;;
+        "ruby2.2.7")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.2.7");
+            small_version="2.2.7";
+        ;;
         "ruby2.3.0")
             full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.3.0");
             small_version="2.3.0";
@@ -88,6 +92,10 @@ function switchEngine(){
             full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.3.3");
             small_version="2.3.3";
         ;;
+        "ruby2.3.4")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.3.4");
+            small_version="2.3.4";
+        ;;
         "ruby2.3.1")
             full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.3.1");
             small_version="2.3.1";
@@ -95,6 +103,10 @@ function switchEngine(){
         "ruby2.4.0")
             full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.4.0");
             small_version="2.4.0";
+        ;;
+        "ruby2.4.1")
+            full_version=$($FIND "${RVM_PATH}/rubies" -maxdepth 1 -type d | tail -n+2 | xargs -n1 basename -- | $GREP "2.4.1");
+            small_version="2.4.1";
         ;;
         *)
         return 1
