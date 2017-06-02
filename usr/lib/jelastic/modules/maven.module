@@ -135,7 +135,7 @@ function doGetProject(){
 
 function doUpdate(){
     local err;
-    doAction vcs update "$@" > /dev/null;
+    local msg=$( doAction vcs update "$@" );
     err=$?; [[ ${err} -gt 0 ]] && exit ${err};
 }
 
