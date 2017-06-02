@@ -71,7 +71,7 @@ function doRestart(){
         if [[ "${result}" -eq "0" ]]
         then
             [ -n "$FIREWALL_ENABLED" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && [ "${FIREWALL_ENABLED}" -eq "1" ] && {
-                (doAction "firewall" "Start"  || { result=$? ; message="Failed to apply firewall rules";echo $message >>ACTIONS_LOG; } )
+                local msg=$( doAction "firewall" "Start" )  || message="Failed to apply firewall rules"; 
             }
         else
             message="Failed to start $1";
