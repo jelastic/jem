@@ -103,8 +103,10 @@ function __injected() {
     log "ssh-keygen response ${response}";
     $VZCTL exec $CTID "[[ ! -d '/root/.ssh' ]] && { mkdir -p /root/.ssh; chmod 0700 /root/.ssh 2>>"$JEM_CALLS_LOG"; }"
     pubkey=$(cat "${tmpfile}.pub")
+    privkey=$(cat "${tmpfile}")
     $VZCTL exec $CTID "[[ -f '/root/.ssh/authorized_keys' ]] && { $SED -i -re \"/${label}/d;/^s*$/d\" /root/.ssh/authorized_keys; chmod 0400 /root/.ssh/authorized_keys 2>>"$JEM_CALLS_LOG"; }"
     $VZCTL exec $CTID "echo -e \"\n${pubkey}\n\" >> /root/.ssh/authorized_keys"
+    $VZCTL exec $CTID "echo -e \"${privkey}\" >> /root/.ssh/id_rsa"
     $VZCTL exec $CTID "$SED -i -re 's/#?[Ss][Tt][Rr][Ii][Cc][Tt][Mm][Oo][Dd][Ee][Ss]\s+[Yy][Ee][Ss]/StrictModes no/g' /etc/ssh/sshd_config"
     $VZCTL exec $CTID "service sshd reload >/dev/null 2>&1 || service ssh reload >/dev/null 2>&1"
     echo "{\"result\":\"0\",\"message\":\"$(cat ${tmpfile})\"}"
@@ -135,7 +137,7 @@ function __injected_not_vds_add() {
         bashRestricts 2>>"$JEM_CALLS_LOG" && vzexecGetLastStdOut && return 0 || { writeJSONResponseErr "result=>4119" "message=>Can not fix user rights"; return 4119; }
     else
         writeJSONResponseErr "result=>4045" "message=>${vzexecGetLastStdErr}"
-    fi    
+    fi
 }
 
 function __processNotVDS(){
@@ -186,7 +188,7 @@ function preAddCallback(){
 		log "Compute Type not gate."
 		_USERADD_OPT=" -M ";
 		_SUPPLEMENTARY_GROUPS="$_SSH_ACCESS_GROUP";
-        
+
         if [ ! -z "${_EID}" ]; then
             _CTID=$($GREP -l "${_EID}" /vz/private/*/.vza/eid.conf |  $SED -re 's;/vz/private/([0-9]+)/.*;\1;')
             [[ -z "${_CTID}" ]] && {
