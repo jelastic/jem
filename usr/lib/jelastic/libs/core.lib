@@ -321,7 +321,7 @@ function doAction() {
     resultFile=$(mktemp)
     export resultFile
 
-    timeout --preserve-status $actiontimeout cat <(
+    timeout $actiontimeout cat <(
 
         source "$MANAGE_DEFAULT_ACTIONS" 2>/dev/null || die "Couldn't source ${MANAGE_DEFAULT_ACTIONS}";
         source "${modfile}" 2>/dev/null || die "Couldn't source ${modfile}";
