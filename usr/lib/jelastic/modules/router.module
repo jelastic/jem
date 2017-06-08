@@ -266,9 +266,9 @@ function doUnbind() {
             fi
 
             if [[ $NAT_ACTION == "dnat" ]] ; then
-                res=$($EXEC $IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j DNAT --to-destination $__IP:$__PORT 2>/dev/null)
+                res=$($EXEC "$IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j DNAT --to-destination $__IP:$__PORT 2>/dev/null")
             else
-                res=$($EXEC $IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j REDIRECT --to-port $__PORT 2>/dev/null)
+                res=$($EXEC "$IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j REDIRECT --to-port $__PORT 2>/dev/null")
             fi
 
             if [[ $res -eq 0 ]] ; then
