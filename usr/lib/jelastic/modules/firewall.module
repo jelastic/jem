@@ -252,7 +252,7 @@ function onModLoadCallback() {
         case "$1" in
             --cp)
                 # ports to close
-                [[ -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
+                [[ ! -z "$2" && -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
                 oldifs=$IFS;
                 IFS=',';
                 __closedports=(${2});
@@ -261,7 +261,7 @@ function onModLoadCallback() {
                 ;;
             --op)
                 # ports to open
-                [[ -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
+                [[ ! -z "$2" && -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
                 oldifs=$IFS;
                 IFS=',';
                 __openports=(${2});
@@ -270,7 +270,7 @@ function onModLoadCallback() {
                 ;;
             --rp)
                 # ports to remove from open ports list
-                [[ -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
+                [[ ! -z "$2" && -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
                 oldifs=$IFS;
                 IFS=',';
                 __removeports=(${2});
