@@ -17,6 +17,7 @@
 [ -n "${FSUTILS_VERSION:-}" ] && return 0;
 FSUTILS_VERSION="0.1";
 $PROGRAM 'grep';
+$PROGRAM 'rm';
 
 #
 # isMountpointMounted
@@ -149,5 +150,14 @@ function checkUnit(){
     if ! unitExists "$1"; then
         return 1;
     fi
+    return 0;
+}
+
+### Safe delete for mount points if shared storage is used ###
+function rm(){
+    args=$@;
+    [[ $1 == *"-"* ]] && shift;
+    local resourceToDelete=$1;
+    [ ! -z $resourceToDelete -a  -d $resourceToDelete ] && { isMountpointMounted $resourceToDelete  &&  $RM  $args/* ;} || $RM $args;
     return 0;
 }
