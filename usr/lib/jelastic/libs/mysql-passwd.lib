@@ -29,7 +29,7 @@ $PROGRAM 'mysqladmin';
 
 function setPassword() {
 
-		while [ "$1" != "" ]; 
+		while [ "$1" != "" ];
 		do
 		  case $1 in
 		    -u )       shift
@@ -45,7 +45,7 @@ function setPassword() {
 		local tries=200
 		local tries2=200
 		local pid="/var/lib/mysql/mysqld.pid"
-		local db='mysql'	
+		local db='mysql'
 		echo $(date)  >> $LOG_FILE
 		if [ "x$SERVICE" == "xmysql" -a ! -f /etc/init.d/mysql ]
 		then
@@ -57,7 +57,7 @@ function setPassword() {
 
 		while [ "$tries" -gt 0 ]
 		do
-			if ! ps ax | $GREP -v grep | $GREP -q  mysql ; 
+			if ! ps ax | $GREP -v grep | $GREP -q  mysql ;
 			then
 				break;
 			fi
@@ -71,18 +71,18 @@ function setPassword() {
 		if ps ax | $GREP -v grep | $GREP -q  mysqld ;  then /usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1; fi
 		${SERVICE_CMD} ${SERVICE} regenerate-config  >> $LOG_FILE 2>&1
 		eval $MYSQLD_SAFE --skip-grant-tables --user=mysql  --pid-file=$pid >> $LOG_FILE 2>&1 &
-		
+
 		sleep 5;
-		while [ ! -e $pid ] 
+		while [ ! -e $pid ]
 		do
 		    sleep 1
 		    tries2=$(($tries2-1))
-			if [ "$tries2" -lt 0  ] 	
-			then 
+			if [ "$tries2" -lt 0  ]
+			then
 				echo "Time for wait mysqld-safe expired. result 4051" >> $LOG_FILE
 				/usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1;
 				startService ${SERVICE} >>$LOG_FILE 2>&1
-				writeJSONResponseErr "result=>4051" "message=>Could not set password!"; 
+				writeJSONResponseErr "result=>4051" "message=>Could not set password!";
 				die -q
 			fi
 		done
@@ -97,10 +97,10 @@ function setPassword() {
                fi
 		$MYSQL $db --execute="DELETE FROM user WHERE user = '';"
 		$MYSQL $db --execute="FLUSH PRIVILEGES;"
-		
+
 		sleep 2
 		/usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1;
-		
+
 		tries=200
 		echo "Stopping Mysql after set password " >> $LOG_FILE
 		while [ "$tries" -gt 0 ]
@@ -113,21 +113,35 @@ function setPassword() {
 			tries=$(($tries-1))
 			stopService ${SERVICE} >> $LOG_FILE 2>&1
 		done
-		
+
 		startService ${SERVICE}  >>$LOG_FILE 2>&1
 		if ! ps ax | $GREP -v grep | $GREP -q  mysql ;
 		then
 			sleep 2
 			startService ${SERVICE}  >>$LOG_FILE 2>&1
-		
+
 		fi
-		
-		val=$(sed 's/\.//' <<< $COMPUTE_TYPE_FULL_VERSION )
+
+                val=$(sed 's/\.//' <<< $COMPUTE_TYPE_FULL_VERSION )
+                isDefPassLifetime=0
+                defPassLifetime=$($MYSQL -u "${user}" -p"${password}" -NB -e "show global variables like 'default_password_lifetime'" 2>&1 | $SED -re '/mysql/d' | $SED -rne '/default_password_lifetime/s/default_password_lifetime\s+([0-9]+)/\1/p')
+                [ ! -z "$defPassLifetime" ] && {
+                    [[ $defPassLifetime -gt 0 ]] && isDefPassLifetime=1
+                    mysqlusers=($($MYSQL $db -u "${user}" -p"${password}" -NB -e "select CONCAT('\'',user, '\'@\'', host,'\'') from user where user like 'root%'" 2>&1 | $SED -re '/mysql/d'))
+                }
+
 		[ -z "$val" ] && val=0 ;
 		if [ "x$COMPUTE_TYPE" == "xmysql" -a $val -ge 57  ] ; then
 		    $MYSQL -u "${user}" -p"${password}" $db --execute="SET PASSWORD FOR 'root'@'localhost' = PASSWORD('${password}');" >>$LOG_FILE 2>>$LOG_FILE
 		    $MYSQL -u "${user}" -p"${password}" $db --execute="SET PASSWORD FOR 'root'@'%' = PASSWORD('${password}');" >>$LOG_FILE 2>>$LOG_FILE
-		fi
+                fi
+
+                if [[ $isDefPassLifetime -gt 0 ]] ; then
+                    for muser in ${mysqlusers[*]}; do
+                        $MYSQL -u "${user}" -p"${password}" $db --execute="ALTER USER $muser PASSWORD EXPIRE INTERVAL ${defPassLifetime} DAY;"
+                    done
+                fi
+
 		echo "Password updated" >> $LOG_FILE
 		$CHKCONFIG --level 3 ${SERVICE} on >>$LOG_FILE 2>&1
 }
