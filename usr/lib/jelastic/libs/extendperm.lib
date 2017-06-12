@@ -27,6 +27,7 @@ function ExtendPerm(){
     if [ -f "$EXTEND_LIST_FILE" ] ; then
         FLIST=$($GREP -E "${COMPUTE_TYPE}|common" "$EXTEND_LIST_FILE"| $AWK '{print $2";"}' )
         [ -f /etc/jelastic/redeploy.conf ] && $SETFACL -m $filep /etc/jelastic/redeploy.conf >>$JEM_CALLS_LOG 2>&1;
+        [ -f /etc/rc.d/rc.local ] && $SETFACL -m $filep /etc/rc.d/rc.local >>$JEM_CALLS_LOG 2>&1;
 
         if [ -x "$SETFACL" ] ; then
             $SETFACL -m $dirp /var/spool/cron  >>$JEM_CALLS_LOG 2>&1;
