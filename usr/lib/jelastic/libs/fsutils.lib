@@ -29,7 +29,7 @@ $PROGRAM 'rm';
 #       1 - mountpoint doesn't exists or unmounted
 function isMountpointMounted() {
     : ${1:?"Missing param: mountpoint"};
-    mount | $GREP -Pqo "\s+${1}\s+";
+    mount | $GREP -Pqo "\s+${1%/}\s+";
     return $?;
 }
 
