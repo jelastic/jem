@@ -136,7 +136,8 @@ function doGetProject(){
 function doUpdate(){
     local err;
     local msg=$( doAction vcs update "$@" );
-    err=$?; [[ ${err} -gt 0 ]] && exit ${err};
+    $GREP -q 'result\":\"0' <<< $msg || { echo $msg 1>&2; die -q; }
+#   err=$?; [[ ${err} -gt 0 ]] && exit ${err};
 }
 
 function doEditProject(){

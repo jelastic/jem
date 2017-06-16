@@ -183,6 +183,9 @@ function die() {
     }
 
     kill ${MANAGE_KILL_TARGET} 2>/dev/null;
+    [ -w "$resultFile" ] && {
+        echo $result >$resultFile
+    }
     exit 249
 }
 
