@@ -61,7 +61,7 @@ function doGather(){
 
 function doApply(){
     VERBOSE=${ENV_VERBOSE:-1}
-    local localResult
+    local localResult=0
     log "In Module: $action Action: $subaction "
     isFunction internalip && { internalIp=$(internalip); export internalIp=$internalIp; }
     isFunction externalip && { externalIp=$(externalip); export externalIp=$externalIp; }
@@ -75,8 +75,7 @@ function doApply(){
         tplPermissions=$( cut -d: -f3 <<< ${permString} );
 
         log "File: ${ERB_DIR}/${tpl} User:$tplUser Group:$tplGroupUser Permissions:$tplPermissions" ;
-        $PERL $APPLY_PL ${ERB_DIR}/${tpl} /${tpl} >> "$ACTIONS_LOG"  2>&1
-        localResult=$?
+        $PERL $APPLY_PL ${ERB_DIR}/${tpl} /${tpl} >> "$ACTIONS_LOG"  2>&1 || localResult=$?;
         chown ${tplUser:-root}:${tplGroup:-root} "/${tpl}" >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
         chmod "${tplPermissions:-644}" "/${tpl}" >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
         [ -f "/${tpl}" ] && head -n 1 /${tpl} | ${GREP} -q "^#rights=" && $SED -ri '1,1'd /${tpl} >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
@@ -89,6 +88,7 @@ function doApply(){
         writeJSONResponseOut "result=>0" "message=>Ok";
     else
         writeJSONResponseErr "result=>${localResult}" "message=>Apply failed";
+        return $localResult;
     fi
 }
 
