@@ -214,16 +214,16 @@ function _checkConfigs() {
     [[ ! -e "/vz/root/${CTID}/etc/exports" ]] && return 1
 
     isContainerRunning ${CTID} && {
-	local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
-	if [[ "xstorage" == "x$computetype" ]] ; then
+        local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
+        if [[ "xstorage" == "x$computetype" ]] ; then
             if [[ ! -e "/vz/root/${CTID}$MOUNTPROG" ]] ; then
                 return $TRUE
             fi
-	fi
+        fi
 
-       vzexecRun "$UNFSDBIN -T"
-       errCode=$(vzexecGetLastErrCode)
-       [[ "$errCode" -ne 0 ]] && return $FALSE
+        vzexecRun "$UNFSDBIN -T"
+        errCode=$(vzexecGetLastErrCode)
+        [[ "$errCode" -ne 0 ]] && return $FALSE
     }
     return $TRUE
 }
@@ -231,7 +231,7 @@ function _checkConfigs() {
 function _nfsReexport() {
     log "ReExporting shares"
     _checkConfigs || {
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" ;
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)" ;
         return 99;
     }
     _adjustFirewall
@@ -240,11 +240,11 @@ function _nfsReexport() {
 	local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
         if [[ "xstorage" == "x$computetype" ]] ; then
             if [[ ! -e "/vz/root/${CTID}$MOUNTPROG" ]] ; then
-		vzexecRun "exportfs -ra"
-		local err=$(vzexecGetLastStdErr)
-		[[ -z "${err// }" ]] && return $TRUE
-		writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" ;
-		return 99;
+                vzexecRun "exportfs -ra"
+                local err=$(vzexecGetLastStdErr)
+                [[ -z "${err// }" ]] && return $TRUE
+                writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports) | $err";
+                return 99;
             fi
         fi
     }
@@ -471,7 +471,7 @@ function _removeNativeip() {
     fi
 
     _checkConfigs || {
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" ;
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
         return $FALSE
     }
 
