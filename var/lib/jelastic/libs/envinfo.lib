@@ -205,7 +205,7 @@ case ${COMPUTE_TYPE} in
         BUNDLE_INSTALL_LOG="$CARTRIDGE_HOME/log/bundle_install.log";
         MOUNT_DIR="/opt/repo";
 	;;
-	gate)
+    gate)
 		gw_boost_lib_inherit="usermanage-gate";
 	;;
     dummy)
@@ -213,8 +213,9 @@ case ${COMPUTE_TYPE} in
 		dumper_module_inherit="dummy-dumper";
 		default_user="admin";
 	;;
-	storage)
-		MOUNT_DIR="/data";
+    storage)
+            MOUNT_DIR="/data";
+            SERVICE='nfs-server';
 	;;
 esac
 
