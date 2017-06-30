@@ -215,7 +215,7 @@ function getInfraAddresses() {
         return 1;
     }
 
-    domain=$(host ${NSIP} | $SED -re '/NXDOMAIN/d;s/.*\s+(rslv[0-9]{0,3}|resolver)\.(\S+)\.$/\2/g;/arpa/d');
+    domain=$(host ${NSIP} | $SED -re '/NXDOMAIN/d;s/.*\s+(rslv[0-9]{0,3}|resolver)\.(\S+)\.$/\2/g;/arpa/d' | tail -n 1);
     [ -z "${domain}" ] && return 1;
 
     ## TODO: Need to replace to the v4 code {{{
