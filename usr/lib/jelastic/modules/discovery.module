@@ -58,6 +58,12 @@ function doGather(){
     writeJSONResponseOut "result=>0" "message=>Ok";
 }
 
+function doPostDiscovery(){
+    echo "doPostDiscovery" >>$JEM_CALLS_LOG;
+    isFunction postApply && postApply >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
+    isFunction fixresolvconf && fixresolvconf >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
+    [ -f "${ROUTEFIXER}" ] && [ ! -z "$externalIp" ] && bash ${ROUTEFIXER} >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
+}
 
 function doApply(){
     VERBOSE=${ENV_VERBOSE:-1}
@@ -81,9 +87,7 @@ function doApply(){
         chmod "${tplPermissions:-644}" "/${tpl}" >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
         [ -f "/${tpl}" ] && head -n 1 /${tpl} | ${GREP} -q "^#rights=" && $SED -ri '1,1'd /${tpl} >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
     done
-    isFunction postApply && postApply ;
-    isFunction fixresolvconf && fixresolvconf ;
-    [ -f "${ROUTEFIXER}" ] && [ ! -z "$externalIp" ] && bash ${ROUTEFIXER}
+    doPostDiscovery;
     if [ $localResult == 0 ]
     then
         writeJSONResponseOut "result=>0" "message=>Ok";
