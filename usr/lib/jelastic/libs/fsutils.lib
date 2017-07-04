@@ -21,10 +21,10 @@ $PROGRAM 'rm';
 
 #
 # isMountpointMounted
-# 
-# ARGS: 
+#
+# ARGS:
 #       mountpoint:string - FS mountpoint
-# RESULT: 
+# RESULT:
 #       0 - mountpoint exists and mounted
 #       1 - mountpoint doesn't exists or unmounted
 function isMountpointMounted() {
@@ -35,10 +35,10 @@ function isMountpointMounted() {
 
 #
 # getFSType
-# 
-# ARGS: 
+#
+# ARGS:
 #       mountpoint:string - FS mountpoint
-# RESULT: 
+# RESULT:
 #       0 - no error
 #       1 - error detecting FS type
 function getFSType() {
@@ -105,7 +105,7 @@ function checkRights(){
                 break
             fi
         done
-    elif [[ $(($file_perm & $OWNER_PATTERN)) != 0 ]]; then 
+    elif [[ $(($file_perm & $OWNER_PATTERN)) != 0 ]]; then
         # The owner has write access. Does the user own the file?
         [[ $user == $file_owner ]] && ACCESS=yes
     fi
@@ -158,6 +158,6 @@ function rm(){
     args=$@;
     [[ $1 == *"-"* ]] && shift;
     local resourceToDelete=$1;
-    [ ! -z $resourceToDelete -a  -d $resourceToDelete ] && { isMountpointMounted $resourceToDelete  &&  $RM  $args/* ;} || $RM $args;
+    [ ! -z "$resourceToDelete" -a  -d "$resourceToDelete" ] && { isMountpointMounted "$resourceToDelete"  &&  $RM  $args/* ;} || $RM $args;
     return 0;
 }
