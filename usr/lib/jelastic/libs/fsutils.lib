@@ -158,6 +158,16 @@ function rm(){
     args=$@;
     [[ $1 == *"-"* ]] && shift;
     local resourceToDelete=$1;
-    [ ! -z "$resourceToDelete" -a  -d "$resourceToDelete" ] && { isMountpointMounted "$resourceToDelete"  &&  $RM  $args/* ;} || $RM $args;
+    if [ ! -z "$resourceToDelete" -a  -d "$resourceToDelete" ] ; then
+        if isMountpointMounted "$resourceToDelete"  ; then
+            set +f
+            $RM  $args/*
+            set -f
+        fi
+    else
+        set +f
+        $RM $args
+        set -f
+    fi
     return 0;
 }
