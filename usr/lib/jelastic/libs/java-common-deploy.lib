@@ -33,16 +33,16 @@ function verifyUnpackedContent(){
     local attempt_amount=450;
     local attempt_num=0;
 
-    while [ true ] 
+    while [ true ]
     do
 
         local content_path;
 
-        [ ${COMPUTE_TYPE} == "tomcat" ] && { 
+        [ ${COMPUTE_TYPE} == "tomcat" ] && {
                     content_path="${WEBROOT}/${context}";
         };
 
-        [ ${COMPUTE_TYPE} == "jetty" ] && [ ${COMPUTE_TYPE_VERSION} == "6" ] && { 
+        [ ${COMPUTE_TYPE} == "jetty" ] && [ ${COMPUTE_TYPE_VERSION} == "6" ] && {
                     local jetty_context_dir=$(ls -1 ${WORKDIR}/ | $GREP ${context} | head -n 1);
                     [ ! -z $jetty_context_dir  ] &&  content_path="${WORKDIR}/${jetty_context_dir}" || content_path="NoPath";
         };
@@ -63,7 +63,9 @@ function clearCache(){
         if [[ -d "$DOWNLOADS" ]]
         then
                 shopt -s dotglob;
+                set -f
                 rm -Rf ${DOWNLOADS}/*;
+                set +f
                 shopt -u dotglob;
         fi
 }
@@ -75,12 +77,12 @@ function deploy(){
         echo "Wrong arguments for deploy" 1>&2;
         exit 1;
     fi
-    clearCache; 
+    clearCache;
     ensureFileCanBeDownloaded $package_url;
     $WGET --no-check-certificate --content-disposition --directory-prefix=${DOWNLOADS} $package_url >> $ACTIONS_LOG 2>&1 || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
     package_name=$(ls ${DOWNLOADS});
 
-    [ ! -s "$DOWNLOADS/$package_name" ] && { 
+    [ ! -s "$DOWNLOADS/$package_name" ] && {
         rm -f ${DOWNLOADS}/${package_name};
         writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
         die -q;
@@ -89,7 +91,7 @@ function deploy(){
     stopServiceSilent ${SERVICE} ;
 
     if [ -e "${WEBROOT}/$context" ]
-    then 
+    then
         rm -fr ${WEBROOT}/$context;
     fi
 
@@ -98,7 +100,7 @@ function deploy(){
     echo $package_name | $GREP -qP "ear$" && ext="ear" || ext="war";
 
     if [[ ${ext} == "ear" ]]
-    then 
+    then
         [ ! -d  $APPS_DIR ] && mkdir -p $APPS_DIR && chown -R  $DATA_OWNER  ${APPS_DIR} 2>>"$JEM_CALLS_LOG";
         [ -f "${DOWNLOADS}/${package_name}" ] && mv "${DOWNLOADS}/${package_name}" "${APPS_DIR}/${context}.${ext}";
     else
@@ -106,7 +108,7 @@ function deploy(){
     fi
 
     applyPostDeploy;
-    clearCache; 
+    clearCache;
     startServiceSilent ${SERVICE} ;
 
     verifyUnpackedContent "${context}";
@@ -119,7 +121,7 @@ function undeploy(){
         echo "Wrong arguments for undeploy" 1>&2
         exit 1
     fi
-    
+
     applyPreUndeploy;
 
     [ -f ${WEBROOT}/${context}.war ] && rm -f ${WEBROOT}/${context}.war
@@ -127,7 +129,7 @@ function undeploy(){
 
     applyPostUndeploy;
 
-}   
+}
 
 function renameContext(){
 
@@ -148,11 +150,11 @@ function renameContext(){
 	die -q;
     }
 
-    shopt -u dotglob;   
+    shopt -u dotglob;
     applyPostRename;
     startServiceSilent ${SERVICE} ;
     verifyUnpackedContent "${newContext}";
- 
+
 }
 
 function describeDeploy(){
