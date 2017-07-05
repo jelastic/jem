@@ -32,17 +32,17 @@ VERBOSE=0;
 function unpack(){
     package_name=$(ls $DOWNLOADS);
     APPWEBROOT=$1;
-    [ ! -s "$DOWNLOADS/$package_name" ] && { 
+    [ ! -s "$DOWNLOADS/$package_name" ] && {
         clearCache;
         [ "x$(basename ${APPWEBROOT})" != "xROOT" ] && { rmdir ${APPWEBROOT}; }
         writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
         die -q;
     }
 
-    shopt -s dotglob; 
+    shopt -s dotglob;
     rm -Rf ${APPWEBROOT}/*;
-    shopt -u dotglob; 
-    
+    shopt -u dotglob;
+
     ensureFileCanBeUncompressed "$DOWNLOADS/${package_name}";
     [[ ! -d "$APPWEBROOT" ]] && { mkdir -p $APPWEBROOT;}
     if [[ ${package_url} =~ .zip$ ]] || [[ ${package_name} =~ .zip$ ]]
@@ -107,12 +107,12 @@ function shiftContentFromSubdirectory(){
             mv "$appwebroot/$object/"* "$appwebroot/" 2>/dev/null ;
             [ -d "$appwebroot/$object" ] && rm -rf "$appwebroot/$object";
         else
-            rmdir "$appwebroot/$object" && [ "x$(basename $appwebroot)" != "xROOT" ] && { 
+            rmdir "$appwebroot/$object" && [ "x$(basename $appwebroot)" != "xROOT" ] && {
                      [ -d "$appwebroot" ] &&  rm -rf "$appwebroot";
-            } ;  writeJSONResponseErr "result=>4072" "message=>Empty package!"; die -q; 
+            } ;  writeJSONResponseErr "result=>4072" "message=>Empty package!"; die -q;
         fi
     fi
-    shopt -u dotglob;   
+    shopt -u dotglob;
 }
 
 
@@ -120,7 +120,9 @@ function clearCache(){
     if [[ -d "$DOWNLOADS" ]]
     then
        shopt -s dotglob;
+       set -f
        rm -Rf ${DOWNLOADS}/*;
+       set +f
        shopt -u dotglob;
     fi
 }
@@ -152,7 +154,7 @@ function deploy(){
     [ $? -gt 0 ] && { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q; };
 
     package_name=$(ls ${DOWNLOADS});
-    [ ! -s "$DOWNLOADS/$package_name" ] && { 
+    [ ! -s "$DOWNLOADS/$package_name" ] && {
         rm -f ${DOWNLOADS}/${package_name};
         writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
         die -q;
@@ -229,11 +231,11 @@ function renameContext(){
         shopt -u dotglob
     fi
 
-    if [ ! -h "${WEBROOT}/${oldContext}" ]; then 
+    if [ ! -h "${WEBROOT}/${oldContext}" ]; then
     if [ -d "${WEBROOT}/${oldContext}" ]
     then
         shopt -s dotglob;
-        mv "$WEBROOT/$oldContext/"* "$WEBROOT/$newContext/" 2>/dev/null && [ "$oldContext" != "ROOT" ] && rm -rf $WEBROOT/$oldContext; 
+        mv "$WEBROOT/$oldContext/"* "$WEBROOT/$newContext/" 2>/dev/null && [ "$oldContext" != "ROOT" ] && rm -rf $WEBROOT/$oldContext;
         deployLog "Moving application data from $oldContext to $newContext";
         shopt -u dotglob;
     else
