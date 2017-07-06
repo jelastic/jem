@@ -36,7 +36,7 @@ function setContext(){
 
 function prepareContext(){
     local context=$1;
-    if ! $GREP -q ${context} <<< "development production test" ; then 
+    if ! $GREP -q ${context} <<< "development production test" ; then
 	    writeJSONResponseErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
     fi
     echo "${context}" > /var/lib/jelastic/env;
@@ -57,7 +57,7 @@ function deploy(){
     [ $? -gt 0 ] && { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q; };
 
     package_name=$(ls ${DOWNLOADS});
-    [ ! -s "$DOWNLOADS/$package_name" ] && { 
+    [ ! -s "$DOWNLOADS/$package_name" ] && {
         rm -f ${DOWNLOADS}/${package_name};
         writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
         die -q;
@@ -87,9 +87,11 @@ function undeploy(){
     local context=$1;
 #   if [[ ${COMPUTE_TYPE} == "apache-ruby" ]]
 #   then
-    	shopt -s dotglob;
-		rm -Rf $WEBROOT/ROOT/* ;
-    	shopt -u dotglob;
+        shopt -s dotglob;
+        set -f
+        rm -Rf $WEBROOT/ROOT/* ;
+        set +f
+        shopt -u dotglob;
         return 0;
 #   fi
 }
@@ -108,7 +110,7 @@ function renameContext(){
 
     stopService ${SERVICE} > /dev/null 2>&1;
 
-    bundleInstall 
+    bundleInstall
 
     startServiceSilent ${SERVICE} ;
 

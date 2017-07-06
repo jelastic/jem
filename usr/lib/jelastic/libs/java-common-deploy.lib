@@ -83,7 +83,9 @@ function deploy(){
     package_name=$(ls ${DOWNLOADS});
 
     [ ! -s "$DOWNLOADS/$package_name" ] && {
+        set -f
         rm -f ${DOWNLOADS}/${package_name};
+        set +f
         writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
         die -q;
     }
@@ -92,7 +94,9 @@ function deploy(){
 
     if [ -e "${WEBROOT}/$context" ]
     then
+        set -f
         rm -fr ${WEBROOT}/$context;
+        set +f
     fi
 
     applyPreDeploy;

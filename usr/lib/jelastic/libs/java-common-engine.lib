@@ -29,7 +29,7 @@ JAVA_DEFAULT_DIR="/usr/java/default"
 function switchEngine(){
 
 	local engine_type=$1
-	
+
 	case $engine_type in
 		"java6" )
 		 local java_dir="$JAVA6_DIR"
@@ -40,15 +40,15 @@ function switchEngine(){
 		"java8" )
 		 local java_dir="$JAVA8_DIR"
 	;;
-	*) 	
+	*)
 	return 1
 
     esac
 
-	[ -L "$JAVA_LATEST_DIR" ] && rm "$JAVA_LATEST_DIR";
+	[ -L "$JAVA_LATEST_DIR" ] && { set -f; rm "$JAVA_LATEST_DIR"; set +f; }
 	[ ! -z "$java_dir" ] && ln -s "$java_dir" "$JAVA_LATEST_DIR";
 
-	[ -L "$JAVA_DEFAULT_DIR" ] && rm "$JAVA_DEFAULT_DIR";
+	[ -L "$JAVA_DEFAULT_DIR" ] && { set -f; rm "$JAVA_DEFAULT_DIR"; set +f; }
     [ ! -z "$java_dir" ] && ln -s "$JAVA_LATEST_DIR" "$JAVA_DEFAULT_DIR";
 
 	[ -d "$JAVA_COMMON_PATH" ] && chown -R "$DATA_OWNER" "$JAVA_COMMON_PATH" 2>>"$JEM_CALLS_LOG";

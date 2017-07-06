@@ -21,7 +21,7 @@ inherit os;
 include output uninterract;
 
 function doCheckout(){
-    [ ! -z "$WEBROOT" ] && rm -Rf "${WEBROOT}/${PROJECT_NAME}";
+    [ ! -z "$WEBROOT" ] && { set -f; rm -Rf "${WEBROOT}/${PROJECT_NAME}"; set +f; }
 
     if [[ "$LOGIN" != "__GUEST__"  ]] ; then
         local repo_proto=$(echo $URL | $SED -nre 's/(.*):\/\/(.*)/\1/p');
@@ -46,10 +46,10 @@ function doCheckout(){
         }
         runNonInterractive "$GIT clone ${preparedUrl} ${WEBROOT}/${PROJECT_NAME}" >> $JEM_CALLS_LOG 2>&1;
         result=$?; [ $result -ne 0 ] && return $result;
-	[ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
+        [ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
             echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
             cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
-	}
+        }
         [ ! -z $BRANCH ] && cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1 && cd - >> $JEM_CALLS_LOG 2>&1;       ###### we removed --git-dir directive because of bug in GIT
         cd "${WEBROOT}/${PROJECT_NAME}" && runNonInterractive "$GIT submodule update --init --recursive" >> $JEM_CALLS_LOG 2>&1 ; result=$? && cd - > /dev/null 2>&1;
         [ $result -ne 0 ] && return $result;
@@ -61,18 +61,18 @@ function doCheckout(){
             result=$?; [ $result -ne 0 ] && return $result;
         fi
         cd "${WEBROOT}/${PROJECT_NAME}" && {
-    	    runNonInterractive "$GIT  submodule update --init --recursive" > /dev/null 2>&1;
-    	    result=$?; [ $result -ne 0 ] && return $result;
-    	}
-	[ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
+            runNonInterractive "$GIT  submodule update --init --recursive" > /dev/null 2>&1;
+            result=$?; [ $result -ne 0 ] && return $result;
+        }
+        [ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
             echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
-    	    cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD  >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
-	}
+            cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD  >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
+        }
         [ ! -z $BRANCH ] && cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1 && cd - > /dev/null 2>&1;      ###### we removed --git-dir directive because of bug in GIT
         [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
             inherit ruby-common;
             bundleInstall;
-	    reloadServiceSilent ${SERVICE} ;
+            reloadServiceSilent ${SERVICE} ;
         } || return 0;
     fi
     return 0;
@@ -115,7 +115,7 @@ function getLastRepoCommit(){
 function getLastRemoteCommit(){
     readProjectConfig;
     preparedUrl="${URL}";
-    
+
     if [[ "$LOGIN" != "__GUEST__"  ]] ; then
         local repo_proto=$(echo $URL | $SED -nre 's/(.*):\/\/(.*)/\1/p');
         local host_and_uri=$(echo $URL | $SED -re 's/(.*:\/\/)(.*)/\2/');

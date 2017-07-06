@@ -167,7 +167,7 @@ source /usr/lib/rvm/environments/default
 END_OF_RVMEEE
 
 	rvmbin="/usr/lib/rvm/bin/rvm"
-	
+
 	RUBY_BIN_SOURCE=/usr/lib/rvm/rubies/${full_version}/bin/ruby
 
 	# The following code loads RVM as user or system install:
@@ -181,7 +181,7 @@ END_OF_RVMEEE
 	export rvm_path=/usr/lib/rvm && rvm --default use ${full_version} 1>>$ACTIONS_LOG 2>&1
         export rvm_path=/usr/lib/rvm && gem update --system 1>>$ACTIONS_LOG  2>&1
 	isFunction "postSwitchEngine" && {
-		postSwitchEngine 
+		postSwitchEngine
 	}
 # common part
 
@@ -190,7 +190,7 @@ END_OF_RVMEEE
 		rm -f "${RVM_PATH}/gems/current-gems";
 	fi
 	ln -s "${RVM_PATH}/gems/${full_version}" "${RVM_PATH}/gems/current-gems" 1>>$ACTIONS_LOG 2>&1;
-	
+
 	curent_passenger_version="${RVM_PATH}/gems/${full_version}/gems/passenger-version"
 	if [ -L "${curent_passenger_version}" -o -f "${curent_passenger_version}" ]
 	then
