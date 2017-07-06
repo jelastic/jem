@@ -160,14 +160,18 @@ function rm(){
     local resourceToDelete=$1;
     if [ ! -z "$resourceToDelete" -a  -d "$resourceToDelete" ] ; then
         if isMountpointMounted "$resourceToDelete"  ; then
+            #delete contents inside mounted directory
             set +f
             $RM  $args/*
             set -f
+            return 0
         fi
-    else
-        set +f
-        $RM $args
-        set -f
     fi
+
+    #delete regular direcory or file
+    set +f
+    $RM $args
+    set -f
+
     return 0;
 }

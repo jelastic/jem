@@ -40,7 +40,9 @@ function unpack(){
     }
 
     shopt -s dotglob;
+    set -f
     rm -Rf ${APPWEBROOT}/*;
+    set +f
     shopt -u dotglob;
 
     ensureFileCanBeUncompressed "$DOWNLOADS/${package_name}";
@@ -108,7 +110,7 @@ function shiftContentFromSubdirectory(){
             [ -d "$appwebroot/$object" ] && rm -rf "$appwebroot/$object";
         else
             rmdir "$appwebroot/$object" && [ "x$(basename $appwebroot)" != "xROOT" ] && {
-                     [ -d "$appwebroot" ] &&  rm -rf "$appwebroot";
+                     [ -d "$appwebroot" ] && { set -f; rm -rf "$appwebroot"; set +f; }
             } ;  writeJSONResponseErr "result=>4072" "message=>Empty package!"; die -q;
         fi
     fi
@@ -227,7 +229,9 @@ function renameContext(){
         mkdir -p "$WEBROOT/$newContext";
     else
         shopt -s dotglob
+        set -f
         rm -Rf "$WEBROOT/$newContext/"* && deployLog "Content of $newContext directory removed";
+        set +f
         shopt -u dotglob
     fi
 
@@ -245,7 +249,9 @@ function renameContext(){
 
     if [ "x${newContext}" == "xROOT" ]
     then
+        set -f
         rm -Rf $WEBROOT/$oldContext/ 2>/dev/null && deployLog "Directory $oldContext deleted";
+        set +f
         delContext $oldContext;
         return 0;
     else

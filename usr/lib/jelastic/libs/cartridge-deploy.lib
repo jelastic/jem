@@ -34,8 +34,10 @@ function deploy(){
     $WGET --content-disposition --no-check-certificate --directory-prefix=$DOWNLOADS $package_url >> $ACTIONS_LOG 2>&1;
     [ $? -gt 0 ] && { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q; };
     package_name=$(ls ${DOWNLOADS});
-    [ ! -s "$DOWNLOADS/$package_name" ] && { 
+    [ ! -s "$DOWNLOADS/$package_name" ] && {
+        set -f
         rm -f ${DOWNLOADS}/${package_name};
+        set +f
         writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
         die -q;
     }

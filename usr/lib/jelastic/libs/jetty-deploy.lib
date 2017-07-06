@@ -35,10 +35,10 @@ function applyWadiSettings(){
 	WADICONF=$(basename ${context}.xml)
 
 	if [[ -s "$JETTY_HOME/$TEMPLATES/$WADI_TEMPLATE" ]]
-	then 
+	then
 		cp $JETTY_HOME/$TEMPLATES/$WADI_TEMPLATE $TMP_TEMPLATE
 		if [ "$context" == "root" ]
-		then 
+		then
 			$SED -i "s/CONTEXTPATH//g" $TMP_TEMPLATE
 		else
 			$SED -i "s/CONTEXTPATH/$context/g" $TMP_TEMPLATE
@@ -52,25 +52,29 @@ function applyWadiSettings(){
 
 function removeWadiSettings(){
 
-	local context=$1;
-	WADICONF=$(basename ${context}.xml)
-	
-	if [ -f "$JETTY_HOME/$CONTEXT_CONF_DIR/$WADICONF" ]
-        then
-                rm -f $JETTY_HOME/$CONTEXT_CONF_DIR/$WADICONF
-        fi
+    local context=$1;
+    WADICONF=$(basename ${context}.xml)
+
+    if [ -f "$JETTY_HOME/$CONTEXT_CONF_DIR/$WADICONF" ]
+    then
+        set -f
+        rm -f $JETTY_HOME/$CONTEXT_CONF_DIR/$WADICONF
+        set +f
+    fi
 }
 
 function applyPreDeploy(){
-	[ "$context" == "ROOT" ]  && context='root';
-	if [[ -n $(find ${WEBROOT} -maxdepth 1 -iname ${context}.war) ]]
-	then 
-    	    rm -f ${WEBROOT}/${context}.war
-    	    rm -f ${WEBROOT}/$(toLowerCase ${context}.war)
-    	    rm -rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${context}.war*
-    	    rm -rf ${WORK_DIR}/Jetty_0_0_0_0_8080_$(toLowerCase ${context}).war*
-    	fi
-	return 0;
+    [ "$context" == "ROOT" ]  && context='root';
+    if [[ -n $(find ${WEBROOT} -maxdepth 1 -iname ${context}.war) ]]
+    then
+        set -f
+        rm -f ${WEBROOT}/${context}.war
+        rm -f ${WEBROOT}/$(toLowerCase ${context}.war)
+        rm -rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${context}.war*
+        rm -rf ${WORK_DIR}/Jetty_0_0_0_0_8080_$(toLowerCase ${context}).war*
+        set +f
+    fi
+    return 0;
 }
 
 function applyPostDeploy(){
@@ -83,20 +87,24 @@ function applyPreUndeploy(){
 }
 
 function applyPostUndeploy(){
-	rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${context}*
+    set -f
+    rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${context}*
     rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_*/webapp/${context}.war ;
-	[ ${COMPUTE_TYPE_VERSION} == "6" ] && removeWadiSettings $context;
+    set +f
+    [ ${COMPUTE_TYPE_VERSION} == "6" ] && removeWadiSettings $context;
 }
 
 function applyPreRename(){
-	[ "$oldContext" == "ROOT" ]  && oldContext='root';
-	[ "$newContext" == "ROOT" ]  && newContext='root';
-	return 0;
+    [ "$oldContext" == "ROOT" ]  && oldContext='root';
+    [ "$newContext" == "ROOT" ]  && newContext='root';
+    return 0;
 }
 
 function applyPostRename(){
-	rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}.war*
-	rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}*
-	[ ${COMPUTE_TYPE_VERSION} == "6" ] &&  removeWadiSettings $oldContext;
-	[ ${COMPUTE_TYPE_VERSION} == "6" ] &&  applyWadiSettings $newContext;
+    set -f
+    rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}.war*
+    rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}*
+    set +f
+    [ ${COMPUTE_TYPE_VERSION} == "6" ] &&  removeWadiSettings $oldContext;
+    [ ${COMPUTE_TYPE_VERSION} == "6" ] &&  applyWadiSettings $newContext;
 }

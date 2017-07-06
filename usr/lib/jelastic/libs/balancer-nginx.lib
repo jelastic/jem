@@ -63,7 +63,7 @@ function getSubnetById(){
   CURRENT_GROUP=1
   GROUP_ID=$1
   for NET in 10.{0..255}
-  do  
+  do
     for SUBNET in $NET.{0..255}
     do
       ### for IP in $SUBNET.{1..255..$SUBNET_STEP} - new construction not working in old bash3
@@ -73,7 +73,7 @@ function getSubnetById(){
         then
           echo $SUBNET.$IP
           return 0;
-        else  
+        else
           CURRENT_GROUP=$[CURRENT_GROUP+1]
         fi
       done
@@ -89,17 +89,21 @@ function reloadConfigs(){
     cat "$NGINX_CONFIG_TEMPLATE" > "$NGINX_CONFIG"
     cat "$DHCPD_CONFIG_TEMPLATE" > "$DHCPD_CONFIG"
     if [ -e "$LEASES_FILE" ]; then
-    	rm -f "$LEASES_FILE";
+        set -f
+        rm -f "$LEASES_FILE";
+        set +f
     fi
     toActionLog "- Templates are reloaded"
     return 0;
 }
 
 function clearHosts(){
-  rm -Rf "$UPSTREAMS_LOCATION_PATH"/group*
-  echo '' > "$UPSTREAMS_LOCATION_PATH"/common
-  toActionLog "- Upstreams cleaned!"
-  return 0;
+    set -f
+    rm -Rf "$UPSTREAMS_LOCATION_PATH"/group*
+    set +f
+    echo '' > "$UPSTREAMS_LOCATION_PATH"/common
+    toActionLog "- Upstreams cleaned!"
+    return 0;
 }
 
 function removeDublicates(){
@@ -108,9 +112,9 @@ function removeDublicates(){
   nginx_config=( $(cat "$NGINX_CONFIG") )
 
   for ((i=0; i < "${#nginx_config[@]}"; i++))
-  do 
-		if [ "${nginx_config[${i}]}" != "${nginx_config[${i}+1]}" ] 
-		then	
+  do
+		if [ "${nginx_config[${i}]}" != "${nginx_config[${i}+1]}" ]
+		then
 	 		echo "${nginx_config[${i}]}" >> $TMP_CONFIG
 		fi
   done
@@ -129,11 +133,11 @@ function makeSureNodesReceivedIpsFromDhcpd(){
   let local accepted_result=$AMOUNT_OF_DHCPD_LEASES+2;
   for check in {1..15}
   do
-    current_result=$(getAmountOfDhcpdLeases); 
-    [ $current_result == $accepted_result ] && { break; } || { 
+    current_result=$(getAmountOfDhcpdLeases);
+    [ $current_result == $accepted_result ] && { break; } || {
       sleep 3s;
       [ $check == 15 ] && { toActionLog "- Cound not make sure that DHCP works corectly now"; };
-    } 
+    }
   done
 }
 
@@ -146,8 +150,8 @@ function addRangeToDhcpdConfig(){
     RANGE=$(createDhcpdRange $AMOUNT_OF_HOSTS)
     insertDhcpdRangeIntoConfig "$RANGE #$1"
     toActionLog "- DHCP range $RANGE is added to config";
-  else	
-    toActionLog "- ${GROUP_CONFIG} not exists" 
+  else
+    toActionLog "- ${GROUP_CONFIG} not exists"
     return 11;
   fi
   return 0;
@@ -180,11 +184,11 @@ function generateUpstreams(){
       echo "${upstreams[@]} ### UPSTREAMPROTO for $1 ###"
     else
       [ ! -z "$WEIGHT_CHANGED_FLAG" ] && { [ "$WEIGHT_CHANGED_FLAG" -eq 1 ] && [ -f "$EXTRA_CONF" ] && extraConfContent=$( <${EXTRA_CONF} ); }
-      echo "upstream $1 {${backups[@]}  ${upstreams[@]} $extraConfContent sticky path=/; } ### UPSTREAMPROTO for $1 ###"  
+      echo "upstream $1 {${backups[@]}  ${upstreams[@]} $extraConfContent sticky path=/; } ### UPSTREAMPROTO for $1 ###"
     fi
-  else  
+  else
     toActionLog "- ${GROUP_CONFIG} not exists" ;
-    return 11; 
+    return 11;
   fi
   toActionLog "- upstreams generated"
 
@@ -195,7 +199,7 @@ function generateDefaultUpstreamLine(){
   GROUP_CONFIG=$UPSTREAMS_LOCATION_PATH/$1
   extraConfContent=''
   if [ -e "$GROUP_CONFIG" ]; then
-   
+
     count=0
     OLD_IFS=$IFS; IFS=$'\n';
     for i in  $(sort -u ${GROUP_CONFIG} )
@@ -228,7 +232,7 @@ function createDhcpdRange(){
   SUBNET_ID=$( $GREP -n NEXT_SUBNET_ID $DHCPD_CONFIG | tail -n 1 | $AWK '{print $3}' )
   NEXT_SUBNET_START=$(getSubnetById $SUBNET_ID)
   ((SUBNET_ID++))
-  $SED -i "7 c ### NEXT_SUBNET_ID $SUBNET_ID" $DHCPD_CONFIG 
+  $SED -i "7 c ### NEXT_SUBNET_ID $SUBNET_ID" $DHCPD_CONFIG
   LAST_SUBNET_IP=$(echo $NEXT_SUBNET_START | $AWK -F "." {'print $4'})
   let "LAST_SUBNET_IP +=$AMOUNT_OF_HOSTS-1"
   NEXT_SUBNET_END="$(echo $NEXT_SUBNET_START | $AWK -F "." '{print $1"."$2"."$3"."}')$LAST_SUBNET_IP"
@@ -244,7 +248,7 @@ function updateUpstreamSection(){
   elif [[ $UPSTREAM_LINE == *server* ||  $WEIGHT_CHANGED_FLAG -eq 1 ]]; then
     LINE=( $( $GREP -n UPSTREAMPROTO $NGINX_CONFIG | tail -n 1 | $AWK -F: '{print $1}' ) )
     $SED -i "$LINE a $UPSTREAM_LINE" $NGINX_CONFIG
-    [ ! -z "$WEIGHT_CHANGED_FLAG" ] && { [ "$WEIGHT_CHANGED_FLAG" -eq 1 ] && $SED -i "$LINE a $DISCLIMER_LINE" $NGINX_CONFIG ; } 
+    [ ! -z "$WEIGHT_CHANGED_FLAG" ] && { [ "$WEIGHT_CHANGED_FLAG" -eq 1 ] && $SED -i "$LINE a $DISCLIMER_LINE" $NGINX_CONFIG ; }
   fi
 }
 
@@ -253,10 +257,10 @@ function updateMappingsSection(){
   CHECK_LINE=$( $GREP MAPPROTO ${NGINX_CONFIG} | $GREP -w $2 | tail -n 1)
   if [[ $CHECK_LINE == *$2* ]]; then
   	LINE=( $( $GREP -n MAPPROTO ${NGINX_CONFIG} | $GREP -w $2 | tail -n 1 | $AWK -F: '{print $1}') )
-    $SED -i "$LINE c $MAPPING_LINE" $NGINX_CONFIG 
+    $SED -i "$LINE c $MAPPING_LINE" $NGINX_CONFIG
   elif [[ $MAPPING_LINE == *:* ]]; then
   	LINE=( $( $GREP -n MAPPROTO $NGINX_CONFIG | tail -n 1 | $AWK -F: '{print $1}') )
-    $SED -i "$LINE a $MAPPING_LINE" $NGINX_CONFIG 
+    $SED -i "$LINE a $MAPPING_LINE" $NGINX_CONFIG
   fi
 }
 
@@ -264,12 +268,12 @@ function updateDefaultUpstreamSection(){
   UPSTREAM_LINE=$(echo -e "\\x09 $1")
   CHECK_LINE=$( $GREP DEFUPPROTO $NGINX_CONFIG | $GREP -w $2 | tail -n 1)
   if [[ $CHECK_LINE == *$2* ]]; then
-    LINE=( $( $GREP -n DEFUPPROTO ${NGINX_CONFIG} | $GREP -w $2 | tail -n 1 | $AWK -F: '{print $1}') ) 
-    $SED -i "$LINE c $UPSTREAM_LINE" $NGINX_CONFIG 
+    LINE=( $( $GREP -n DEFUPPROTO ${NGINX_CONFIG} | $GREP -w $2 | tail -n 1 | $AWK -F: '{print $1}') )
+    $SED -i "$LINE c $UPSTREAM_LINE" $NGINX_CONFIG
   elif [[ $UPSTREAM_LINE == *server* ]]; then
     LINE=( $( $GREP -n DEFUPPROTO $NGINX_CONFIG | tail -n 1 | $AWK -F: '{print $1}') )
-    $SED -i "$LINE a $UPSTREAM_LINE" $NGINX_CONFIG 
-    [ ! -z "$WEIGHT_CHANGED_FLAG" ] && { [ "$WEIGHT_CHANGED_FLAG" -eq 1 ] && $SED -i "$LINE a $DISCLIMER_LINE" $NGINX_CONFIG ; } 
+    $SED -i "$LINE a $UPSTREAM_LINE" $NGINX_CONFIG
+    [ ! -z "$WEIGHT_CHANGED_FLAG" ] && { [ "$WEIGHT_CHANGED_FLAG" -eq 1 ] && $SED -i "$LINE a $DISCLIMER_LINE" $NGINX_CONFIG ; }
   fi
 }
 
@@ -335,10 +339,10 @@ function generateMapRegexLine(){
       mappings[$count]="$regex_line $1;"
       ((count++))
     done
-    IFS=$OLD_IFS   
+    IFS=$OLD_IFS
 
     echo "${mappings[@]} ### MAPPROTO for $1 ###"
-  else 
+  else
     toActionLog "- ${GROUP_CONFIG} not exists"
     return 11;
   fi
@@ -353,7 +357,7 @@ function moveIpsFromGroupToCommon(){
   	do
     		echo $line >> $UPSTREAM_COMMON_CONFIG
   	done
-   else	
+   else
     toActionLog "- ${GROUP_CONFIG} not exists"
     return 11;
   fi
@@ -368,13 +372,13 @@ function removeGroupIpsFromCommon(){
     		$GREP -v '$line' $UPSTREAM_COMMON_CONFIG  >  $TMP_CONFIG
     		mv $TMP_CONFIG $UPSTREAM_COMMON_CONFIG
   	done
-  else	
-    toActionLog "- ${GROUP_CONFIG} not exists" 
+  else
+    toActionLog "- ${GROUP_CONFIG} not exists"
     return 11;
   fi
 }
 
-############ TCP Balancing functions ############# 
+############ TCP Balancing functions #############
 
 function updateTcpUpstreamSection(){
   fend_port=$1
@@ -393,7 +397,7 @@ function addTCPPortMappings(){
   then
   	#cat $NGINX_TCPMAP_TEMPLATE > $TMP_TEMPLATE;
   	OLDIFS=$IFS
-  	IFS=$'\n'	
+  	IFS=$'\n'
     if $GREP pair $NGINX_TCPMAP_CONFIG | $GREP -v '!--' -q ; then
         echo -e "\ntcp {\n">> $TMP_TEMPLATE;
     for line in $( $GREP pair $NGINX_TCPMAP_CONFIG | $GREP -v '!--' )
@@ -474,7 +478,7 @@ function weightChanged(){
   done
 
   for ((count=1; count <= ${#ip_a[@]}; count++))
-  do 
+  do
         log "IP: ${ip_a[$count]}  WEIGT:${weight_a[$count]}  OLD:${old_val[$count]} ${old_backup}"
         new_opts=;
         [ -z ${weight_a[$count]} ] && new_opts="${new_opts} ${backup_a[$count]}" || new_opts="${new_opts} weight=${weight_a[$count]} ${backup_a[$count]}"
@@ -596,7 +600,7 @@ function addNodeHTD(){
 function removeStickyHTD(){
   [ ! -e ${STICKY_CONF} ] && { touch ${STICKY_CONF}; chmod 666 ${STICKY_CONF}; }
   perl -i -p0e "s/sticky\s*[:a-zA-Z0-9\s\/\=\.\_]{0,}\s*;//g" $NGINX_CONFIG;
-  writeJSONResponseOut "result=>0" "message=>Ok"; 
+  writeJSONResponseOut "result=>0" "message=>Ok";
 }
 
 function addNginxSticky(){
@@ -650,16 +654,16 @@ function setConfigVariables(){
 }
 
 function setSSLforLB(){
-    [ -f "$NGINX_SSL_CONFIG" ] && 
+    [ -f "$NGINX_SSL_CONFIG" ] &&
 	$SED -i -re 's/^\s*include\s*conf.d\/ssl.upstreams.inc/#include conf.d\/ssl.upstreams.inc/' $NGINX_SSL_CONFIG ;
-    [ -f "${NGINX_SSL_CONFIG}.disabled" ] && 
+    [ -f "${NGINX_SSL_CONFIG}.disabled" ] &&
         $SED -i -re 's/^\s*include\s*conf.d\/ssl.upstreams.inc/#include conf.d\/ssl.upstreams.inc/' "${NGINX_SSL_CONFIG}.disabled" ;
 }
 
 function unsetSSLforLB(){
-    [ -f "$NGINX_SSL_CONFIG" ] && 
+    [ -f "$NGINX_SSL_CONFIG" ] &&
         $SED -i -re 's/^\s*#\s*include\s*conf.d\/ssl.upstreams.inc/include conf.d\/ssl.upstreams.inc/'  $NGINX_SSL_CONFIG ;
-    [ -f "${NGINX_SSL_CONFIG}.disabled" ] && 
+    [ -f "${NGINX_SSL_CONFIG}.disabled" ] &&
         $SED -i -re 's/^\s*#\s*include\s*conf.d\/ssl.upstreams.inc/include conf.d\/ssl.upstreams.inc/' "${NGINX_SSL_CONFIG}.disabled" ;
     return 0;
 }
@@ -700,7 +704,7 @@ function addHostToGroup(){
 
 function buildCluster(){
     local groupname="$1";
-    if ! $GREP -q upstream "$NGINX_CONFIG" ; then 
+    if ! $GREP -q upstream "$NGINX_CONFIG" ; then
       reloadConfigs;
     fi
     clearTCPPortMappings && \
@@ -712,8 +716,8 @@ function buildCluster(){
     clearGroupFromNginxConfig common && \
     removeGroupIpsFromCommon "$groupname" && \
     result=0 || result=1 ;
-    if [ "$result" -eq 0 ] ; then  
-      toActionLog "- Group "$groupname" is added to cluster" 
+    if [ "$result" -eq 0 ] ; then
+      toActionLog "- Group "$groupname" is added to cluster"
     else
       toActionLog "- Error was while adding group"
     fi
