@@ -58,14 +58,18 @@ function deploy(){
 
     package_name=$(ls ${DOWNLOADS});
     [ ! -s "$DOWNLOADS/$package_name" ] && {
+        set -f
         rm -f ${DOWNLOADS}/${package_name};
+        set +f
         writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
         die -q;
     }
     # check exactly FILE - it should not exists, otherwise 'mkdir' return error
     if [[ -f "${APPWEBROOT%/}" ]]
     then
+        set -f
         rm -f "${APPWEBROOT%/}";
+        set +f
     fi
     unpack $APPWEBROOT && echo "Application deployed successfully!" >> $ACTIONS_LOG 2>&1 || {  if [ "$context" != "ROOT" ];then rm -rf $APPWEBROOT 1>/dev/null 2>&1; fi;  writeJSONResponseErr "result=>4071" "message=>Cannot unpack package"; die -q; }
     shiftContentFromSubdirectory $APPWEBROOT;
