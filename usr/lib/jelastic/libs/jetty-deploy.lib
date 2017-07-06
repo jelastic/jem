@@ -69,8 +69,11 @@ function applyPreDeploy(){
     then
         set -f
         rm -f ${WEBROOT}/${context}.war
+        set -f
         rm -f ${WEBROOT}/$(toLowerCase ${context}.war)
+        set -f
         rm -rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${context}.war*
+        set -f
         rm -rf ${WORK_DIR}/Jetty_0_0_0_0_8080_$(toLowerCase ${context}).war*
         set +f
     fi
@@ -89,6 +92,7 @@ function applyPreUndeploy(){
 function applyPostUndeploy(){
     set -f
     rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${context}*
+    set -f
     rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_*/webapp/${context}.war ;
     set +f
     [ ${COMPUTE_TYPE_VERSION} == "6" ] && removeWadiSettings $context;
@@ -103,6 +107,7 @@ function applyPreRename(){
 function applyPostRename(){
     set -f
     rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}.war*
+    set -f
     rm -Rf ${WORK_DIR}/Jetty_0_0_0_0_8080_${oldContext}*
     set +f
     [ ${COMPUTE_TYPE_VERSION} == "6" ] &&  removeWadiSettings $oldContext;
