@@ -145,7 +145,7 @@ function preparePath() {
         tpath=$($SED -re 's/\$/\\$/g' -e 's/(`)/\\\1/g' <<< "${tpath}")
     fi
 
-    local cmd="[[ ! -d '$($SED -re "s/'/\\\'\'/g" <<< "${tpath}")' ]] && mkdir -p \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\"; chmod 0777 \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\"";
+    local cmd="[[ ! -d '$($SED -re "s/'/\\\'\'/g" <<< "${tpath}")' ]] && mkdir -p \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\" 2>&1 && chmod 0777 \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\"";
     if [[ -z "${hn}" ]] ; then
         log "${cmd}"
         vzexecRun "${cmd}"
