@@ -264,6 +264,7 @@ function renameContext(){
                 [ ! -n ${CURRENT_DIR} ] && { writeJSONResponseErr "result=>4052" "message=>Context does not exist"; die -q; }
                 if [ -d ${WEBROOT}/${CURRENT_DIR} ] ;then
                         shopt -s dotglob;
+                        set +f
                         mv ${WEBROOT}/${CURRENT_DIR}/* ${WEBROOT}/${newContext} 2>/dev/null && deployLog "Moving application data from ${CURRENT_DIR} to ${newContext}";
                         shopt -u dotglob;
                 fi

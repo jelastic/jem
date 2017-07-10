@@ -48,7 +48,7 @@ export NO_EXPECT="false";
 [ -z "$VCS_UPDATE_LOG" ] && VCS_UPDATE_LOG="${VCS_LOG_DIR}/vcs_update.log";
 
 [ "x${COMPUTE_TYPE}" == "xcartridge" ] && restoreEnvironmentVariables && {
-    [ -f ${CARTRIDGE_HOME}/jelastic/jelastic.conf ] && source ${CARTRIDGE_HOME}/jelastic/jelastic.conf; 
+    [ -f ${CARTRIDGE_HOME}/jelastic/jelastic.conf ] && source ${CARTRIDGE_HOME}/jelastic/jelastic.conf;
     WEBROOT="${Webroot_Path}";
 }
 
@@ -187,7 +187,7 @@ function readProjectConfig(){
     }
     [ ! -z "$AUTHORIZATION_KEY" -a -f "$AUTHORIZATION_KEY" ] && { AUTHORIZATION_KEY_VAL=`cat $AUTHORIZATION_KEY`; export AUTHORIZATION_KEY; }
     [ -z "$GIT_AUTORESOLVE_CONFLICT" ] && GIT_AUTORESOLVE_CONFLICT=true ;
-#    [ ! -z "$AUTHORIZATION_KEY" ] && { 
+#    [ ! -z "$AUTHORIZATION_KEY" ] && {
 #      export AUTHORIZATION_KEY;
 #    }
   else
@@ -224,7 +224,7 @@ function _deployLog(){
 
 function doCreateProject(){
   checkVCSDirectories;
-  parseArguments "$@"; 
+  parseArguments "$@";
 
   isValidURL $URL || { writeJSONResponseErr "result=>4050" "message=>URL is not valid!"; return 1; };
       local incorrect_login_regex="[~\!\#\$%^&\*\(\)\-\+\{\}\\\/=]";
@@ -247,10 +247,10 @@ function doDeleteProject(){
     return 1;
   }
   [ -d "${WEBROOT}/${PROJECT_NAME}" ] && rm -Rf ${WEBROOT}/${PROJECT_NAME};
-  [[ "$PROJECT_NAME" == "ROOT" ]] && { 
-        rm -rf ${WEBROOT}/ROOT; 
+  [[ "$PROJECT_NAME" == "ROOT" ]] && {
+        rm -rf ${WEBROOT}/ROOT;
         cd ${WEBROOT}; ROOT_DIRS=$(ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$");
-        rm -rf ${ROOT_DIRS} && _deployLog "Removing deprecated ROOT context directories ${ROOT_DIRS}"; 
+        rm -rf ${ROOT_DIRS} && _deployLog "Removing deprecated ROOT context directories ${ROOT_DIRS}";
         mkdir -p ${WEBROOT}/${PROJECT_NAME}; updateOwnership ${WEBROOT}/${PROJECT_NAME} > /dev/null 2>&1;
         }
   [ -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.key" ] && rm -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.key" ;
@@ -284,15 +284,15 @@ function doUpdate(){
     if [[ -d ${WEBROOT}/ROOT && ! -h ${WEBROOT}/ROOT ]] ; then
       mv -f ${WEBROOT}/ROOT ${WEBROOT}/$NEXT_DIR && _deployLog "Copying content of the ROOT directory to $NEXT_DIR";
     fi
-    if [ -z "${PREVIOUS_DIR}" ] ;then 
+    if [ -z "${PREVIOUS_DIR}" ] ;then
         local DIR_AMOUNT=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | wc -l`;
-        [ ${DIR_AMOUNT} -gt 1 ]  && PREVIOUS_DIR=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n2 | head -1`; 
+        [ ${DIR_AMOUNT} -gt 1 ]  && PREVIOUS_DIR=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n2 | head -1`;
     fi
         [ -n "${PREVIOUS_DIR}" ] && rm -rf ${WEBROOT}/${PREVIOUS_DIR} && _deployLog "Removing old deprecated context directory ${PREVIOUS_DIR}";
         if [ -n "${CURRENT_DIR}" ] ;then
                 cp -rf ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1  && _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR}";
                 if [ $? -ne 0 ]; then
-                        writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR}"; 
+                        writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR}";
                         return 1;
                 fi
         fi
@@ -302,7 +302,7 @@ function doUpdate(){
                 updateProject 2>>"$VCS_UPDATE_LOG" && { writeJSONResponseOut "result=>0" "message=>Project updated succesfuly";
                 ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; updateOwnership ${WEBROOT}/ROOT;
                 updateOwnership ${WEBROOT}/${PROJECT_NAME};
-                [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}"; 
+                [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}";
     writeProjectConfig; }
                 rcode=$?;
                 [ "$rcode" -eq 1 ] && return 0 || return $rcode
@@ -311,7 +311,7 @@ function doUpdate(){
                 doCheckout &&  writeJSONResponseOut "result=>0" "message=>Project update completed successfully" || { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; }
                 updateOwnership ${WEBROOT}/${PROJECT_NAME};
                 ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; updateOwnership ${WEBROOT}/ROOT;
-                [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}"; 
+                [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}";
     writeProjectConfig; }
                 rcode=$?;
                 [ "$rcode" -eq 1 ] && return 0 || return $rcode
@@ -330,15 +330,16 @@ function doUpdate(){
                     shopt -u dotglob;
                 fi
                     shopt -s dotglob;
+                    set +f
                     mv -f ${WEBROOT}/${TARGET_DIR}/* ${WEBROOT}/ROOT;
-                        if [ $? -ne 0 ]; then
-                    shopt -u dotglob;
-                          writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application to ROOT directory";
-                            return 1;
-                        fi
+                    if [ $? -ne 0 ]; then
+                        shopt -u dotglob;
+                        writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application to ROOT directory";
+                        return 1;
+                    fi
                 shopt -u dotglob;
                 fi
-                cd ${WEBROOT}; ROOT_DIRS=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$"`; 
+                cd ${WEBROOT}; ROOT_DIRS=`ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$"`;
         rm -rf ${ROOT_DIRS} && _deployLog "Removing deprecated ROOT context directories ${ROOT_DIRS}"; cd  /;
         fi
         if [ -d "${WEBROOT}/${PROJECT_NAME}/.$(toLowerCase ${VCS_TYPE})" ] ; then
@@ -359,7 +360,7 @@ function doUpdate(){
 }
 
 
-function doCallProjectUpdate(){ 
+function doCallProjectUpdate(){
   local project_name="$1";
   local last_repo_commit=$(getLastRepoCommit $project_name);
   [ "x${last_repo_commit}" == "x${LAST_DEPLOYED_COMMIT}" ] && return 0;
@@ -472,12 +473,12 @@ function doEditProject(){
     [ "x${PROJECT_NAME}" != "xROOT" ] && ATOMIC_DEPLOY="false";
   }
   if [ "$changeUrlresult" -eq 0 ]; then
-        writeProjectConfig ; 
+        writeProjectConfig ;
         writeProjectresult=$?;
   else
         writeProjectresult=-1;
   fi
-  if [ "$writeProjectresult" -eq 0 -a "$changeUrlresult" -eq 0 ]; then 
+  if [ "$writeProjectresult" -eq 0 -a "$changeUrlresult" -eq 0 ]; then
         if [ "x$OLD_PROJECT_NAME" !=  "x$PROJECT_NAME" -a -f "${VCS_CONFIG_DIR}/${OLD_PROJECT_NAME}.properties" ];then
           rm -f "${VCS_CONFIG_DIR}/${OLD_PROJECT_NAME}.properties";
         fi
@@ -486,13 +487,13 @@ function doEditProject(){
                 VAL=$VAL" environment=>${ENVIRONMENT} context=>${CONTEXT} autoupdate=>${AUTOUPDATE} interval=>${UPDATE_INTERVAL}" ;
         fi
         if [ ! -z "$AUTHORIZATION_KEY_VAL" ] ; then
-                hash=`echo $AUTHORIZATION_KEY_VAL | md5sum | $AWK '{print $1}'`; 
+                hash=`echo $AUTHORIZATION_KEY_VAL | md5sum | $AWK '{print $1}'`;
                 VAL=$VAL" hash=>$hash";
         fi
         writeJSONResponseOut "result=>0" "message=>Project edited succesfuly" ${VAL} ;
 
   else
-        writeJSONResponseErr "result=>4017" "message=>Project edit failed"; 
+        writeJSONResponseErr "result=>4017" "message=>Project edit failed";
  fi
 }
 
