@@ -62,11 +62,11 @@ function switchEngine(){
         chown -R ${DATA_OWNER} "$PYTHON34_DIR" 2>>"$JEM_CALLS_LOG";
 	chown -R ${DATA_OWNER} "$PYTHON35_DIR" 2>>"$JEM_CALLS_LOG";
 
-        python_bin=$(ls -1 ${python_dir}/bin/pytho* | head -n 1)
+        python_bin=$(set +f;ls -1 ${python_dir}/bin/pytho* | head -n 1)
         [ -L "$PYTHON_DEFAULT_CLI" ] && rm "$PYTHON_DEFAULT_CLI";
         [ -d "$python_dir" ] && ln -sf "${python_bin}" "$PYTHON_DEFAULT_CLI";
 
-        python_pip=$(ls -1 ${python_dir}/bin/pip* | head -n 1)
+        python_pip=$(set +f;ls -1 ${python_dir}/bin/pip* | head -n 1)
         [ -L "$PYTHON_DEFAULT_PIP" ] && rm "$PYTHON_DEFAULT_PIP";
         [ -d "$python_dir" ] && ln -sf "${python_pip}" "$PYTHON_DEFAULT_PIP";
         
