@@ -77,7 +77,7 @@ function doDeploy(){
 
 	if [[ -z "$package_url" ]]
 	then
-		writeJSONResponseErr "result=>4058" "message=>Wrong arguments for deploy" ; 
+		writeJSONResponseErr "result=>4058" "message=>Wrong arguments for deploy" ;
 		exit 1
 	fi
 	if [[ -z "$context" ]]
@@ -90,13 +90,13 @@ function doDeploy(){
 
     [ ! -z "$Context_Regex" ] && context_regex="/${Context_Regex}/p";
 
-    [ "x${COMPUTE_TYPE}" ==  "xtomcat" ]  && {  
+    [ "x${COMPUTE_TYPE}" ==  "xtomcat" ]  && {
          [ "x${COMPUTE_TYPE_VERSION}" == "x7" ]  && context_regex='/^((([a-zA-Z0-9])+((-|_|\.|#{1})?([a-zA-Z0-9])+)+(#{2}[0-9]+)?)|([a-zA-Z0-9]+))$/p;' || context_regex='/^((([a-zA-Z0-9])+((-|_|\.|#{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
     }
     [ "x${COMPUTE_TYPE}" ==  "xjetty" ] && context_regex='/^((([a-zA-Z0-9])+((-|_{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
     [ "x${COMPUTE_TYPE}" ==  "xglassfish" ] && context_regex='/^((([a-zA-Z0-9])+((-|_|\.{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
     [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && context_regex='/^(production|development|test)$/p;';
-    
+
     [ -z "$context_regex" ] && context_regex='/^((([a-zA-Z0-9])+(-{1}([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;'
 
     if [[ -z $($SED  -nre  "$context_regex" <<< $context ) ]]
@@ -111,7 +111,7 @@ function doDeploy(){
     }
 
     local vcs_project_properties="/var/lib/jelastic/vcs/${context}.properties";
-    [ -f "$vcs_project_properties" ] && rm -f "$vcs_project_properties";
+    [ -f "$vcs_project_properties" ] && { set -f; rm -f "$vcs_project_properties"; set +f; }
 
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
         ldeploy="deploy" #added for backwards compatibility with Openshift cartridge templates
@@ -123,8 +123,8 @@ function doDeploy(){
 	result=$?;
 	[ $result -eq 156 ] && result=4078;
 	[ $result -eq 56  ] && result=4071;
-	[ -z "$result" ] && [ $result -lt 4000 ] && result=4060; 
-	writeJSONResponseErr "result=>$result" "message=>Deploy failed" ; 
+	[ -z "$result" ] && [ $result -lt 4000 ] && result=4060;
+	writeJSONResponseErr "result=>$result" "message=>Deploy failed" ;
     };
 }
 
