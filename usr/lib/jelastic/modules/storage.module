@@ -321,7 +321,7 @@ function dosetupUtils() {
         log "${MOUNTPACKAGE} not found!"
         exit 1;
     fi
-    issue_string=$(cat $release_files $issue_file 2>/dev/null);
+    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
     OS=$(detectOS "$issue_string")
     OS_ver=$(getOSVersion "$issue_string")
     OS_ver=${OS_ver%%.*}

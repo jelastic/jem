@@ -28,7 +28,7 @@ function doInstall(){
         while [ $# -gt 0 ]
         do
                 case "$1" in
-                        -n| --name)
+                    -n| --name)
                         shift;
                         local PACKAGES=$1;
                         ;;
@@ -36,7 +36,7 @@ function doInstall(){
                         shift;
                         CTID=$1;
                         ;;
-			-| --)
+                    -| --)
                         shift;
                         break;
                         ;;
@@ -44,13 +44,13 @@ function doInstall(){
                 shift;
         done
 
-	if [[ -z "${PACKAGES}" ]]
+        if [[ -z "${PACKAGES}" ]]
         then
                 writeJSONResponseErr "result=>4058" "message=>Packages are not specified" ;
                 exit 1
         fi
 
-	if [[ -z "${CTID}" ]]
+        if [[ -z "${CTID}" ]]
         then
                 writeJSONResponseErr "result=>4058" "message=>CTID is not specified" ;
                 exit 1
@@ -59,10 +59,10 @@ function doInstall(){
         local issue_file="/vz/root/${CTID}/etc/issue";
         local release_files="/vz/root/${CTID}/etc/*-release";
 
-        issue_string=$(cat $release_files $issue_file 2>/dev/null);
+        issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
         OS=$(detectOS "$issue_string");
 
-	if [[ -z "$OS" ]] 
+	if [[ -z "$OS" ]]
 	then
 		writeJSONResponseErr "result=>4097" "message=>Cannot detect OS version" ;
                 exit 1
