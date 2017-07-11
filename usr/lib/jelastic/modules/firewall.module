@@ -374,19 +374,20 @@ function doStart() {
     }
 
     for jaddr in ${JEL_CORE_ADDR}; do
-        isValidIP ${JEL_CORE_ADDR} && {
+        isValidIP ${jaddr} && {
             $IPTABLES -A INPUT -m state --state NEW -s ${jaddr} -m tcp -p tcp --dport 22 -j ACCEPT;
-        } 
+        }
+    done
+
+    for gaddr in ${GATE_ADDR}; do
+        isValidIP ${gaddr} && {
+            $IPTABLES -A INPUT -m state --state NEW -s ${gaddr} -m tcp -p tcp --dport 22 -j ACCEPT;
+        }
     done
 
     [ ! -z "${CORE1_ADDR}" ] && isValidIP ${CORE1_ADDR} && $IPTABLES -A INPUT -m state --state NEW -s ${CORE1_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
     [ ! -z "${CORE2_ADDR}" ] && isValidIP ${CORE2_ADDR} && $IPTABLES -A INPUT -m state --state NEW -s ${CORE2_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
 
-    isValidIP ${GATE_ADDR} && {
-        $IPTABLES -A INPUT -m state --state NEW -s ${GATE_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
-    } || {
-        $IPTABLES -A INPUT -m state --state NEW -s 0.0.0.0/0 -m tcp -p tcp --dport 22 -j ACCEPT;
-    }
     redirPorts=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts; } || _defaultComputeNodeRedirPorts));
     ports=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})Ports && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})Ports; } || _defaultComputeNodePorts));
 
