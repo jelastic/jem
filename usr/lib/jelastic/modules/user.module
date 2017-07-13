@@ -150,68 +150,48 @@ function __processNotVDS(){
 
 function preAddCallback(){
 	log "$@";
-	if [ "x${COMPUTE_TYPE}" == "xgate" ] ;then
-		log "Compute Type = gate. Params: $@.";
-		options=`getopt -o n,u -l uid:,new -- "$@"`;
-		while [ $# -gt 0 ]
-		do
-	    	case $1 in
-	        	# for options with required arguments, an additional shift is required
-		        -u|--uid)
-	                [[ -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && {  writeJSONResponseErr "result=>4028" "message=>Wrong UID!"; die -q; }
-			        _USER_NAME="$2"; shift ;;
-		        (--) shift; break;;
-	    	esac
-	    	shift
-		done
-		# _USER_NAME == Jelastic UID, min=1
-		let "_UID=${_USER_NAME}+10000000";
-		#_GUID - system guid ssh-user. for gateway
-		groupId "${_SSH_ACCESS_GROUP}" ;
-		_GUID=${_response_GUID};
-		_USERADD_OPT=" -s ${_JELASTIC_SHELL}"
-	else
-		options=`getopt -o n,u,e -l uid:,new,eid -- "$@"`;
-		while [ $# -gt 0 ]
-		do
-		    	case $1 in
-				# for options with required arguments, an additional shift is required
-				-n|--new) _REGENERATE_KEY="yes";;
-				(--) shift; break;;
-				-e|--eid)
-				    _EID="$2";
-				    shift;shift;;
-		    	esac
-	        	shift
-		done
 
-		log "Compute Type not gate."
-		_USERADD_OPT=" -M ";
-		_SUPPLEMENTARY_GROUPS="$_SSH_ACCESS_GROUP";
+    options=`getopt -o n,u,e -l uid:,new,eid -- "$@"`;
+    while [ $# -gt 0 ]
+    do
+            case $1 in
+            # for options with required arguments, an additional shift is required
+            -n|--new) _REGENERATE_KEY="yes";;
+            (--) shift; break;;
+            -e|--eid)
+                _EID="$2";
+                shift;shift;;
+            esac
+            shift
+    done
 
-        if [ ! -z "${_EID}" ]; then
-            _CTID=$($GREP -l "${_EID}" /vz/private/*/.vza/eid.conf |  $SED -re 's;/vz/private/([0-9]+)/.*;\1;')
-            [[ -z "${_CTID}" ]] && {
-                writeJSONResponseErr "result=>4105" "message=>Container not found"
-                die -q
-            }
-            prefix=$($VZLIST $_CTID -Ho root)
-            [[ -z "${prefix}" ]] && {
-                writeJSONResponseErr "result=>4105" "message=>Container root dir not found"
-                die -q
-            }
-            if [[ -f ${prefix}/etc/jelastic/metainf.conf && ! -n "$(grep "COMPUTE_TYPE=storage" ${prefix}/etc/jelastic/metainf.conf)" ]]; then
-                __processNotVDS ${_CTID}
-                _UID=700
-                _GUID=700
-            else
-                __processVDS ${_CTID}
-                _UID=0
-                _GUID=0
+    log "Compute Type not gate."
+    _USERADD_OPT=" -M ";
+    _SUPPLEMENTARY_GROUPS="$_SSH_ACCESS_GROUP";
 
-            fi
+    if [ ! -z "${_EID}" ]; then
+        _CTID=$($GREP -l "${_EID}" /vz/private/*/.vza/eid.conf |  $SED -re 's;/vz/private/([0-9]+)/.*;\1;')
+        [[ -z "${_CTID}" ]] && {
+            writeJSONResponseErr "result=>4105" "message=>Container not found"
+            die -q
+        }
+        prefix=$($VZLIST $_CTID -Ho root)
+        [[ -z "${prefix}" ]] && {
+            writeJSONResponseErr "result=>4105" "message=>Container root dir not found"
+            die -q
+        }
+        if [[ -f ${prefix}/etc/jelastic/metainf.conf && ! -n "$(grep "COMPUTE_TYPE=storage" ${prefix}/etc/jelastic/metainf.conf)" ]]; then
+            __processNotVDS ${_CTID}
+            _UID=700
+            _GUID=700
+        else
+            __processVDS ${_CTID}
+            _UID=0
+            _GUID=0
+
         fi
-	fi
+    fi
+        
 	isFunction "getAppUserInfo" && { log "Call getAppUserInfo"; "getAppUserInfo" "${_USER_NAME}"; } || {  writeJSONResponseErr "result=>4048" "message=>Can not get user info!"; die -q; };
 	[ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
 }
