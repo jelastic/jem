@@ -179,7 +179,8 @@ case ${COMPUTE_TYPE} in
 		SERVICE='memcached';
 	;;
 	gate)
-		gw_boost_lib_inherit="user-gate";
+		DATA_OWNER='root:root';
+		gw_boost_lib_inherit="user-common";
 	;;
 	cartridge)
 		DATA_OWNER='jelastic:jelastic';
