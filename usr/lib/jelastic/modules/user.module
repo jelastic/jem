@@ -16,7 +16,7 @@
 
 
 
-inherit default config envinfo os;
+inherit default config os envinfo;
 inherit ${gw_boost_lib_inherit};
 inherit extendperm;
 inherit vzexec;
