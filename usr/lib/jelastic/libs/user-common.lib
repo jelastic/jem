@@ -63,7 +63,7 @@ readonly HISTIGNORE
         do
                 [ ! -f "${_homedir}/${filename}" ] && {
                         touch "${_homedir}/${filename}"
-                        chown ${DATA_OWNER} "${_homedir}/${filename}"
+                        chown ${DATA_OWNER} "${_homedir}/${filename}" 2>>"$JEM_CALLS_LOG";
                 }
 
                 chattr -f +a "${_homedir}/${filename}" || true
@@ -74,7 +74,7 @@ readonly HISTIGNORE
 
         IFS="${NIFS}"
         USER_BASHRC="${_homedir}/.bash_profile"
-        [ -f "${USER_BASHRC}" ] && { chattr -a "${USER_BASHRC}"; } || true
+        [ -f "${USER_BASHRC}" ] && { chattr -f -a "${USER_BASHRC}"; } || true
 
         for variable in $bashrcvar
         do
@@ -85,7 +85,7 @@ readonly HISTIGNORE
                 IFS="${NIFS}"
         done
         IFS="${OIFS}"
-        chown ${DATA_OWNER} "${USER_BASHRC}"
+        chown ${DATA_OWNER} "${USER_BASHRC}" 2>>"$JEM_CALLS_LOG";
         chattr -f +a "${USER_BASHRC}" || true
 }
 
@@ -100,12 +100,12 @@ function getAppUserInfo(){
             memcached )
                 mkdir -p "/home/memcached";
                 _homedir="/home/memcached";
-                chown ${_UID}:${_GUID} ${_homedir}
+                chown ${_UID}:${_GUID} ${_homedir} 2>>"$JEM_CALLS_LOG";
             ;;
             maven)
                 mkdir -p "/opt/maven/";
                 _homedir="/opt/maven/";
-                chown ${_UID}:${_GUID} ${_homedir}
+                chown ${_UID}:${_GUID} ${_homedir} 2>>"$JEM_CALLS_LOG";
 	    ;;
             glassfish)
                 [ -d /var/lib/jelastic/glalssfish ] && {
