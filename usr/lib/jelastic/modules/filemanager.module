@@ -89,7 +89,7 @@ function checkUser(){
 function dirRead(){
     ExtendPerm ;
     local dir=${1:?"Missing param: dir"};
-    if ! $( su - "$FS_USER" $JPERM $(printf '%q' "${dir}") 'r' 'x') ; then
+    if ! $( su - "$FS_USER" $JPERM $(printf '%q' "${dir}") 'r' 'x' 2>>${JEM_CALLS_LOG} ) ; then
         return 37;
     fi
     return 0;
@@ -136,7 +136,7 @@ function doRead() {
         return $result_code;
     fi
 
-    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'r'" ) ; then
+    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'r'" 2>>${JEM_CALLS_LOG} ) ; then
         return 0 ;
     else
 	result=$?;
@@ -162,12 +162,12 @@ function doWrite() {
 		return 33;
 	fi
 	local parent_dir=$(dirname "$FS_PATH") ;
-        if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'w'" ) ; then
+        if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'w'" 2>>${JEM_CALLS_LOG} ) ; then
 	    return 0
 	else
 	    result=$?
 	    if [ $result -eq 2 ] ; then
-		if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w'" ) ; then
+		if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w'" 2>>${JEM_CALLS_LOG} ) ; then
 		    return 0
 		else
 		    if [ $result -eq 2 ] ; then
@@ -202,7 +202,7 @@ function doCreate() {
     fi
     local parent_dir=$(dirname "$FS_PATH") ;
 
-    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w' 'x'" ) ; then
+    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w' 'x'" 2>>${JEM_CALLS_LOG} ) ; then
         return 0;
     else
 	result=$?;
@@ -229,7 +229,7 @@ function doDelete() {
         return 35;
     fi
     local parent_dir=$(dirname "$FS_PATH");
-    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w' 'x'" ) ; then
+    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w' 'x'" 2>>${JEM_CALLS_LOG} ) ; then
         return 0;
     else
 	result=$?;
@@ -242,7 +242,7 @@ function doDelete() {
         return 37;
     fi
 
-    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'w'" ) ; then
+    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'w'" 2>>${JEM_CALLS_LOG} ) ; then
         return 0;
     else
 	result=$?;
@@ -291,7 +291,7 @@ function doCopy() {
             writeJSONResponseErr "result=>4042" "message=>Destination directory $FS_DESTINATION not exists";
             return 42;
         else
-            if ! $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_DESTINATION}") 'w' 'x'" ) ; then
+            if ! $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_DESTINATION}") 'w' 'x'" 2>>${JEM_CALLS_LOG}) ; then
 		writeJSONResponseErr "result=>4037" "message=>Permission denied";
 		return 37;
 	    fi
