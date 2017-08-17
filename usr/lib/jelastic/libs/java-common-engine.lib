@@ -55,6 +55,9 @@ function switchEngine(){
 
     [ -d "$JAVA_COMMON_PATH" ] && chown -R "$DATA_OWNER" "$JAVA_COMMON_PATH" 2>>"$JEM_CALLS_LOG";
 
+    # Do not setcap for java6
+    [[ "x${engine_type}" == "xjava6" ]] && return 0
+
     [ -e "/etc/ld.so.conf.d/java.conf" ] && /bin/rm "/etc/ld.so.conf.d/java.conf"
 
     echo -e "$(find /usr/java/${java_dir} -name libjli.so -printf "%h\n")" > "/etc/ld.so.conf.d/java.conf"
