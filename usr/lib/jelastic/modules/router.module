@@ -146,15 +146,15 @@ function doRedirect() {
 
     local rules_files="/vz/root/${CTID}/etc/jelastic/iptables";
 
-    local portExists=$($EXEC $IPTABLES -L -n -t nat | $SED -nre "/REDIRECT/{/${__PROTO}/{/dpt:${__SPORT}/{/ports ${__PORT}/p}}}")
+    local portExists=$($EXEC "$IPTABLES -L -n -t nat" | $SED -nre "/REDIRECT/{/${__PROTO}/{/dpt:${__SPORT}/{/ports ${__PORT}/p}}}")
     if [ ! -z "$portExists" ] ; then
         writeJSONResponseErr "result=>4099" "message=>This pair SPORT:DPORT already exists"; exit 1;
     fi
 
-    if $EXEC $IPTABLES -t nat -I PREROUTING -p $__PROTO -m $__PROTO --dport $__SPORT -j REDIRECT --to-port $__PORT ; then
+    if $EXEC "$IPTABLES -t nat -I PREROUTING -p $__PROTO -m $__PROTO --dport $__SPORT -j REDIRECT --to-port $__PORT" ; then
 
         [ ! -d "$rules_files" ] && mkdir -p "$rules_files"
-        rule="$($EXEC $IPTABLES -t nat -S | $SED -nre "/${__PROTO}/{/--dport ${__SPORT}/{/--to-ports ${__PORT}/p;}}")"
+        rule="$($EXEC "$IPTABLES -t nat -S" | $SED -nre "/${__PROTO}/{/--dport ${__SPORT}/{/--to-ports ${__PORT}/p;}}")"
 
         [ ! -z "${rule}" ] && rule=$($SED -nre "/${rule}/p" <<< "${rule}")
 
@@ -266,9 +266,9 @@ function doUnbind() {
             fi
 
             if [[ $NAT_ACTION == "dnat" ]] ; then
-                res=$($EXEC "$IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j DNAT --to-destination $__IP:$__PORT 2>/dev/null")
+                res=$($EXEC "$IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j DNAT --to-destination $__IP:$__PORT" 2>/dev/null)
             else
-                res=$($EXEC "$IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j REDIRECT --to-port $__PORT 2>/dev/null")
+                res=$($EXEC "$IPTABLES -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j REDIRECT --to-port $__PORT" 2>/dev/null)
             fi
 
             if [[ $res -eq 0 ]] ; then
