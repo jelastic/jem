@@ -68,6 +68,10 @@ function switchEngine(){
 
     $PATCHELF --set-rpath "/usr/java/${java_dir}/jre/lib/amd64/jli" "/usr/java/${java_dir}/jre/bin/java"
     $PATCHELF --set-rpath "/usr/java/${java_dir}/lib/amd64/jli" "/usr/java/${java_dir}/bin/java"
+
+    #TODO: Investigate and fix this double-run
+    $SETCAP cap_net_bind_service=+epi "/usr/java/${java_dir}/bin/java"
+    $SETCAP cap_net_bind_service=+epi "/usr/java/${java_dir}/jre/bin/java"
 }
 
 
