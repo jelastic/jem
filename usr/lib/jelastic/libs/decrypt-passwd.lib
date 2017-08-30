@@ -49,7 +49,7 @@ function getPassword(){
                         exit 0;
                         ;;
         esac
-        echo $passwordEncrypted | openssl enc -d -a -aes-128-cbc -nosalt -pass "pass:$keyString" 2>> $ACTIONS_LOG || {  writeJSONResponseErr "result=>4087" "message=>Could not decrypt password!!"; die -q; }
+        echo $passwordEncrypted | openssl enc -d -a -A -aes-128-cbc -nosalt -pass "pass:$keyString" 2>> $ACTIONS_LOG || {  writeJSONResponseErr "result=>4087" "message=>Could not decrypt password!!"; die -q; }
 }
 
 
