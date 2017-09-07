@@ -36,7 +36,7 @@ Cmnd_Alias CARTRIDGE_SERVICE = /sbin/service cartridge stop, /sbin/service cartr
 
 Cmnd_Alias CUSTOM_IMPR = /usr/bin/passwd jelastic-ftp, /usr/bin/jem firewall fwstart, /usr/bin/jem balancer rebuildconfig, /usr/bin/jem firewall list *
 
-Cmnd_Alias UNFS = /etc/init.d/rpcbind *, /sbin/service rpcbind *, /bin/mount *, /etc/init.d/unfsd.jelastic *, /sbin/service unfsd.jelastic *, /usr/sbin/exportfs *
+Cmnd_Alias JEM = /bin/jem service start, /bin/jem service stop, /bin/jem service restart
 
-%ssh-access ALL = NOPASSWD: TOMCAT, TOMCAT_SERVICE, JETTY, JETTY_SERVICE,  MONGO, MONGO_SERVICE, COUCHDB, COUCHDB_SERVICE, MEMCACHED, MEMCACHED_SERVICE, MYSQL, MYSQL_SERVICE, POSTGRESQL, POSTGRESQL_SERVICE, NGINX, NGINX_SERVICE, HTTPD, HTTPD_SERVICE, PHP_FPM, PHP_FPM_SERVICE, GLASSFISH_DOMAIN1, GLASSFISH_DOMAIN1_SERVICE, CARTRIDGE, CARTRIDGE_SERVICE, CUSTOM_IMPR, UNFS
+%ssh-access ALL = NOPASSWD: TOMCAT, TOMCAT_SERVICE, JETTY, JETTY_SERVICE,  MONGO, MONGO_SERVICE, COUCHDB, COUCHDB_SERVICE, MEMCACHED, MEMCACHED_SERVICE, MYSQL, MYSQL_SERVICE, POSTGRESQL, POSTGRESQL_SERVICE, NGINX, NGINX_SERVICE, HTTPD, HTTPD_SERVICE, PHP_FPM, PHP_FPM_SERVICE, GLASSFISH_DOMAIN1, GLASSFISH_DOMAIN1_SERVICE, CARTRIDGE, CARTRIDGE_SERVICE, CUSTOM_IMPR, UNFS, JEM
 
