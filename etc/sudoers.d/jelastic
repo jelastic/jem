@@ -40,7 +40,7 @@ Cmnd_Alias CARTRIDGE_SERVICE = /sbin/service cartridge stop, /sbin/service cartr
 Cmnd_Alias NODEJS = /etc/init.d/nodejs start, /etc/init.d/nodejs stop, /etc/init.d/nodejs restart, /etc/init.d/nodejs reload, /etc/init.d/nodejs graceful, /etc/init.d/nodejs status
 Cmnd_Alias NODEJS_SERVICE = /sbin/service nodejs start, /sbin/service nodejs stop, /sbin/service nodejs restart, /sbin/service nodejs reload, /sbin/service nodejs graceful, /sbin/service nodejs status
 
-Cmnd_Alias CUSTOM_IMPR = /usr/bin/passwd jelastic-ftp, /usr/bin/jem firewall fwstart, /usr/bin/jem balancer rebuildconfig, /usr/bin/jem firewall list *
+Cmnd_Alias CUSTOM_IMPR = /usr/bin/passwd jelastic-ftp, /usr/bin/jem firewall fwstart, /usr/bin/jem balancer rebuildconfig, /usr/bin/jem firewall list *, /usr/bin/chmod
 
 Cmnd_Alias JEM = /bin/jem service start, /bin/jem service stop, /bin/jem service restart
 
