@@ -10,9 +10,6 @@ Cmnd_Alias MONGO_SERVICE = /sbin/service mongod start, /sbin/service mongod stop
 Cmnd_Alias COUCHDB =  /etc/init.d/couchdb start, /etc/init.d/couchdb stop, /etc/init.d/couchdb restart, /etc/init.d/couchdb status
 Cmnd_Alias COUCHDB_SERVICE =  /sbin/service couchdb start, /sbin/service couchdb stop, /sbin/service couchdb restart, /sbin/service couchdb status
 
-Cmnd_Alias COUCHBASE =  /etc/init.d/couchbase start, /etc/init.d/couchbase stop, /etc/init.d/couchbase restart, /etc/init.d/couchbase status
-Cmnd_Alias COUCHBASE_SERVICE =  /sbin/service couchbase start, /sbin/service couchbase stop, /sbin/service couchbase restart, /sbin/service couchbase status
-
 Cmnd_Alias MEMCACHED = /etc/init.d/memcached start, /etc/init.d/memcached stop, /etc/init.d/memcached status, /etc/init.d/memcached restart, /etc/init.d/memcached reload, /etc/init.d/memcached condrestart
 Cmnd_Alias MEMCACHED_SERVICE = /sbin/service memcached start, /sbin/service memcached stop, /sbin/service memcached status, /sbin/service memcached restart, /sbin/service memcached reload, /sbin/service memcached condrestart
 
@@ -41,5 +38,5 @@ Cmnd_Alias CUSTOM_IMPR = /usr/bin/passwd jelastic-ftp, /usr/bin/jem firewall fws
 
 Cmnd_Alias JEM = /bin/jem service start, /bin/jem service stop, /bin/jem service restart
 
-%ssh-access ALL = NOPASSWD: TOMCAT, TOMCAT_SERVICE, JETTY, JETTY_SERVICE,  MONGO, MONGO_SERVICE, COUCHDB, COUCHDB_SERVICE, COUCHBASE, COUCHBASE_SERVICE, MEMCACHED, MEMCACHED_SERVICE, MYSQL, MYSQL_SERVICE, POSTGRESQL, POSTGRESQL_SERVICE, NGINX, NGINX_SERVICE, HTTPD, HTTPD_SERVICE, PHP_FPM, PHP_FPM_SERVICE, GLASSFISH_DOMAIN1, GLASSFISH_DOMAIN1_SERVICE, CARTRIDGE, CARTRIDGE_SERVICE, CUSTOM_IMPR, UNFS, JEM
+%ssh-access ALL = NOPASSWD: TOMCAT, TOMCAT_SERVICE, JETTY, JETTY_SERVICE,  MONGO, MONGO_SERVICE, COUCHDB, COUCHDB_SERVICE, MEMCACHED, MEMCACHED_SERVICE, MYSQL, MYSQL_SERVICE, POSTGRESQL, POSTGRESQL_SERVICE, NGINX, NGINX_SERVICE, HTTPD, HTTPD_SERVICE, PHP_FPM, PHP_FPM_SERVICE, GLASSFISH_DOMAIN1, GLASSFISH_DOMAIN1_SERVICE, CARTRIDGE, CARTRIDGE_SERVICE, CUSTOM_IMPR, UNFS, JEM
 
