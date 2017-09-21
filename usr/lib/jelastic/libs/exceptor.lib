@@ -83,3 +83,22 @@ function ensureFileCanBeDownloaded(){
     return 0;
 }
 
+function getPackageName() {
+    if [ -f "$package_url" ]; then
+        package_name="$package_url";
+    elif [[ "${package_url}" =~ file://* ]]; then
+        package_name="${package_url:7}"
+        [ -f "$package_name" ] || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
+    else
+        ensureFileCanBeDownloaded $package_url;
+        $WGET --no-check-certificate --content-disposition --directory-prefix=${DOWNLOADS} $package_url >> $ACTIONS_LOG 2>&1 || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
+        package_name="${DOWNLOADS}/$(ls ${DOWNLOADS})";
+        [ ! -s "$package_name" ] && {
+            set -f
+            rm -f "${package_name}";
+            set +f
+            writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
+            die -q;
+        }
+    fi
+}

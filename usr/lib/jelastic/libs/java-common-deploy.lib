@@ -18,6 +18,7 @@
 JAVACOMMONDEPLOYLIB_VERSION="0.1";
 $PROGRAM 'grep';
 
+inherit default exceptor;
 
 [ ! -z "$WEBROOT" -a ! -d "$WEBROOT" ] && mkdir -p ${WEBROOT};
 
@@ -78,20 +79,8 @@ function deploy(){
         exit 1;
     fi
     clearCache;
-    if [ -f "$package_url" ]; then
-        package_name="$package_url";
-    else
-        ensureFileCanBeDownloaded $package_url;
-        $WGET --no-check-certificate --content-disposition --directory-prefix=${DOWNLOADS} $package_url >> $ACTIONS_LOG 2>&1 || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
-        package_name=$(ls ${DOWNLOADS});
-        [ ! -s "$DOWNLOADS/$package_name" ] && {
-            set -f
-            rm -f ${DOWNLOADS}/${package_name};
-            set +f
-            writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
-            die -q;
-        }
-    fi
+    getPackageName;
+    ensureFileCanBeUncompressed "${package_name}";
 
     ensureFileCanBeUncompressed ${DOWNLOADS}/${package_name};
     stopServiceSilent ${SERVICE} ;
@@ -113,13 +102,13 @@ function deploy(){
         if [ -f "$package_url" ]; then
                 cp "${package_name}" "${APPS_DIR}/${context}.${ext}";
         elif [ -f "${DOWNLOADS}/${package_name}" ]; then
-                mv "${DOWNLOADS}/${package_name}" "${APPS_DIR}/${context}.${ext}";
+                mv "${package_name}" "${APPS_DIR}/${context}.${ext}";
         fi
     else
         if [ -f "$package_url" ]; then
                 cp "${package_name}" "${WEBROOT}/${context}.${ext}";
         elif [ -f "${DOWNLOADS}/${package_name}" ]; then 
-                mv "${DOWNLOADS}/${package_name}" "${WEBROOT}/${context}.${ext}";
+                mv "${package_name}" "${WEBROOT}/${context}.${ext}";
         fi
     fi
 

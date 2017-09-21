@@ -29,43 +29,37 @@ VERBOSE=0;
 
 [ -e "${MANAGE_CORE_PATH}/${COMPUTE_TYPE}"-deploy.lib ] && { include ${COMPUTE_TYPE}-deploy; }
 
-function unpack(){
-    package_name=$(ls $DOWNLOADS);
-    APPWEBROOT=$1;
-    [ ! -s "$DOWNLOADS/$package_name" ] && {
-        clearCache;
-        [ "x$(basename ${APPWEBROOT})" != "xROOT" ] && { rmdir ${APPWEBROOT}; }
-        writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
-        die -q;
-    }
 
+function unpack(){
+    APPWEBROOT=$1;
+    getPackageName;
     shopt -s dotglob;
     set -f
     rm -Rf ${APPWEBROOT}/*;
     set +f
     shopt -u dotglob;
 
-    ensureFileCanBeUncompressed "$DOWNLOADS/${package_name}";
+    ensureFileCanBeUncompressed "${package_name}";
     [[ ! -d "$APPWEBROOT" ]] && { mkdir -p $APPWEBROOT;}
     if [[ ${package_url} =~ .zip$ ]] || [[ ${package_name} =~ .zip$ ]]
     then
-        $UNZIP -o "$DOWNLOADS/$package_name" -d "$APPWEBROOT" 2>>$ACTIONS_LOG 1>/dev/null;
+        $UNZIP -o "$package_name" -d "$APPWEBROOT" 2>>$ACTIONS_LOG 1>/dev/null;
         rcode=$?;
         [ "$rcode" -eq 1 ] && return 0 || return $rcode
     fi
     if [[ ${package_url} =~ .tar$ ]] || [[ ${package_name} =~ .tar$ ]]
     then
-       $TAR --overwrite -xpf "$DOWNLOADS/$package_name" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+       $TAR --overwrite -xpf "$package_name" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
     fi
     if [[ ${package_url} =~ .tar.gz$ ]] || [[ ${package_name} =~ .tar.gz$ ]]
     then
-       $TAR --overwrite -xpzf "$DOWNLOADS/$package_name" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+       $TAR --overwrite -xpzf "$package_name" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
     fi
     if [[ ${package_url} =~ .tar.bz2$ ]] || [[ ${package_name} =~ .tar.bz2$ ]]
     then
-       $TAR --overwrite -xpjf  "$DOWNLOADS/$package_name" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+       $TAR --overwrite -xpjf  "$package_name" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
     fi
 }
@@ -150,17 +144,8 @@ function deploy(){
     local ext=$3;
     [ ! -d "$DOWNLOADS" ] && { mkdir -p "$DOWNLOADS"; }
     clearCache;
-    ensureFileCanBeDownloaded $package_url;
     prepareContext ${context} ;
-    $WGET -nv --tries=2 --content-disposition --no-check-certificate --directory-prefix=$DOWNLOADS $package_url >> $ACTIONS_LOG 2>&1;
-    [ $? -gt 0 ] && { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q; };
 
-    package_name=$(ls ${DOWNLOADS});
-    [ ! -s "$DOWNLOADS/$package_name" ] && {
-        rm -f ${DOWNLOADS}/${package_name};
-        writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
-        die -q;
-    }
     # check exactly FILE - it should not exists, otherwise 'mkdir' returns error
     if [ "x$(basename ${APPWEBROOT})" == "xROOT" ] && [ "x${atomic_deploy}" == "xtrue" ]
     then
@@ -281,15 +266,4 @@ function renameContext(){
 
 }
 
-# function describeDeploy(){
-#     echo "deploy php application \n\t\t -u \t <package URL> \n\t\t -c \t <context> \n\t\t -e \t zip | tar | tar.gz | tar.bz";
-# }
-
-# function describeUndeploy(){
-#     echo "undeploy php application \n\t\t -c \t <context>";
-# }
-
-# function describeRename(){
-#     echo "rename php context \n\t\t -n \t <new context> \n\t\t -o \t <old context>\n\t\t -e \t <extension>";
-# }
 
