@@ -253,12 +253,9 @@ function doBuildCluster(){
 }
 
 function doSetAdminPassword(){
-    decryptPassword $@
-    set -- ${JEM_PARAMS[@]}
-
-    local password=$1;
-    doAction passwd set "$password";
+    doAction passwd set "$@";
 }
+
 function doInternalCall(){
 	$glassfish_tools $@ ;
 }
