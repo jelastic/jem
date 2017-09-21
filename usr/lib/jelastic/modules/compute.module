@@ -253,7 +253,7 @@ function doBuildCluster(){
 }
 
 function doSetAdminPassword(){
-    doAction passwd set "$@";
+    tmp=$(doAction passwd set "$@");
 }
 
 function doInternalCall(){
