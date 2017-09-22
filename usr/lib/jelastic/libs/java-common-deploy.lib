@@ -82,7 +82,6 @@ function deploy(){
     getPackageName;
     ensureFileCanBeUncompressed "${package_name}";
 
-    ensureFileCanBeUncompressed ${DOWNLOADS}/${package_name};
     stopServiceSilent ${SERVICE} ;
 
     if [ -e "${WEBROOT}/$context" ]
@@ -99,17 +98,9 @@ function deploy(){
     if [[ ${ext} == "ear" ]]
     then
         [ ! -d  $APPS_DIR ] && mkdir -p $APPS_DIR && chown -R  $DATA_OWNER  ${APPS_DIR} 2>>"$JEM_CALLS_LOG";
-        if [ -f "$package_url" ]; then
-                cp "${package_name}" "${APPS_DIR}/${context}.${ext}";
-        elif [ -f "${DOWNLOADS}/${package_name}" ]; then
-                mv "${package_name}" "${APPS_DIR}/${context}.${ext}";
-        fi
+        cp "${package_name}" "${APPS_DIR}/${context}.${ext}";
     else
-        if [ -f "$package_url" ]; then
-                cp "${package_name}" "${WEBROOT}/${context}.${ext}";
-        elif [ -f "${DOWNLOADS}/${package_name}" ]; then 
-                mv "${package_name}" "${WEBROOT}/${context}.${ext}";
-        fi
+        cp "${package_name}" "${WEBROOT}/${context}.${ext}";
     fi
 
     applyPostDeploy;
