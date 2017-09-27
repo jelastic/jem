@@ -16,7 +16,7 @@
 
 
 
-inherit default os envinfo;
+inherit default os envinfo hooks;
 include output decrypt-passwd;
 
 DESCRIPTION="Enables SSL for application stack";
@@ -24,6 +24,8 @@ VERSION="1";
 DEFAULT_ACTION="Usage";
 VCS_CONFIG_DIR="/var/lib/jelastic/vcs";
 DEFAULT_DOMAIN="jelastic";
+
+HOOKS_DIR="/var/lib/jelastic/hooks";
 
 export GIT_SSL_NO_VERIFY=true;
 SCRIPTS_DIR="/root/maven/scripts/"
@@ -102,10 +104,10 @@ while [ "$1" != "" ]; do
     -su | --skip-upload )       shift;
                                 SKIP_UPLOAD=$1;
                                 ;;
-    --update )           	shift;
+    --update )                  shift;
                                 UPDATE=$1;
                                 ;;
-    --build )            	shift;
+    --build )                   shift;
                                 BUILD=$1;
                                 ;;
     -m  | --updateinverval | -i  | --interval )    shift;
@@ -178,11 +180,24 @@ function readProjectConfig(){
       fi
 }
 
+function preBuildHook(){
+    [ -f "$HOOKS_DIR/preBuild_${context}.sh" ] && { chmod +x "$HOOKS_DIR/preBuild_${context}.sh"; . "$HOOKS_DIR/preBuild_${context}.sh" >> "$ACTIONS_LOG" 2>&1 ; } || return 0;
+}
+
+function postBuildHook(){
+    [ -f "$HOOKS_DIR/postBuild_${context}.sh" ] && { chmod +x "$HOOKS_DIR/postBuild_${context}.sh"; . "$HOOKS_DIR/postBuild_${context}.sh" >> "$ACTIONS_LOG" 2>&1 ; } || return 0;
+}
+
+function removeHooks(){
+    rm -f "$HOOKS_DIR/*_${context}.sh" ;
+}
+
 function doBuild(){ 
     BUILD_IS_OK="false";
     parseArguments "$@"  || return 1;
     readProjectConfig;
     [ "x$UPDATE" == "xtrue" ] && doUpdate update -n $PROJECT_NAME;
+    applyHook preBuild;
     if [ -e "${APPROOT}/${PROJECT_NAME}/pom.xml" ] ; then
         #echo "Building $m_name ..."
         $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true";
@@ -192,7 +207,7 @@ function doBuild(){
                 fi
             $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:publish $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST"  -Djelastic-upload-only=true -Djelastic-session="$SESSION" --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
                         [ $? -eq 0 ] && {
-                                writeJSONResponseOut "result=>0" "message=>Build success"; return 0;
+                                writeJSONResponseOut "result=>0" "message=>Build success"; applyHook postBuild; return 0;
             } || {
                 writeJSONResponseErr "result=>4049" "message=>Upload failed, see logs for details" ; return 1 ;
             };

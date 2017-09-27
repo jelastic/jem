@@ -16,7 +16,7 @@
 
 
 
-inherit default os envinfo;
+inherit default os envinfo hooks;
 include uninterract output php-common-deploy string net;
 include cartridge-common decrypt-passwd;
 
@@ -117,9 +117,9 @@ function parseArguments() {
       -r  | --autoresolveconflict)    shift;
                                    GIT_AUTORESOLVE_CONFLICT="$1";
                                   ;;
-      -a | --atomicdeploy)	shift;
-				  ATOMIC_DEPLOY="$1";
-				  ;;
+      -a | --atomicdeploy)      shift;
+                                  ATOMIC_DEPLOY="$1";
+                                  ;;
     esac
     shift
   done
@@ -260,12 +260,14 @@ function doDeleteProject(){
 
   [ "`find ${VCS_CONFIG_DIR} -type f`" ] || doDisableScheduler;
   [ ${COMPUTE_TYPE} == "cartridge" ] && recoverBrokenMountPoints;
+  removeHooks;
 }
 
 function doUpdate(){
   parseArguments "$@";
   readProjectConfig || { writeJSONResponseErr "result=>4006" "message=>Error while reading project config!"; return 1; };
   enableVCSLibrary;
+  applyHook preUpdate;
   if [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" ] && [ "x${PROJECT_NAME}" == "xROOT" ] && [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
   local NEXT_DIR=ROOT_`date +%Y.%m.%d-%H.%M.%S`;
         if [ -h ${WEBROOT}/ROOT ] ; then
@@ -356,9 +358,9 @@ function doUpdate(){
   [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && return 0;
   [ "x${COMPUTE_TYPE}" != "xmaven" ]  && isFunction "setContext" && setContext ${PROJECT_NAME};
   [ "x${COMPUTE_TYPE}" == "xcartridge" ] && recoverBrokenMountPoints && service cartridge build >>  $ACTIONS_LOG  2>&1  && service cartridge deploy >> $ACTIONS_LOG  2>&1;
+  applyHook postUpdate;
   return 0;
 }
-
 
 function doCallProjectUpdate(){
   local project_name="$1";
@@ -500,4 +502,3 @@ function doEditProject(){
 function describeUpdate(){
     echo "Update project";
 }
-
