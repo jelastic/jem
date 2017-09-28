@@ -180,18 +180,6 @@ function readProjectConfig(){
       fi
 }
 
-function preBuildHook(){
-    [ -f "$HOOKS_DIR/preBuild_${context}.sh" ] && { chmod +x "$HOOKS_DIR/preBuild_${context}.sh"; . "$HOOKS_DIR/preBuild_${context}.sh" >> "$ACTIONS_LOG" 2>&1 ; } || return 0;
-}
-
-function postBuildHook(){
-    [ -f "$HOOKS_DIR/postBuild_${context}.sh" ] && { chmod +x "$HOOKS_DIR/postBuild_${context}.sh"; . "$HOOKS_DIR/postBuild_${context}.sh" >> "$ACTIONS_LOG" 2>&1 ; } || return 0;
-}
-
-function removeHooks(){
-    rm -f "$HOOKS_DIR/*_${context}.sh" ;
-}
-
 function doBuild(){ 
     BUILD_IS_OK="false";
     parseArguments "$@"  || return 1;
