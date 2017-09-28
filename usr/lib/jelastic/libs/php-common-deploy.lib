@@ -43,23 +43,23 @@ function unpack(){
     [[ ! -d "$APPWEBROOT" ]] && { mkdir -p $APPWEBROOT;}
     if [[ ${package_url} =~ .zip$ ]] || [[ ${package_name} =~ .zip$ ]]
     then
-        $UNZIP -o "$package_name" -d "$APPWEBROOT" 2>>$ACTIONS_LOG 1>/dev/null;
+        $UNZIP -o "${package_path}/${package_name}" -d "$APPWEBROOT" 2>>$ACTIONS_LOG 1>/dev/null;
         rcode=$?;
         [ "$rcode" -eq 1 ] && return 0 || return $rcode
     fi
     if [[ ${package_url} =~ .tar$ ]] || [[ ${package_name} =~ .tar$ ]]
     then
-       $TAR --overwrite -xpf "$package_name" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+       $TAR --overwrite -xpf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
     fi
     if [[ ${package_url} =~ .tar.gz$ ]] || [[ ${package_name} =~ .tar.gz$ ]]
     then
-       $TAR --overwrite -xpzf "$package_name" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+       $TAR --overwrite -xpzf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
     fi
     if [[ ${package_url} =~ .tar.bz2$ ]] || [[ ${package_name} =~ .tar.bz2$ ]]
     then
-       $TAR --overwrite -xpjf  "$package_name" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+       $TAR --overwrite -xpjf  "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
     fi
 }
@@ -265,5 +265,3 @@ function renameContext(){
     updateOwnership "$WEBROOT/$newContext"
 
 }
-
-
