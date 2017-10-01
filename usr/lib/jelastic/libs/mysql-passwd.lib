@@ -29,8 +29,6 @@ $PROGRAM 'mysqladmin';
 
 function setPassword() {
 
-return 0;
-
 		while [ "$1" != "" ];
 		do
 		  case $1 in
