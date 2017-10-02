@@ -20,7 +20,7 @@ DESCRIPTION="Firewall module";
 VERSION="1.1";
 DEFAULT_ACTION="Usage";
 
-inherit tests os envinfo log net config;
+inherit tests os envinfo log net config vzexec;
 include cartridge-common;
 
 $PROGRAM 'iptables';
@@ -33,9 +33,12 @@ $PROGRAM 'sed';
 $PROGRAM 'grep';
 $PROGRAM 'awk';
 $PROGRAM 'iptables-restore';
+$PROGRAM 'vzctl'
 
-SAVEFILE='/var/lib/jelastic/firewall';
-CUSTOM_RULES_FILE='/etc/sysconfig/iptables-custom';
+SAVEFILE='/var/lib/jelastic/firewall'
+CUSTOM_RULES_FILE='/etc/sysconfig/iptables-custom'
+JELASTIC_4RULES_FILE='/etc/sysconfig/iptables4-jelastic'
+JELASTIC_6RULES_FILE='/etc/sysconfig/iptables6-jelastic'
 
 # 7755 - file replication (lsync?)
 # 7979 - for export/import
@@ -59,15 +62,6 @@ function _getnginx_phpRedirPorts { return 0; }
 function _getmavenRedirPorts { return 0; }
 function _getnginx_rubyRedirPorts { return 0; }
 
-function _getbalancerPorts() {
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
-        echo "$($FIND /etc/nginx/ -type f | $XARGS $SED -rne '/^\s*#/d;/listen[^0-9]+([0-9:\.\*]+);/{s/.*(:|\s+)([0-9]+);/\2/;/[^0-9]+/d;s/\s+//;p}' | sort -u) ${FTPPort}";
-    } || {
-        echo "80";
-    }
-    return 0;
-}
-
 function _getcartridgePorts() {
     #restoreEnvironmentVariables;
     echo $($SED -re 's/"//g'  <<<  $($SED -re 's/Private_Port=//g' <<< $(cat $MANIFEST_EXPORTED | $GREP "Private_Port=" ))| sort -u) ${FTPPort};
@@ -76,51 +70,6 @@ function _getcartridgePorts() {
 
 function _getcartridgeRedirPorts () {
     echo "PREROUTING:0.0.0.0/0:0.0.0.0/0:80:8080:REDIRECT";
-    return 0;
-}
-
-function _defaultComputeNodePorts() {
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
-        echo "${FTPPort} 80 443 1024-65535";
-    } || {
-        echo "80 8080";
-    }
-    return 0;
-}
-
-function _getglassfishPorts() {
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
-        echo "${FTPPort} 22 80 443 1024-65535";
-    } || {
-        echo "22 80 4848 8009 8080 24848 28080";
-    }
-    return 0;
-}
-
-function _gettomcatPorts() {
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
-        echo "${FTPPort} 22 80 443 1024-65535";
-    } || {
-        echo "22 80 8009 8080";
-    }
-    return 0;
-}
-
-function _gettomeePorts() {
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
-        echo "${FTPPort} 22 80 443 1024-65535";
-    } || {
-        echo "22 80 8009 8080";
-    }
-    return 0;
-}
-
-function _getjettyPorts() {
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && {
-        echo "${FTPPort} 22 80 443 1024-65535";
-    } || {
-        echo "22 80 8009 8080";
-    }
     return 0;
 }
 
@@ -134,58 +83,8 @@ function _defaultComputeNodeRedirPorts () {
     return 0;
 }
 
-function _getmariadbRedirPorts() { return 0; }
-
-function _getcouchdbRedirPorts() { return 0; }
-
-function _getmongodbRedirPorts() { return 0; }
-
-function _getapache_rubyRedirPorts() { return 0; }
-
-function _getmariadbPorts() {
-    local ports="80 3306";
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports";
-    echo "$ports"
-    return 0;
-}
-
-function _getapache_phpPorts() {
-    local ports="80 443 8080 8000";
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports 1024-65535";
-    echo "$ports"
-    return 0;
-}
-
-
-function _getapache_rubyPorts() {
-     local ports="80 443 8080 8000";
-     [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports 1024-65535";
-     echo "$ports"
-     return 0;
-}
-
 function _getmysqlRedirPorts() { return 0; }
-
-function _getmysqlPorts() {
-    _getmariadbPorts;
-    return $?;
-}
-
-function _getmongodbPorts() {
-    local ports="80 27017";
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports";
-    echo "$ports"
-    return 0;
-}
-
 function _getpostgresRedirPorts() { return 0; }
-
-function _getpostgresPorts() {
-    local ports="80 5432";
-    [[ -n "${PublicIP}" ]] && [[ "$PublicIP" -eq "$__TRUE" ]] && ports="${FTPPort} $ports";
-    echo "$ports"
-    return 0;
-}
 
 function _isPublicIPv4() {
     getAddr "venet0" "ipv4"
@@ -244,7 +143,7 @@ function onModLoadCallback() {
     RPCPort=$($NETSTAT -tnlp | $SED -n -re '/rpc/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -l cp:,op:,rp: -- params "$@" 2>/dev/null` oldifs;
+    local temp=`getopt -l ctid:,rules:,cp:,op:,rp: -- params "$@" 2>/dev/null` oldifs;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
@@ -283,6 +182,20 @@ function onModLoadCallback() {
                 done
 
                 ;;
+            --ctid)
+                shift
+                CTID=$1
+                vzexecSetCTID $CTID
+                shift
+                ;;
+            --rules)
+                shift;
+                oldifs=$IFS;
+                IFS=';';
+                RULES=($1);
+                IFS=${oldifs};
+                shift;
+                ;;
             --)
                 shift;
                 break;
@@ -290,21 +203,6 @@ function onModLoadCallback() {
         esac;
     done;
 
-    # store given "closed" ports in list for loading
-    for i in "${__closedports[@]}" ; do
-        [[ -z $(indexOf "${CLOSEDPORTS[*]}" "$i") ]] && CLOSEDPORTS=($i ${CLOSEDPORTS[*]})
-        #remove "closed" port from open ports list
-        [[ ! -z "${OPENPORTS[*]}" ]] && OPENPORTS=($(removeValueFromArray "${OPENPORTS[*]}" "$i"))
-    done
-
-    # the same for the "open" ports
-    for i in "${__openports[@]}" ; do
-        [[ -z $(indexOf "${OPENPORTS[*]}" "$i") ]] && OPENPORTS=($i ${OPENPORTS[*]})
-        [[ ! -z "${CLOSEDPORTS[*]}" ]] && CLOSEDPORTS=($(removeValueFromArray "${CLOSEDPORTS[*]}" "$i"))
-    done
-
-    storeConfig "${SAVEFILE}" OPENPORTS ${OPENPORTS[@]}
-    storeConfig "${SAVEFILE}" CLOSEDPORTS ${CLOSEDPORTS[@]}
 }
 
 function describeStart() {
@@ -362,7 +260,6 @@ function doStart() {
     done;
 
     $IPTABLES -A INPUT -m state --state NEW -s 10.0.0.0/27 -j ACCEPT;
-    $IPTABLES -A INPUT -p icmp -j ACCEPT;
 
     log "getting Infra adresses";
     getInfraAddresses infraAddr;
@@ -389,39 +286,6 @@ function doStart() {
     [ ! -z "${CORE2_ADDR}" ] && isValidIP ${CORE2_ADDR} && $IPTABLES -A INPUT -m state --state NEW -s ${CORE2_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
 
     redirPorts=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts; } || _defaultComputeNodeRedirPorts));
-    ports=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})Ports && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})Ports; } || _defaultComputeNodePorts));
-
-    # merge default ports list with the stored "open" ports
-    for i in "${OPENPORTS[@]}" ; do
-        [[ -z $(indexOf "${ports[*]}" "$i") ]] && ports=($i ${ports[*]})
-    done
-
-    # process input chain
-    # NOTE: the default INPUT & FORWARD policy is DROP
-    for port in ${ports[@]} ; do
-        isRange "$port" && {
-            local srange=$($SED -re 's/([0-9]+)(-|:)([0-9]+)/\1/' <<< ${port});
-            local erange=$($SED -re 's/([0-9]+)(-|:)([0-9]+)/\3/' <<< ${port});
-            $IPTABLES -A INPUT -m state --state NEW -m tcp -p tcp --dport ${srange}:${erange} -j ACCEPT;
-            $IPTABLES -A INPUT -m state --state NEW -m udp -p udp --dport ${srange}:${erange} -j ACCEPT;
-        } || {
-            $IPTABLES -A INPUT -m state --state NEW -m tcp -p tcp --dport ${port} -j ACCEPT;
-            $IPTABLES -A INPUT -m state --state NEW -m udp -p udp --dport ${port} -j ACCEPT;
-        }
-    done;
-
-    # enforce a rules for the "closed" ports to DROP
-    for port in ${CLOSEDPORTS[@]} ; do
-        isRange "$port" && {
-            local srange=$($SED -re 's/([0-9]+)(-|:)([0-9]+)/\1/' <<< ${port});
-            local erange=$($SED -re 's/([0-9]+)(-|:)([0-9]+)/\3/' <<< ${port});
-            $IPTABLES -A INPUT -m state --state NEW -m tcp -p tcp --dport ${srange}:${erange} -j DROP;
-            $IPTABLES -A INPUT -m state --state NEW -m udp -p udp --dport ${srange}:${erange} -j DROP;
-        } || {
-            $IPTABLES -A INPUT -m state --state NEW -m tcp -p tcp --dport ${port} -j DROP;
-            $IPTABLES -A INPUT -m state --state NEW -m udp -p udp --dport ${port} -j DROP;
-        }
-    done;
 
     # process input chain NAT
     for port in ${redirPorts[@]} ; do
@@ -429,14 +293,23 @@ function doStart() {
         $IPTABLES -t nat -A ${ruleParams[0]} -s ${ruleParams[1]} -d ${ruleParams[2]} -m tcp -p tcp --dport ${ruleParams[3]} -j ${ruleParams[5]} --to-port ${ruleParams[4]};
     done;
 
-    $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited;
     [ ${COMPUTE_TYPE} == "cartridge" ] && {
-    [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" >>$JEM_CALLS_LOG 2>&1;
+        [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" >>$JEM_CALLS_LOG 2>&1;
     }
 
     [ -f "${CUSTOM_RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${CUSTOM_RULES_FILE}" 2>>$ACTIONS_LOG ;
-	echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_RULES_FILE}" >> $JEM_CALLS_LOG ;
+        echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
+
+    [ -f "${JELASTIC_4RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${JELASTIC_4RULES_FILE}" 2>>$ACTIONS_LOG ;
+        echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_4RULES_FILE}" >> $JEM_CALLS_LOG ;
+    }
+
+    [ -f "${JELASTIC_6RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${JELASTIC_6RULES_FILE}" 2>>$ACTIONS_LOG ;
+        echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_6RULES_FILE}" >> $JEM_CALLS_LOG ;
+    }
+
+    $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited;
     log "saving rules";
     /sbin/service iptables save 2>/dev/null | $GRAB_OUTPUT;
     return 0;
@@ -619,4 +492,47 @@ function doPanic() {
     $IPTABLES -F -t nat;
     _setDefaultPolicy "DROP";
     return 0;
+}
+
+
+function dofwset() {
+    echo "*filter" > "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
+    for ruleraw in ${RULES[@]} ; do
+        rulevars=$(awk -F, '{print "proto="$1";ptype="$2";dport="$3";srchost="$4";dsthost="$5";chain="$6";raction="$7";tcptype="$8";"}' <<< $ruleraw )
+        eval $rulevars
+        chain="${chain^^}"
+        proto="${proto,,}"
+
+        rulecmd="-A $chain"
+        if [ "x$srchost" != "x" ] ; then
+            rulecmd="$rulecmd -p $proto"
+        fi
+
+        if [ "x$srchost" != "x" ] ; then
+            rulecmd="$rulecmd -s $srchost"
+        fi
+
+        if [ "x$dsthost" != "x" ] ; then
+            rulecmd="$rulecmd -s $dsthost"
+        fi
+
+        if [ "x$ptype" == "xrange" ] ; then
+            rulecmd="$rulecmd -m multiport --dports $dport"
+        else
+            rulecmd="$rulecmd --dport $dport"
+        fi
+
+        rulecmd="$rulecmd -j $raction"
+        if [ "x$tcptype" == "xIPV4" ] ; then
+            echo $rulecmd >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
+        else
+            echo $rulecmd >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
+        fi
+
+        echo "CTID $CTID RULE $rulecmd" >> ${JEM_CALLS_LOG} 2>&1;
+    done
+    echo "COMMIT" >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
+    vzexecRun "jem firewall start"
+    writeJSONResponseOut "result=>0" "message=>Firewall rules set" "log=>$(vzexecGetLastStdOut) $(vzexecGetLastStdErr)"
+    return 0
 }
