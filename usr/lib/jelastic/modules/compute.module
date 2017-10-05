@@ -88,14 +88,37 @@ function doDeploy(){
 
     # Contexts validation
 
-    [ ! -z "$Context_Regex" ] && context_regex="/${Context_Regex}/p";
+    [ -n "$Context_Regex" ] && context_regex="/${Context_Regex}/p";
 
-    [ "x${COMPUTE_TYPE}" ==  "xtomcat" ]  && {
-         [ "x${COMPUTE_TYPE_VERSION}" == "x7" ]  && context_regex='/^((([a-zA-Z0-9])+((-|_|\.|#{1})?([a-zA-Z0-9])+)+(#{2}[0-9]+)?)|([a-zA-Z0-9]+))$/p;' || context_regex='/^((([a-zA-Z0-9])+((-|_|\.|#{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
-    }
-    [ "x${COMPUTE_TYPE}" ==  "xjetty" ] && context_regex='/^((([a-zA-Z0-9])+((-|_{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
-    [ "x${COMPUTE_TYPE}" ==  "xglassfish" ] && context_regex='/^((([a-zA-Z0-9])+((-|_|\.{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
-    [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && context_regex='/^(production|development|test)$/p;';
+    case ${COMPUTE_TYPE} in
+
+        tomcat)
+            case "${COMPUTE_TYPE_VERSION}" in
+
+                7|8|9)
+                context_regex='/^((([a-zA-Z0-9])+((-|_|\.|#{1})?([a-zA-Z0-9])+)+(#{2}[0-9]+)?)|([a-zA-Z0-9]+))$/p;'
+                ;;
+
+                *)
+                context_regex='/^((([a-zA-Z0-9])+((-|_|\.|#{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;'
+                ;;
+
+            esac
+        ;;
+
+        jetty)
+        context_regex='/^((([a-zA-Z0-9])+((-|_{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
+        ;;
+
+        glassfish)
+        context_regex='/^((([a-zA-Z0-9])+((-|_|\.{1})([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;';
+        ;;
+
+        apache-ruby|nginx-ruby)
+        context_regex='/^(production|development|test)$/p;';
+        ;;
+
+    esac
 
     [ -z "$context_regex" ] && context_regex='/^((([a-zA-Z0-9])+(-{1}([a-zA-Z0-9])+)+)|([a-zA-Z0-9]+))$/p;'
 
