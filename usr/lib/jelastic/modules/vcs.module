@@ -147,7 +147,7 @@ function writeProjectConfig(){
   echo "VCS_TYPE=${VCS_TYPE}" >> $PROJECT_CONFIG;
   echo "URL=${URL}" >> $PROJECT_CONFIG;
   echo "LOGIN=${LOGIN}" >> $PROJECT_CONFIG;
-  echo "PASSWORD=\"${PASSWORD}\"" >> $PROJECT_CONFIG;
+  echo PASSWORD="'"${PASSWORD}"'" >> $PROJECT_CONFIG;
   echo "BRANCH=${BRANCH}" >> $PROJECT_CONFIG;
   echo "ENVIRONMENT=${ENVIRONMENT}" >> $PROJECT_CONFIG;
   echo "CONTEXT=${CONTEXT}" >> $PROJECT_CONFIG;
