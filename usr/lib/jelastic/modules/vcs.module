@@ -120,6 +120,9 @@ function parseArguments() {
       -a | --atomicdeploy)      shift;
                                   ATOMIC_DEPLOY="$1";
                                   ;;
+      --builddir )		shift;
+                        BUILDDIR=$1;
+                                ;;
     esac
     shift
   done
@@ -170,6 +173,7 @@ function writeProjectConfig(){
     echo "$AUTHORIZATION_KEY_VAL" > "${VCS_CONFIG_DIR}/${PROJECT_NAME}".key
     chmod 600 "${VCS_CONFIG_DIR}/${PROJECT_NAME}".key
   fi
+  [ -z "$BUILDDIR" ] || echo "BUILDDIR=$BUILDDIR" >> $PROJECT_CONFIG;
 }
 
 function readProjectConfig(){
@@ -420,6 +424,7 @@ function doGetProject(){
   [ ! -z "$CONTEXT" ] &&  [ ! -z "$ENVIRONMENT" ] && { VAL=$VAL" environment=>${ENVIRONMENT} context=>${CONTEXT}" ; }
   [ ! -z "$AUTHORIZATION_KEY_VAL" ] && { hash=`echo "$AUTHORIZATION_KEY_VAL" | md5sum | $AWK '{print $1}'`; VAL=$VAL" hash=>$hash"; }
   [ ! -z $GIT_AUTORESOLVE_CONFLICT ] && { VAL=$VAL" resolveconflict=>${GIT_AUTORESOLVE_CONFLICT}"; }
+  [ ! -z "$BUILDDIR" ] && { VAL=$VAL" builddir=>${BUILDDIR}"; }
   writeJSONResponseOut "result=>0" ${VAL} ;
 }
 
