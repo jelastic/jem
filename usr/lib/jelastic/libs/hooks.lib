@@ -35,16 +35,18 @@ function getHooksLogName()
         ;;
     esac
 
-    [ -z "${HOOKS_LOG}" ] && HOOKS_LOG="${ACTION_LOG}";
+    [ -z "${HOOKS_LOG}" ] && HOOKS_LOG="${ACTION_LOG}";    
 }
 
 function applyHook(){
     hook="$1";
     getHooksLogName;
+    touch ${HOOKS_LOG};
+    chown ${DATA_OWNER} ${HOOKS_LOG};
     if [ -f "$HOOKS_DIR/${hook}_${context}.sh" ]; then 
         echo -en "$(date) Applying ${hook} hook for ${context} context \n" >> ${HOOKS_LOG}; 
         chmod +x "$HOOKS_DIR/${hook}_${context}.sh"; 
-        . "$HOOKS_DIR/${hook}_${context}.sh" >> ${HOOKS_LOG} 2>>${HOOKS_LOG} ;
+        runuser -l jelastic -c ". "$HOOKS_DIR/${hook}_${context}.sh" >> ${HOOKS_LOG} 2>>${HOOKS_LOG};"
     else
         return 0;
     fi
