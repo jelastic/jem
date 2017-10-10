@@ -53,5 +53,6 @@ function applyHook(){
 }
 
 function removeHooks(){
+    getHooksLogName;
     rm -f "$HOOKS_DIR/*_${context}.sh" && echo echo -e "$(date) All hooks are removed for ${context} context" >> ${HOOKS_LOG} || return 0;
 }
