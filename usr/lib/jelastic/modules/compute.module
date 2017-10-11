@@ -148,7 +148,7 @@ function doDeploy(){
         result=$?;
         [ $result -eq 156 ] && result=4078;
         [ $result -eq 56  ] && result=4071;
-        [ -z "$result" ] && [ $result -lt 4000 ] && result=4060;
+        [ ! -z "$result" ] && [ $result -lt 4000 ] && result=4060;
         writeJSONResponseErr "result=>$result" "message=>Deploy failed" ;
     };
 }
