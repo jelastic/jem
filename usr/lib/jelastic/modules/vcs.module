@@ -424,7 +424,7 @@ function doGetProject(){
   [ ! -z "$CONTEXT" ] &&  [ ! -z "$ENVIRONMENT" ] && { VAL=$VAL" environment=>${ENVIRONMENT} context=>${CONTEXT}" ; }
   [ ! -z "$AUTHORIZATION_KEY_VAL" ] && { hash=`echo "$AUTHORIZATION_KEY_VAL" | md5sum | $AWK '{print $1}'`; VAL=$VAL" hash=>$hash"; }
   [ ! -z $GIT_AUTORESOLVE_CONFLICT ] && { VAL=$VAL" resolveconflict=>${GIT_AUTORESOLVE_CONFLICT}"; }
-  [ ! -z "$BUILDDIR" ] && { VAL=$VAL" builddir=>${BUILDDIR}"; }
+  [ ! -z "$BUILDDIR" ] && { VAL=$VAL" subdirectory=>${BUILDDIR}"; }
   writeJSONResponseOut "result=>0" ${VAL} ;
 }
 
