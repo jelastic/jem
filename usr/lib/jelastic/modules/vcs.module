@@ -120,7 +120,7 @@ function parseArguments() {
       -a | --atomicdeploy)      shift;
                                   ATOMIC_DEPLOY="$1";
                                   ;;
-      --builddir )		shift;
+      --subdirectory )		shift;
                         BUILDDIR=$1;
                                 ;;
     esac
