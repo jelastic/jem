@@ -506,7 +506,9 @@ function dofwset() {
 
         rulecmd="-A $chain"
         if [ "x$proto" != "x" ] ; then
-            rulecmd="$rulecmd -p $proto"
+            if [ "x$dport" != "x" ] ; then
+                rulecmd="$rulecmd -p $proto"
+            fi
         fi
 
         if [ "x$srchost" != "x" ] ; then
@@ -518,9 +520,13 @@ function dofwset() {
         fi
 
         if [ "x$ptype" == "xrange" ] ; then
-            rulecmd="$rulecmd -m multiport --dports $dport"
+            if [ "x$dport" != "x" ] ; then
+                rulecmd="$rulecmd -m multiport --dports $dport"
+            fi
         else
-            rulecmd="$rulecmd --dport $dport"
+            if [ "x$dport" != "x" ] ; then
+                rulecmd="$rulecmd --dport $dport"
+            fi
         fi
 
         rulecmd="$rulecmd -j $raction"
