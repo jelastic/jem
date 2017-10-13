@@ -504,7 +504,7 @@ function dofwset() {
         proto="${proto,,}"
 
         rulecmd="-A $chain"
-        if [ "x$srchost" != "x" ] ; then
+        if [ "x$proto" != "x" ] ; then
             rulecmd="$rulecmd -p $proto"
         fi
 
