@@ -40,13 +40,14 @@ function getHooksLogName()
 
 function applyHook(){
     hook="$1";
-    if [ -f "$HOOKS_DIR/${hook}_${context}.sh" ]; then 
+    target="$2"
+    if [ -f "$HOOKS_DIR/${hook}_${target}.sh" ]; then 
         getHooksLogName;
         touch ${HOOKS_LOG};
         chown ${DATA_OWNER} ${HOOKS_LOG};
-        echo -en "$(date) Applying ${hook} hook for ${context} context \n" >> ${HOOKS_LOG}; 
-        chmod +x "$HOOKS_DIR/${hook}_${context}.sh"; 
-        runuser -l jelastic -c ". "$HOOKS_DIR/${hook}_${context}.sh" >> ${HOOKS_LOG} 2>>${HOOKS_LOG};"
+        echo -en "$(date) Applying ${hook} hook for ${target} \n" >> ${HOOKS_LOG}; 
+        chmod +x "$HOOKS_DIR/${hook}_${target}.sh"; 
+        runuser -l jelastic -c ". "$HOOKS_DIR/${hook}_${target}.sh" >> ${HOOKS_LOG} 2>>${HOOKS_LOG};"
     else
         return 0;
     fi
@@ -54,5 +55,5 @@ function applyHook(){
 
 function removeHooks(){
     getHooksLogName;
-    rm -f "$HOOKS_DIR/*_${context}.sh" && echo echo -e "$(date) All hooks are removed for ${context} context" >> ${HOOKS_LOG} || return 0;
+    rm -f "$HOOKS_DIR/*_${target}.sh" && echo echo -e "$(date) All hooks are removed for ${target}" >> ${HOOKS_LOG} || return 0;
 }

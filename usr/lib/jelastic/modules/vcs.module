@@ -271,7 +271,7 @@ function doUpdate(){
   parseArguments "$@";
   readProjectConfig || { writeJSONResponseErr "result=>4006" "message=>Error while reading project config!"; return 1; };
   enableVCSLibrary;
-  applyHook preUpdate;
+  applyHook preUpdate ${PROJECT_NAME};
   if [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" ] && [ "x${PROJECT_NAME}" == "xROOT" ] && [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
   local NEXT_DIR=ROOT_`date +%Y.%m.%d-%H.%M.%S`;
         if [ -h ${WEBROOT}/ROOT ] ; then
@@ -362,7 +362,7 @@ function doUpdate(){
   [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && return 0;
   [ "x${COMPUTE_TYPE}" != "xmaven" ]  && isFunction "setContext" && setContext ${PROJECT_NAME};
   [ "x${COMPUTE_TYPE}" == "xcartridge" ] && recoverBrokenMountPoints && service cartridge build >>  $ACTIONS_LOG  2>&1  && service cartridge deploy >> $ACTIONS_LOG  2>&1;
-  applyHook postUpdate;
+  applyHook postUpdate ${PROJECT_NAME};
   return 0;
 }
 
