@@ -190,8 +190,8 @@ function doBuild(){
     readProjectConfig;
     [ "x$UPDATE" == "xtrue" ] && doUpdate update -n $PROJECT_NAME;
     [[ ${BUILDDIR} =~ pom.xml$ && -f "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}" ]] && BUILDDIR=${BUILDDIR/pom.xml};
-    applyHook ${PROJECT_NAME} preBuild;
     if [ -e "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
+    applyHook ${PROJECT_NAME} preBuild;
         #echo "Building $m_name ..."
         $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true";
         if [ "x$BUILD_IS_OK" == "xtrue" ] ; then
