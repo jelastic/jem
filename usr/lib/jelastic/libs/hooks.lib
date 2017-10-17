@@ -39,8 +39,8 @@ function getHooksLogName()
 }
 
 function applyHook(){
-    hook="$1";
-    target="$2"
+    target="$1"
+    hook="$2"
     if [ -f "$HOOKS_DIR/${hook}_${target}.sh" ]; then 
         getHooksLogName;
         touch ${HOOKS_LOG};
@@ -55,5 +55,6 @@ function applyHook(){
 
 function removeHooks(){
     getHooksLogName;
+    target="$1"
     rm -f "$HOOKS_DIR/*_${target}.sh" && echo echo -e "$(date) All hooks are removed for ${target}" >> ${HOOKS_LOG} || return 0;
 }
