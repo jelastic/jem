@@ -53,6 +53,17 @@ function applyHook(){
     fi
 }
 
+function renameHooks(){
+    target="$1"
+    old_target="$2"
+    [ ! -d ${HOOKS_DIR} ] && return 0;
+    hooks_to_rename=$(ls ${HOOKS_DIR}|grep ${old_target})
+    for i in ${hooks_to_rename}
+    do
+        mv -f ${HOOKS_DIR}/$i ${HOOKS_DIR}/$(echo $i|cut -d"_" -f1)_${target}.sh;
+    done
+}
+
 function removeHooks(){
     getHooksLogName;
     target="$1"
