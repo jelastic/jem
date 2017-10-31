@@ -47,7 +47,7 @@ function applyHook(){
         chown ${DATA_OWNER} ${HOOKS_LOG};
         echo -en "$(date) Applying ${hook} hook for ${target} \n" >> ${HOOKS_LOG}; 
         chmod +x "$HOOKS_DIR/${hook}_${target}.sh"; 
-        runuser -l jelastic -c ". "$HOOKS_DIR/${hook}_${target}.sh" >> ${HOOKS_LOG} 2>>${HOOKS_LOG};"
+        runuser -l jelastic -c "$HOOKS_DIR/${hook}_${target}.sh >> ${HOOKS_LOG} 2>>${HOOKS_LOG};"
     else
         return 0;
     fi
