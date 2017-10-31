@@ -221,7 +221,12 @@ function doDeploy(){
     #echo "Deploying $m_name ..."
     [[ ${BUILDDIR} =~ pom.xml$ && -f "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}" ]] && BUILDDIR=${BUILDDIR/pom.xml};
     if [ -e "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
-        [ "x$BUILD" == "xtrue" ] && { $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true"; } || BUILD_IS_OK="true";
+        if [ "x$BUILD" == "xtrue" ]; then
+            applyHook ${PROJECT_NAME} preBuild;
+            $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && { BUILD_IS_OK="true"; applyHook ${PROJECT_NAME} postBuild; }
+        else
+            BUILD_IS_OK="true";
+        fi
         readProjectConfig $PROJECT_NAME;
         generateDeployProperties;
         if [ "x$BUILD_IS_OK" == "xtrue" ] ; then
