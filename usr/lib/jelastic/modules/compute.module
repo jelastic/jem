@@ -141,7 +141,7 @@ function doDeploy(){
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
         ldeploy="deploy" #added for backwards compatibility with Openshift cartridge templates
         isFunction "_deploy" && ldeploy="_deploy" #must be removed after the cartridge support is finished
-        "$ldeploy" "$package_url" "$context" "$ext" >> "$ACTIONS_LOG"  2>&1 &&  service cartridge build >>  "$ACTIONS_LOG"  2>&1  && service cartridge deploy >> "$ACTIONS_LOG"  2>&1 && { writeJSONResponseOut "result=>0" "message=>Application deployed successfully"; return 0 ; } || { writeJSONResponseErr "result=>4060" "message=>Deploy failed"; return 1; } ;
+        "$ldeploy" "$package_url" "$context" "$ext" >> "$ACTIONS_LOG"  2>&1 { service cartridge build ; service cartridge deploy; applyHook ${context} postDeploy } >> "$ACTIONS_LOG"  2>&1 && { writeJSONResponseOut "result=>0" "message=>Application deployed successfully"; return 0 ; } || { writeJSONResponseErr "result=>4060" "message=>Deploy failed"; return 1; } ;
     }
 
     deploy "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" && applyHook ${context} postDeploy && writeJSONResponseOut "result=>0" "message=>Application deployed successfully" || {
