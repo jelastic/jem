@@ -29,6 +29,8 @@ $PROGRAM 'mysqladmin';
 
 function setPassword() {
 
+		/usr/bin/chown -R mysql:mysql /var/log/mysql &>/dev/null;
+
 		while [ "$1" != "" ];
 		do
 		  case $1 in

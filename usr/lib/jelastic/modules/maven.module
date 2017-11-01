@@ -16,7 +16,7 @@
 
 
 
-inherit default os envinfo;
+inherit default os envinfo hooks;
 include output decrypt-passwd;
 
 DESCRIPTION="Enables SSL for application stack";
@@ -24,6 +24,8 @@ VERSION="1";
 DEFAULT_ACTION="Usage";
 VCS_CONFIG_DIR="/var/lib/jelastic/vcs";
 DEFAULT_DOMAIN="jelastic";
+
+HOOKS_DIR="/var/lib/jelastic/hooks";
 
 export GIT_SSL_NO_VERIFY=true;
 SCRIPTS_DIR="/root/maven/scripts/"
@@ -101,14 +103,26 @@ while [ "$1" != "" ]; do
                                 ;;
     -su | --skip-upload )       shift;
                                 SKIP_UPLOAD=$1;
-                                ;;				
+                                ;;
+    --update )                  shift;
+                                UPDATE=$1;
+                                ;;
+    --build )                   shift;
+                                BUILD=$1;
+                                ;;
     -m  | --updateinverval | -i  | --interval )    shift;
                                 UPDATE_INTERVAL=$1;
-                                ;;                                
+                                ;;
+    --subdirectory )	shift;
+		BUILDDIR=$1;
+	;;
   esac
   shift
 done
 }
+
+[ -z "$UPDATE" ] && UPDATE="true";
+[ -z "$BUILD" ] && BUILD="true";
 
 function checkProjectsDirectory(){
     [ ! -d  $APPROOT ] && mkdir -p $APPROOT;
@@ -154,6 +168,7 @@ function generateDeployProperties(){
 
 function readProjectConfig(){
     local project_to_read;
+    BUILDDIR='';
     [ -z "$1" ] && project_to_read=${PROJECT_NAME} || project_to_read="$1";
     if [ -e "${VCS_CONFIG_DIR}/${project_to_read}.properties" ] ; then
       source "${VCS_CONFIG_DIR}/${project_to_read}.properties";
@@ -173,17 +188,19 @@ function doBuild(){
     BUILD_IS_OK="false";
     parseArguments "$@"  || return 1;
     readProjectConfig;
-    doUpdate update -n $PROJECT_NAME;
-    if [ -e "${APPROOT}/${PROJECT_NAME}/pom.xml" ] ; then
+    [ "x$UPDATE" == "xtrue" ] && doUpdate update -n $PROJECT_NAME;
+    [[ ${BUILDDIR} =~ pom.xml$ && -f "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}" ]] && BUILDDIR=${BUILDDIR/pom.xml};
+    if [ -e "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
+    applyHook ${PROJECT_NAME} preBuild;
         #echo "Building $m_name ..."
-        $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true";
+        $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true";
         if [ "x$BUILD_IS_OK" == "xtrue" ] ; then
-		if [ "x$SKIP_UPLOAD" == "xtrue" ] ; then
-	    		writeJSONResponseOut "result=>0" "message=>Build success"; return 0;
-		fi	
-            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:publish $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST"  -Djelastic-upload-only=true -Djelastic-session="$SESSION" --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
-			[ $? -eq 0 ] && {
-				writeJSONResponseOut "result=>0" "message=>Build success"; return 0;	
+                if [ "x$SKIP_UPLOAD" == "xtrue" ] ; then
+                        writeJSONResponseOut "result=>0" "message=>Build success"; return 0;
+                fi
+            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:publish $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST"  -Djelastic-upload-only=true -Djelastic-session="$SESSION" --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
+                        [ $? -eq 0 ] && {
+                                writeJSONResponseOut "result=>0" "message=>Build success"; applyHook ${PROJECT_NAME} postBuild; return 0;
             } || {
                 writeJSONResponseErr "result=>4049" "message=>Upload failed, see logs for details" ; return 1 ;
             };
@@ -200,14 +217,15 @@ function doDeploy(){
     BUILD_IS_OK="false";
     parseArguments "$@"  || return 1;
     readProjectConfig;
-    doUpdate update -n $PROJECT_NAME;
+    [ "x$UPDATE" == "xtrue" ] && doUpdate update -n $PROJECT_NAME;
     #echo "Deploying $m_name ..."
-    if [ -e "${APPROOT}/${PROJECT_NAME}/pom.xml" ] ; then
-        $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true";
+    [[ ${BUILDDIR} =~ pom.xml$ && -f "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}" ]] && BUILDDIR=${BUILDDIR/pom.xml};
+    if [ -e "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
+        [ "x$BUILD" == "xtrue" ] && { $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true"; } || BUILD_IS_OK="true";
         readProjectConfig $PROJECT_NAME;
         generateDeployProperties;
         if [ "x$BUILD_IS_OK" == "xtrue" ] ; then
-            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:deploy $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST" -Djelastic-properties="$DEPLOY_PROPROPERTIES" -Dcontext="$CONTEXT" -Denvironment="$ENVIRONMENT" -Djelastic-session="$SESSION" -Dpackaging.type="war" --file "${APPROOT}/${PROJECT_NAME}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
+            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:deploy $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST" -Djelastic-properties="$DEPLOY_PROPROPERTIES" -Dcontext="$CONTEXT" -Denvironment="$ENVIRONMENT" -Djelastic-session="$SESSION" -Dpackaging.type="war" --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
             [ $? -eq 0 ] && { 
                 [ -f "$DEPLOY_PROPROPERTIES" ] && rm "$DEPLOY_PROPROPERTIES" ; 
             } || { 
@@ -215,7 +233,7 @@ function doDeploy(){
             };
         fi
     else
-		echo "[ERROR] File pom.xml is absent" >> "${LOG_DIR}/${PROJECT_NAME}_build.log"
+                echo "[ERROR] File pom.xml is absent" >> "${LOG_DIR}/${PROJECT_NAME}_build.log"
         writeJSONResponseErr "result=>4059" "message=>Build failed, see logs for details" ; return 1 ;
     fi
 }
@@ -237,7 +255,7 @@ function describeCreateProject() {
 }
 
 function describeCreateProjectParameters() {
-    echo "-n|--project-name <name> -t|--vcs-type <git|svn> -u|--url <url> -l|--login <login> [-p|--password <password>] \n\t-b|--branch <branch name> -c|--context <context> -e|--environment <environment name> -au|--autoupdate <true|false>\n\t-i|--inverval <interval>";
+    echo "-n|--project-name <name> -t|--vcs-type <git|svn> -u|--url <url> -l|--login <login> [-p|--password <password>] \n\t-b|--branch <branch name> -c|--context <context> -e|--environment <environment name> -au|--autoupdate <true|false>\n\t-i|--inverval <interval>|--update <true|false>|--build <true|false>";
 }
 
 function describeCreateProjectOptions() {
@@ -252,6 +270,8 @@ function describeCreateProjectOptions() {
     echo "-su|--skip-upload: <true/false>";
     echo "-t|--vcs-type: project type";
     echo "-u|--url:project url";
+    echo "--update: sets if project should be updated before build or not (\"true\" by default)";
+    echo "--build: sets if project should be built before deploy or not (\"true\" by default)";
 }
 
 
@@ -272,7 +292,7 @@ function describeDeploy() {
 }
 
 function describeDeployParameters() {
-    echo "-s|--session <session> -mpv|--maven-plugin-version <version> -a|--api-host <api host> -n|--project-name <name> -h|--host-headers <headers>";
+    echo "-s|--session <session> -mpv|--maven-plugin-version <version> -a|--api-host <api host> -n|--project-name <name> -h|--host-headers <headers>|--update <true|false>|--build <true|false>";
 }
 
 function describeDeployOptions() {
@@ -281,6 +301,8 @@ function describeDeployOptions() {
     echo "-a|--api-host: API host name";
     echo "-n|--project-name: project name";
     echo "-h--host-headers: headers";
+    echo "--update: sets if project should be updated before build or not (\"true\" by default)";
+    echo "--build: sets if project should be built before deploy or not (\"true\" by default)";
 }
 
 function describeEditProject() {
@@ -288,7 +310,7 @@ function describeEditProject() {
 }
 
 function describeEditProjectParameters() {
-    echo "-n|--project-name <name> -o|--old-project-name <old project name> -t|--vcs-type <git|svn> -u|--url <url>\n\t-l|--login <login> [-p|--password <password>] -b|--branch <branch name> -c|--context <context>\n\t-e|--environment <environment name> -au|--autoupdate <true|false> -i|--inverval <interval>";
+    echo "-n|--project-name <name> -o|--old-project-name <old project name> -t|--vcs-type <git|svn> -u|--url <url>\n\t-l|--login <login> [-p|--password <password>] -b|--branch <branch name> -c|--context <context>\n\t-e|--environment <environment name> -au|--autoupdate <true|false> -i|--inverval <interval>|--update <true|false>|--build <true|false>";
 }
 
 function describeEditProjectOptions() {
@@ -303,6 +325,8 @@ function describeEditProjectOptions() {
     echo "-p|--password: password";
     echo "-t|--vcs-type: project type";
     echo "-u|--url:project url";
+    echo "--update: sets if project should be updated before build or not (\"true\" by default)";
+    echo "--build: sets if project should be built before deploy or not (\"true\" by default)";
 }
 
 function describeGetProject() {
@@ -327,5 +351,4 @@ function describeUpdateParameters() {
 
 function describeUpdateOptions() {
     echo "-n|--project-name: project name";
-
 }

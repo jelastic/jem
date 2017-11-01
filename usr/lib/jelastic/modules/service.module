@@ -70,7 +70,7 @@ function doRestart(){
         result=$?;
         if [[ "${result}" -eq "0" ]]
         then
-            [ -n "$FIREWALL_ENABLED" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && [ "${FIREWALL_ENABLED}" -eq "1" ] && {
+            [ -n "$FIREWALL_ENABLED" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && [ "${FIREWALL_ENABLED}" -eq "1" ] && [ "$USER" == "root" ] && {
                 local msg=$( doAction "firewall" "Start" )  || message="Failed to apply firewall rules"; 
             }
         else
@@ -140,3 +140,4 @@ function describeRestartParameters() {
 function describeRestartOptions() {
     echo "<service name>: service to act with";
 }
+

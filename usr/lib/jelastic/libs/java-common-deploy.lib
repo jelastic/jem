@@ -18,6 +18,7 @@
 JAVACOMMONDEPLOYLIB_VERSION="0.1";
 $PROGRAM 'grep';
 
+inherit default exceptor;
 
 [ ! -z "$WEBROOT" -a ! -d "$WEBROOT" ] && mkdir -p ${WEBROOT};
 
@@ -78,18 +79,9 @@ function deploy(){
         exit 1;
     fi
     clearCache;
-    ensureFileCanBeDownloaded $package_url;
-    $WGET --no-check-certificate --content-disposition --directory-prefix=${DOWNLOADS} $package_url >> $ACTIONS_LOG 2>&1 || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
-    package_name=$(ls ${DOWNLOADS});
+    getPackageName;
+    ensureFileCanBeUncompressed "${package_path}/${package_name}";
 
-    [ ! -s "$DOWNLOADS/$package_name" ] && {
-        set -f
-        rm -f ${DOWNLOADS}/${package_name};
-        set +f
-        writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
-        die -q;
-    }
-    ensureFileCanBeUncompressed ${DOWNLOADS}/${package_name};
     stopServiceSilent ${SERVICE} ;
 
     if [ -e "${WEBROOT}/$context" ]
@@ -106,9 +98,9 @@ function deploy(){
     if [[ ${ext} == "ear" ]]
     then
         [ ! -d  $APPS_DIR ] && mkdir -p $APPS_DIR && chown -R  $DATA_OWNER  ${APPS_DIR} 2>>"$JEM_CALLS_LOG";
-        [ -f "${DOWNLOADS}/${package_name}" ] && mv "${DOWNLOADS}/${package_name}" "${APPS_DIR}/${context}.${ext}";
+        /usr/bin/cp "${package_path}/${package_name}" "${APPS_DIR}/${context}.${ext}";
     else
-        [ -f "${DOWNLOADS}/${package_name}" ] && mv "${DOWNLOADS}/${package_name}" "${WEBROOT}/${context}.${ext}";
+        /usr/bin/cp "${package_path}/${package_name}" "${WEBROOT}/${context}.${ext}";
     fi
 
     applyPostDeploy;
@@ -148,10 +140,10 @@ function renameContext(){
     [ -e ${WEBROOT}/${oldContext}.war ] && mv ${WEBROOT}/${oldContext}.war  ${WEBROOT}/${newContext}.war && war_deploy_result=0 || war_deploy_result=1;
     [ -e ${APPS_DIR}/${oldContext}.ear ] && mv ${APPS_DIR}/${oldContext}.ear  ${APPS_DIR}/${newContext}.ear && ear_deploy_result=0 || ear_deploy_result=1;
     [ $(( $war_deploy_result & $ear_deploy_result )) -ne 0  ] && {
-	shopt -u dotglob;
-	startServiceSilent ${SERVICE} ;
-	writeJSONResponseErr "result=>4052" "message=>Context does not exist";
-	die -q;
+        shopt -u dotglob;
+        startServiceSilent ${SERVICE} ;
+        writeJSONResponseErr "result=>4052" "message=>Context does not exist";
+        die -q;
     }
 
     shopt -u dotglob;
@@ -174,4 +166,3 @@ function describeRename(){
     echo "rename java context \n\t\t -n \t <new context> \n\t\t -o \t
 <old context>\n\t\t";
 }
-

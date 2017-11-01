@@ -37,7 +37,7 @@ function setContext(){
 function prepareContext(){
     local context=$1;
     if ! $GREP -q ${context} <<< "development production test" ; then
-	    writeJSONResponseErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
+            writeJSONResponseErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
     fi
     echo "${context}" > /var/lib/jelastic/env;
     bundle_type=$context;
@@ -53,18 +53,6 @@ function deploy(){
     clearCache;
     ensureFileCanBeDownloaded $package_url;
     prepareContext ${context} ;
-    $WGET -nv --tries=2 --content-disposition --no-check-certificate --directory-prefix=$DOWNLOADS $package_url >> $ACTIONS_LOG 2>&1;
-    [ $? -gt 0 ] && { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q; };
-
-    package_name=$(ls ${DOWNLOADS});
-    [ ! -s "$DOWNLOADS/$package_name" ] && {
-        set -f
-        rm -f ${DOWNLOADS}/${package_name};
-        set +f
-        writeJSONResponseErr "result=>4078" "message=>Error loading file from URL";
-        die -q;
-    }
-    # check exactly FILE - it should not exists, otherwise 'mkdir' return error
     if [[ -f "${APPWEBROOT%/}" ]]
     then
         set -f

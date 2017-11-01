@@ -93,8 +93,8 @@ function enableService() {
 # $1 - service name
 function startService() {
     local name=${1};
-    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
-    ${SERVICE_CMD} ${name} start;
+    [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+    $SUDO ${SERVICE_CMD} ${name} start;
     sleep 1;
     return ${?};
 }
@@ -102,8 +102,8 @@ function startService() {
 # $1 - service name
 function startServiceSilent() {
     local name=${1};
-    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
-    ${SERVICE_CMD} ${name} start > /dev/null 2>&1;
+    [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+    $SUDO ${SERVICE_CMD} ${name} start > /dev/null 2>&1;
     sleep 1;
     return ${?};
 }
@@ -111,8 +111,8 @@ function startServiceSilent() {
 
 function stopService() {
     local name=${1};
-    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
-    ${SERVICE_CMD} ${name} stop;
+    [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+    $SUDO ${SERVICE_CMD} ${name} stop;
     sleep 1;
     return ${?};
 };
@@ -120,30 +120,30 @@ function stopService() {
 # $1 - service name
 function stopServiceSilent() {
     local name=${1};
-    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
-    ${SERVICE_CMD} ${name} stop > /dev/null 2>&1;
+    [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+    $SUDO ${SERVICE_CMD} ${name} stop > /dev/null 2>&1;
     sleep 1;
     return ${?};
 }
 
 function reloadService() {
     local name=${1};
-    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
-    ${SERVICE_CMD} ${name} reload;
+    [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+    $SUDO ${SERVICE_CMD} ${name} reload;
     return ${?};
 }
 
 function reloadServiceSilent() {
     local name=${1};
-    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
-    ${SERVICE_CMD} ${name} reload > /dev/null 2>&1;
+    [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+    $SUDO ${SERVICE_CMD} ${name} reload > /dev/null 2>&1;
     return ${?};
 }
 
 function restartServiceSilent() {
     local name=${1};
-    [[ "$UID" != '0' ]] && { writeErrorMsg "You must be root!"; return 1; }
-    ${SERVICE_CMD} ${name} restart > /dev/null 2>&1;
+    [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+    $SUDO ${SERVICE_CMD} ${name} restart > /dev/null 2>&1;
     return ${?};
 }
 
@@ -329,20 +329,20 @@ function installPackageCmd() {
     local pmaction=$1; shift
     for arg do PKGS="$arg $PKGS"; done
     case $OS in
-	suse)
-		PM="zypper --quiet --non-interactive"
-	    ;;
-	debian|ubuntu|kali)
-		PM="apt-get -y"
+        suse)
+                PM="zypper --quiet --non-interactive"
             ;;
-       	centos|redhat|fedora)
-        	PM="yum -y"
+        debian|ubuntu|kali)
+                PM="apt-get -y"
+            ;;
+        centos|redhat|fedora)
+                PM="yum -y"
             ;;
         alpine)
             PM="apk"
             case $pmaction in
-            	install)
-                	pmaction="add -f"
+                install)
+                        pmaction="add -f"
                     ;;
                 remove)
                     pmaction="del -f"
@@ -351,4 +351,3 @@ function installPackageCmd() {
     esac
     echo "$PM $pmaction $PKGS"
 }
-
