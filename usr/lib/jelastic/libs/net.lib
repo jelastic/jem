@@ -19,6 +19,7 @@ NETLIB_VERSION="0.1";
 
 inherit os log core;
 $PROGRAM 'sed';
+$PROGRAM 'ipcalc';
 
 __FD_TCP_DOWNLOAD=5;
 
@@ -230,5 +231,17 @@ function getInfraAddresses() {
     ## }}}
 
     return 0;
+}
+
+function netContainIp(){
+    : ${1:?"Missing param: NET"};
+    : ${2:?"Missing param: IP"};
+    local net=$1
+    local ip=$2
+    eval local $($IPCALC -p $net)
+    local net1=$($IPCALC -n $net)
+    local net2=$($IPCALC -n ${ip}/${PREFIX})
+    { [ "x$net1" != "x$net2" ] || [ -z ${PREFIX} ]; } && return 1;
+    return 0
 }
 
