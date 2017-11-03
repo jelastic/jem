@@ -228,7 +228,6 @@ function doStart() {
     [ -f "$cartridge_config"  ] && Firewall_Enabled=$($GREP Firewall_Enabled "$cartridge_config" | $AWK -F "=" '{ print $2 }')
     [ ! -z "${Firewall_Enabled}" ] && FIREWALL_ENABLED=${Firewall_Enabled};  ### Override for cartridges
     [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
-    [[ "${COMPUTE_TYPE}" == 'memcached' ]] && return 0;  # memcache has own firewall
 
     $IPTABLES -F;
     $IPTABLES -t nat -F;
