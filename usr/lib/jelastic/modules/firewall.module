@@ -423,20 +423,15 @@ function describeEnableOptions() {
 }
 
 function doEnable() {
-    [[ -n "${META_FILE}" ]] && [[ -e "${META_FILE}" ]] && {
-        if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
-            $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=1/g" ${META_FILE};
-        else
-            echo -e "\nFIREWALL_ENABLED=1" >> ${META_FILE};
-            $SED -i -re '/^$/d' ${META_FILE};
-        fi;
-        chkconfig --level 345 iptables on 2>&1 | $GRAB_OUTPUT;
-        echo "Firewall enabled";
-        return 0;
-    } || {
-        echo "Error: No metadata found!";
-        return ${ERR_NO_METADATA};
-    }
+    if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
+        $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=1/g" ${META_FILE}
+    else
+        echo -e "\nFIREWALL_ENABLED=1" >> ${META_FILE}
+        $SED -i -re '/^$/d' ${META_FILE}
+    fi
+    chkconfig --level 345 iptables on 2>&1 | $GRAB_OUTPUT
+    echo "Firewall enabled"
+    return 0
 }
 
 function describeFWEnable() {
