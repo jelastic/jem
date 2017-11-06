@@ -669,20 +669,21 @@ function unsetSSLforLB(){
 }
 
 function rebuildCommon(){
-  if ! grep -q -E 'upstream\s+default_upstream' "$NGINX_CONFIG" ; then
-   reloadConfigs;
-  fi
-  clearGroupFromNginxConfig common && \
-  clearTCPPortMappings && \
-  addGroupToUpsreamCommon && \
-  addGroupToDefaultUpsreamSection common && \
-  addGroupToMappingsSection common && \
-  addTCPPortMappings && \
-  unsetSSLforLB && \
-  { reloadServiceSilent $SERVICE || restartServiceSilent $SERVICE; } && \
-  enableService $SERVICE > /dev/null 2>&1 && \
-  return 0 || return 1;
+    if ! grep -q -E 'upstream\s+default_upstream' "$NGINX_CONFIG" ; then
+        reloadConfigs;
+    fi
+    clearGroupFromNginxConfig common && \
+    clearTCPPortMappings && \
+    addGroupToUpsreamCommon && \
+    addGroupToDefaultUpsreamSection common && \
+    addGroupToMappingsSection common && \
+    addTCPPortMappings && \
+    unsetSSLforLB && local RETVAL="0" || local RETVAL="1" ;
+    { reloadServiceSilent $SERVICE || restartServiceSilent $SERVICE; }
+    enableService $SERVICE > /dev/null 2>&1
+    return ${RETVAL}
 }
+
 
 function rebuildCommonTrafD(){
   NGINX_CONFIG_TEMPLATE="/etc/nginx/templates/nginx.conf.traf.distrib.tpl";
