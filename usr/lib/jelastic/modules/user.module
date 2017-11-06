@@ -180,7 +180,7 @@ function preAddCallback(){
             writeJSONResponseErr "result=>4105" "message=>Container root dir not found"
             die -q
         }
-        if [[ -f ${prefix}/etc/jelastic/metainf.conf && ! -n "$(grep "COMPUTE_TYPE=storage" ${prefix}/etc/jelastic/metainf.conf)" ]]; then
+        if [[ -f ${prefix}/etc/jelastic/metainf.conf ]]; then
             __processNotVDS ${_CTID}
             _UID=700
             _GUID=700
