@@ -34,6 +34,7 @@ $PROGRAM 'sed';
 $PROGRAM 'grep';
 $PROGRAM 'awk';
 $PROGRAM 'iptables-restore';
+$PROGRAM 'ip6tables-restore'
 $PROGRAM 'vzctl'
 
 SAVEFILE='/var/lib/jelastic/firewall'
@@ -305,7 +306,7 @@ function doStart() {
         echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_4RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
 
-    [ -f "${JELASTIC_6RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${JELASTIC_6RULES_FILE}" 2>>$ACTIONS_LOG ;
+    [ -f "${JELASTIC_6RULES_FILE}" ] && { $IP6TABLES_RESTORE -n < "${JELASTIC_6RULES_FILE}" 2>>$ACTIONS_LOG ;
         echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_6RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
 
@@ -493,6 +494,7 @@ function doPanic() {
 
 function dofwset() {
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
+    echo "*filter" > "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
     for ruleraw in ${RULES[@]} ; do
         rulevars=$(awk -F, '{print "proto="$1";ptype="$2";dport="$3";srchost="$4";dsthost="$5";chain="$6";raction="$7";tcptype="$8";"}' <<< $ruleraw )
         eval $rulevars
@@ -534,6 +536,7 @@ function dofwset() {
         echo "CTID $CTID RULE $rulecmd" >> ${JEM_CALLS_LOG} 2>&1;
     done
     echo "COMMIT" >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
+    echo "COMMIT" >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
     vzexecRun "jem firewall start"
     writeJSONResponseOut "result=>0" "message=>Firewall rules set" "log=>$(vzexecGetLastStdOut) $(vzexecGetLastStdErr)"
     return 0
