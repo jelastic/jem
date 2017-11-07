@@ -413,7 +413,7 @@ function _addNativeip() {
             return $FALSE
         fi
 
-        [[ ! -d "/vz/root/${CTID}${destinationPath}" ]] && {
+        [[ ! -d "/vz/root/${CTID}${destinationPath}" ]] && [ ! -L "/vz/root/${CTID}${destinationPath}" ] && {
             mkdir -p "/vz/root/${CTID}${destinationPath}"
             chmod 0777 "/vz/root/${CTID}${destinationPath}"
         }
