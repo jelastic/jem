@@ -85,7 +85,11 @@ function _defaultComputeNodeRedirPorts () {
     return 0;
 }
 
+function _getapache_rubyRedirPorts() { return 0; }
+function _getcouchdbRedirPorts() { return 0; }
 function _getmysqlRedirPorts() { return 0; }
+function _getmariadbRedirPorts() { return 0; }
+function _getmongodbRedirPorts() { return 0; }
 function _getpostgresRedirPorts() { return 0; }
 
 function _isPublicIPv4() {
