@@ -23,7 +23,8 @@ DEFAULT_ACTION="Usage";
 inherit tests os envinfo log net config vzexec;
 include cartridge-common;
 
-$PROGRAM 'iptables';
+$PROGRAM 'iptables'
+$PROGRAM 'ip6tables'
 $PROGRAM 'find';
 $PROGRAM 'xargs';
 $PROGRAM 'netstat';
@@ -125,10 +126,14 @@ function isRange() {
 }
 
 function _setDefaultPolicy() {
-    local policy=${1:-"DROP"};
-    $IPTABLES -P INPUT ${policy};
-    $IPTABLES -P FORWARD ${policy};
+    local policy=${1:-"DROP"}
+    $IPTABLES -P INPUT ${policy}
+    $IPTABLES -P FORWARD ${policy}
     $IPTABLES -P OUTPUT ACCEPT
+
+    $IP6TABLES -P INPUT ${policy}
+    $IP6TABLES -P FORWARD ${policy}
+    $IP6TABLES -P OUTPUT ACCEPT
 }
 
 function doUsage() {
