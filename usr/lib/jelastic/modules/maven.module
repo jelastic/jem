@@ -191,7 +191,7 @@ function doBuild(){
     [ "x$UPDATE" == "xtrue" ] && doUpdate update -n $PROJECT_NAME;
     [[ ${BUILDDIR} =~ pom.xml$ && -f "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}" ]] && BUILDDIR=${BUILDDIR/pom.xml};
     if [ -e "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
-    applyHook ${PROJECT_NAME} preBuild;
+    applyHook ${PROJECT_NAME} preBuild || { writeJSONResponseErr "result=>4129" "message=>Pre-build hook execution failed"; return 1; };
         #echo "Building $m_name ..."
         $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && BUILD_IS_OK="true";
         if [ "x$BUILD_IS_OK" == "xtrue" ] ; then
@@ -200,7 +200,7 @@ function doBuild(){
                 fi
             $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:publish $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST"  -Djelastic-upload-only=true -Djelastic-session="$SESSION" --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
                         [ $? -eq 0 ] && {
-                                writeJSONResponseOut "result=>0" "message=>Build success"; applyHook ${PROJECT_NAME} postBuild; return 0;
+                                writeJSONResponseOut "result=>0" "message=>Build success"; applyHook ${PROJECT_NAME} postBuild || { writeJSONResponseErr "result=>4130" "message=>Post-build hook execution failed"; return 1; }; return 0;
             } || {
                 writeJSONResponseErr "result=>4049" "message=>Upload failed, see logs for details" ; return 1 ;
             };
@@ -222,8 +222,8 @@ function doDeploy(){
     [[ ${BUILDDIR} =~ pom.xml$ && -f "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}" ]] && BUILDDIR=${BUILDDIR/pom.xml};
     if [ -e "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
         if [ "x$BUILD" == "xtrue" ]; then
-            applyHook ${PROJECT_NAME} preBuild;
-            $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && { BUILD_IS_OK="true"; applyHook ${PROJECT_NAME} postBuild; }
+            applyHook ${PROJECT_NAME} preBuild || { writeJSONResponseErr "result=>4129" "message=>Pre-build hook execution failed"; return 1; };
+            $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && { BUILD_IS_OK="true"; applyHook ${PROJECT_NAME} postBuild || { writeJSONResponseErr     "result=>4130" "message=>Post-build hook execution failed"; return 1; }; }
         else
             BUILD_IS_OK="true";
         fi

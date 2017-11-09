@@ -152,7 +152,7 @@ function doDeploy(){
 
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && { service cartridge build ; service cartridge deploy; }
 
-    applyHook ${context} postDeploy || { writeJSONResponseErr "result=>4026" "message=>Post-deploy hook execution failed"; return 1; }
+    applyHook ${context} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed"; return 1; }
 
     writeJSONResponseOut "result=>0" "message=>Application deployed successfully"
 }

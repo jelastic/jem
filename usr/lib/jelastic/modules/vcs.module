@@ -363,8 +363,8 @@ function doUpdate(){
   [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && return 0;
   [ "x${COMPUTE_TYPE}" != "xmaven" ]  && isFunction "setContext" && setContext ${PROJECT_NAME};
   [ "x${COMPUTE_TYPE}" == "xcartridge" ] && recoverBrokenMountPoints && service cartridge build >>  $ACTIONS_LOG  2>&1  && service cartridge deploy >> $ACTIONS_LOG  2>&1;
-  applyHook ${PROJECT_NAME} postUpdate || { writeJSONResponseErr "result=>4028" "message=>Post-update hook execution failed"; return 1; }; 
-  applyHook ${PROJECT_NAME} postDeploy || { writeJSONResponseErr "result=>4026" "message=>Post-deploy hook execution failed"; return 1; };
+  applyHook ${PROJECT_NAME} postUpdate || { writeJSONResponseErr "result=>4128" "message=>Post-update hook execution failed"; return 1; }; 
+  applyHook ${PROJECT_NAME} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed"; return 1; };
   return 0;
 }
 
