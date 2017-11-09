@@ -136,21 +136,25 @@ function doDeploy(){
     local vcs_project_properties="/var/lib/jelastic/vcs/${context}.properties";
     [ -f "$vcs_project_properties" ] && { set -f; rm -f "$vcs_project_properties"; set +f; }
 
-    applyHook ${context} preDeploy;
+    applyHook ${context} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed"; return 1; };
+    
+    deploy_function="deploy"
+ 
+    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && { isFunction "_deploy" && deploy_function="_deploy"; }
 
-    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
-        ldeploy="deploy" #added for backwards compatibility with Openshift cartridge templates
-        isFunction "_deploy" && ldeploy="_deploy" #must be removed after the cartridge support is finished
-        "$ldeploy" "$package_url" "$context" "$ext" >> "$ACTIONS_LOG"  2>&1 { service cartridge build ; service cartridge deploy; applyHook ${context} postDeploy } >> "$ACTIONS_LOG"  2>&1 && { writeJSONResponseOut "result=>0" "message=>Application deployed successfully"; return 0 ; } || { writeJSONResponseErr "result=>4060" "message=>Deploy failed"; return 1; } ;
-    }
-
-    deploy "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" && applyHook ${context} postDeploy && writeJSONResponseOut "result=>0" "message=>Application deployed successfully" || {
+    ${deploy_function} "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" || {
         result=$?;
         [ $result -eq 156 ] && result=4078;
         [ $result -eq 56  ] && result=4071;
         [ ! -z "$result" ] && [ $result -lt 4000 ] && result=4060;
-        writeJSONResponseErr "result=>$result" "message=>Deploy failed" ;
+        writeJSONResponseErr "result=>$result" "message=>Deploy failed" ; return 1;
     };
+
+    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && { service cartridge build ; service cartridge deploy; }
+
+    applyHook ${context} postDeploy || { writeJSONResponseErr "result=>4026" "message=>Post-deploy hook execution failed"; return 1; }
+
+    writeJSONResponseOut "result=>0" "message=>Application deployed successfully"
 }
 
 function doUndeploy(){
@@ -384,4 +388,5 @@ function describeUndeployParameters() {
 function describeUndeployOptions() {
     echo "-c: context name to act with";
 }
+
 
