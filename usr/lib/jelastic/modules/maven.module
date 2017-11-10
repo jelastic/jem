@@ -222,8 +222,8 @@ function doDeploy(){
     [[ ${BUILDDIR} =~ pom.xml$ && -f "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}" ]] && BUILDDIR=${BUILDDIR/pom.xml};
     if [ -e "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
         if [ "x$BUILD" == "xtrue" ]; then
-            applyHook ${PROJECT_NAME} preBuild || { writeJSONResponseErr "result=>4029" "message=>Pre-build hook execution failed"; return 1; };
-            $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && { BUILD_IS_OK="true"; applyHook ${PROJECT_NAME} postBuild || { writeJSONResponseErr     "result=>4030" "message=>Post-build hook execution failed"; return 1; }; }
+            applyHook ${PROJECT_NAME} preBuild || { writeJSONResponseErr "result=>4129" "message=>Pre-build hook execution failed"; return 1; };
+            $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && { BUILD_IS_OK="true"; applyHook ${PROJECT_NAME} postBuild || { writeJSONResponseErr     "result=>4130" "message=>Post-build hook execution failed"; return 1; }; }
         else
             BUILD_IS_OK="true";
         fi
