@@ -242,7 +242,7 @@ function onModLoadCallback() {
     _isPublicIPv4 && PublicIP=$__TRUE || publicIP=$__FALSE;
     FTPPort=$($NETSTAT -tnlp | $SED -n -re '/ftp/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}');
     NFSPort=$($RPCINFO -p 2>/dev/null | $SED -n -re '/nfs/{s/\s+(\S+\s+)+([0-9]+)\s+nfs.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
-    RPCPort=$($RPCINFO -p 2>/dev/null | $SED -n -re '/portmapper/{s/\s+(\S+\s+)+([0-9]+)\s+.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
+    RPCPort=$($RPCINFO -p 2>/dev/null | $SED -n -re '/(portmapper|nlockmgr|mountd)/{s/\s+(\S+\s+)+([0-9]+)\s+.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
 
     ## TODO: remove "params" garbarge option
     local temp=`getopt -l cp:,op:,rp: -- params "$@" 2>/dev/null` oldifs;
@@ -349,16 +349,12 @@ function doStart() {
         $IPTABLES -A INPUT -p tcp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
         $IPTABLES -A INPUT -p udp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
         if [[ "${#NFSPort}" -gt 0 ]] ; then
-            for nfsip in ${NFSIPS[@]} ; do
-                $IPTABLES -A INPUT -p tcp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
-                $IPTABLES -A INPUT -p udp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
-            done
+            $IPTABLES -A INPUT -p tcp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
+            $IPTABLES -A INPUT -p udp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
         fi
         if [[ "${#RPCPort}" -gt 0 ]] ; then
-            for rpcip in ${NFSIPS[@]} ; do
-                $IPTABLES -A INPUT -p tcp -m multiport --dports $RPCPort -d $ip -s $rpcip -j ACCEPT;
-                $IPTABLES -A INPUT -p udp -m multiport --dports $RPCPort -d $ip -s $rpcip -j ACCEPT;
-            done
+            $IPTABLES -A INPUT -p tcp -m multiport --dports $RPCPort -d $ip -s $rpcip -j ACCEPT;
+            $IPTABLES -A INPUT -p udp -m multiport --dports $RPCPort -d $ip -s $rpcip -j ACCEPT;
         fi
     done;
 
