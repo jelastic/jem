@@ -136,7 +136,7 @@ function doDeploy(){
     local vcs_project_properties="/var/lib/jelastic/vcs/${context}.properties";
     [ -f "$vcs_project_properties" ] && { set -f; rm -f "$vcs_project_properties"; set +f; }
 
-    applyHook ${context} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed"; return 1; };
+    applyHook ${context} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
     
     deploy_function="deploy"
  
@@ -152,7 +152,7 @@ function doDeploy(){
 
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && { service cartridge build ; service cartridge deploy; }
 
-    applyHook ${context} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed"; return 1; }
+    applyHook ${context} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }
 
     writeJSONResponseOut "result=>0" "message=>Application deployed successfully"
 }
