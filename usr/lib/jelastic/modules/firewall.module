@@ -436,7 +436,7 @@ function doEnable() {
         $SED -i -re '/^$/d' ${META_FILE}
     fi
     chkconfig --level 345 iptables on 2>&1 | $GRAB_OUTPUT
-    echo "Firewall enabled"
+    writeJSONResponseOut "result=>0" "message=>Firewall has been enabled"
     return 0
 }
 
@@ -456,19 +456,16 @@ function describeDisable() {
 }
 
 function doDisable() {
-    [[ -n "${META_FILE}" ]] && [[ -e "${META_FILE}" ]] && {
-        if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
-            $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=0/g" ${META_FILE};
-        fi;
-        chkconfig iptables off 2>&1 | $GRAB_OUTPUT;
-        echo "Firewall disabled";
-        _setDefaultPolicy "ACCEPT";
-        $IPTABLES -F INPUT; service iptables save &> /dev/null;
-        return 0;
-    } || {
-        echo "Error: No metadata found!";
-        return ${ERR_NO_METADATA};
-    }
+    [ ! -e "${META_FILE}" ] && touch ${META_FILE}
+    if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
+        $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=0/g" ${META_FILE};
+    fi;
+    chkconfig iptables off 2>&1 | $GRAB_OUTPUT;
+    echo "Firewall disabled";
+    _setDefaultPolicy "ACCEPT";
+    $IPTABLES -F INPUT; service iptables save &> /dev/null;
+    writeJSONResponseOut "result=>0" "message=>Firewall has been disabled"
+    return 0;
 }
 
 function describeDisable() {
