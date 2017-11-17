@@ -359,9 +359,10 @@ function doAction() {
             return $result
         }
     );
-    [ -e "$resultFile" ] && { 
-        actionResult=$(cat $resultFile );
-	rm -f "$resultFile";
+    [[ $? -eq 124 ]] && actionResult="124"
+    [ -e "$resultFile" ] && {
+        [ -z "${actionResult}" ] && actionResult=$(cat $resultFile );
+        rm -f "$resultFile";
     }
     echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
     [[ $actionResult -gt 0 ]] && {
