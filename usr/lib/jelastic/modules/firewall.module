@@ -255,14 +255,17 @@ function doStart() {
     for ip in ${intips[@]} ; do
         $IPTABLES -A INPUT -p tcp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
         $IPTABLES -A INPUT -p udp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
-        if [[ "${#NFSPort}" -gt 0 ]] ; then
-            $IPTABLES -A INPUT -p tcp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
-            $IPTABLES -A INPUT -p udp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
-        fi
-        if [[ "${#RPCPort}" -gt 0 ]] ; then
-            $IPTABLES -A INPUT -p tcp -m multiport --dports $RPCPort -d $ip -s $rpcip -j ACCEPT;
-            $IPTABLES -A INPUT -p udp -m multiport --dports $RPCPort -d $ip -s $rpcip -j ACCEPT;
-        fi
+
+        for nfsip in ${NFSIPS[@]} ; do
+            if [[ "${#NFSPort}" -gt 0 ]] ; then
+                $IPTABLES -A INPUT -p tcp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
+                $IPTABLES -A INPUT -p udp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
+            fi
+            if [[ "${#RPCPort}" -gt 0 ]] ; then
+                $IPTABLES -A INPUT -p tcp -m multiport --dports $RPCPort -d $ip -s $nfsip -j ACCEPT;
+                $IPTABLES -A INPUT -p udp -m multiport --dports $RPCPort -d $ip -s $nfsip -j ACCEPT;
+            fi
+        done
     done;
 
     $IPTABLES -A INPUT -m state --state NEW -s 10.0.0.0/27 -j ACCEPT;
