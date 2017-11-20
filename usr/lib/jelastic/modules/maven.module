@@ -114,8 +114,12 @@ while [ "$1" != "" ]; do
                                 UPDATE_INTERVAL=$1;
                                 ;;
     --subdirectory )	shift;
-		BUILDDIR=$1;
-	;;
+                                BUILDDIR=$1;
+                                ;;
+    -g | --nodegroup )
+                                shift;
+                                NODE_GROUP=$1
+                                ;;
   esac
   shift
 done
@@ -164,6 +168,7 @@ function generateDeployProperties(){
     [ -f "$DEPLOY_PROPROPERTIES" ] && rm "$DEPLOY_PROPROPERTIES";
     echo "environment=${ENVIRONMENT}" >> $DEPLOY_PROPROPERTIES;
     echo "context=${CONTEXT}" >> $DEPLOY_PROPROPERTIES;
+    echo "nodegroup=${NODE_GROUP}" >> $DEPLOY_PROPROPERTIES;
 }
 
 function readProjectConfig(){
@@ -260,7 +265,7 @@ function describeCreateProject() {
 }
 
 function describeCreateProjectParameters() {
-    echo "-n|--project-name <name> -t|--vcs-type <git|svn> -u|--url <url> -l|--login <login> [-p|--password <password>] \n\t-b|--branch <branch name> -c|--context <context> -e|--environment <environment name> -au|--autoupdate <true|false>\n\t-i|--inverval <interval>|--update <true|false>|--build <true|false>";
+    echo "-n|--project-name <name> -t|--vcs-type <git|svn> -u|--url <url> -l|--login <login> [-p|--password <password>] \n\t-b|--branch <branch name> -c|--context <context> -e|--environment <environment name> -au|--autoupdate <true|false>\n\t-i|--inverval <interval>|--update <true|false>|--build <true|false>-g|--nodegroup:nodegroup <group name>";
 }
 
 function describeCreateProjectOptions() {
@@ -275,6 +280,7 @@ function describeCreateProjectOptions() {
     echo "-su|--skip-upload: <true/false>";
     echo "-t|--vcs-type: project type";
     echo "-u|--url:project url";
+    echo "-g|--nodegroup:nodegroup name";
     echo "--update: sets if project should be updated before build or not (\"true\" by default)";
     echo "--build: sets if project should be built before deploy or not (\"true\" by default)";
 }
@@ -315,7 +321,7 @@ function describeEditProject() {
 }
 
 function describeEditProjectParameters() {
-    echo "-n|--project-name <name> -o|--old-project-name <old project name> -t|--vcs-type <git|svn> -u|--url <url>\n\t-l|--login <login> [-p|--password <password>] -b|--branch <branch name> -c|--context <context>\n\t-e|--environment <environment name> -au|--autoupdate <true|false> -i|--inverval <interval>|--update <true|false>|--build <true|false>";
+    echo "-n|--project-name <name> -o|--old-project-name <old project name> -t|--vcs-type <git|svn> -u|--url <url>\n\t-l|--login <login> [-p|--password <password>] -b|--branch <branch name> -c|--context <context>\n\t-e|--environment <environment name> -au|--autoupdate <true|false> -i|--inverval <interval>|--update <true|false>|--build <true|false> -g|--nodegroup <group name>";
 }
 
 function describeEditProjectOptions() {
@@ -330,6 +336,7 @@ function describeEditProjectOptions() {
     echo "-p|--password: password";
     echo "-t|--vcs-type: project type";
     echo "-u|--url:project url";
+    echo "-g|--nodegroup:nodegroup name";
     echo "--update: sets if project should be updated before build or not (\"true\" by default)";
     echo "--build: sets if project should be built before deploy or not (\"true\" by default)";
 }

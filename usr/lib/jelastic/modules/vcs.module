@@ -123,6 +123,10 @@ function parseArguments() {
       --subdirectory )		shift;
                         BUILDDIR=$1;
                                 ;;
+    -g | --nodegroup )
+            shift;
+            NODE_GROUP=$1
+        ;;
     esac
     shift
   done
@@ -162,6 +166,7 @@ function writeProjectConfig(){
   echo "NEED_REDEPLOY=$NEED_REDEPLOY" >> $PROJECT_CONFIG;
   echo "GIT_AUTORESOLVE_CONFLICT=$GIT_AUTORESOLVE_CONFLICT" >> $PROJECT_CONFIG;
   echo "ATOMIC_DEPLOY=$ATOMIC_DEPLOY" >> $PROJECT_CONFIG;
+  echo "NODE_GROUP=$NODE_GROUP" >> $PROJECT_CONFIG;
   if [ -z "$AUTHORIZATION_KEY_VAL" ] ; then
     if [ -e ${VCS_CONFIG_DIR}/${PROJECT_NAME}.key ]; then
         echo "AUTHORIZATION_KEY=${VCS_CONFIG_DIR}/${PROJECT_NAME}.key" >> $PROJECT_CONFIG;
@@ -239,7 +244,7 @@ function doCreateProject(){
   writeProjectConfig && {
     [ ${COMPUTE_TYPE} == "apache-ruby" -o ${COMPUTE_TYPE} == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && {
     PROJECT_NAME=${bundle_type}; reloadServiceSilent "$SERVICE";
-  } && [ ! -z $CONTEXT ] &&  [ ! -z $ENVIRONMENT ] && writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "environment=>${ENVIRONMENT}" "context=>${CONTEXT}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}" "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" || writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}"  "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" "atomic_deploy=>${ATOMIC_DEPLOY}"; }  || { writeJSONResponseErr "result=>4001" "message=>Error while creating project config!"; return 1; };
+  } && [ ! -z $CONTEXT ] &&  [ ! -z $ENVIRONMENT ] && writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "environment=>${ENVIRONMENT}" "context=>${CONTEXT}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}" "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" || writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfuly created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}"  "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" "atomic_deploy=>${ATOMIC_DEPLOY}"  "nodegroup=>${NODE_GROUP}"; }  || { writeJSONResponseErr "result=>4001" "message=>Error while creating project config!"; return 1; };
 
 }
 
