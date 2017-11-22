@@ -40,7 +40,8 @@ function vzCreateContainer() {
 function vzIsContainerExists() {
     : ${1:?"Missing CTID param"};
     local ctid=$1
-    return $($VZLIST -a -o ctid | $GREP -qow ${ctid})
+    vzlist -H1  $CTID &>/dev/null
+    return $?
 }
 
 #
@@ -79,4 +80,31 @@ function isContainerRunning() {
         return 1
     fi
     return 0
+}
+
+function getCtPrivate(){
+        : ${1:?"Missing CTID param"};
+        local CTID=$1
+        vzlist $CTID -Ho private 2>/dev/null
+        return $?;
+}
+
+function getCtRoot(){
+        : ${1:?"Missing CTID param"};
+        local CTID=$1
+        vzlist $CTID -Ho root 2>/dev/null
+        return $?;
+}
+
+
+function getCtVeConf(){
+    : ${1:?"Missing CTID param"};
+    local CTID=$1
+    local private=$(getCtPrivate $CTID)
+    if [ ! -z $private -a -d $private ]
+    then
+        echo "${private}/ve.conf"
+    else
+        echo /vz/private/${CTID}/ve.conf
+    fi
 }
