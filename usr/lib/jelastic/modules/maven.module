@@ -235,7 +235,10 @@ function doDeploy(){
         readProjectConfig $PROJECT_NAME;
         generateDeployProperties;
         if [ "x$BUILD_IS_OK" == "xtrue" ] ; then
-            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:deploy $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST" -Djelastic-properties="$DEPLOY_PROPROPERTIES" -Dcontext="$CONTEXT" -Denvironment="$ENVIRONMENT" -Djelastic-session="$SESSION" -Dpackaging.type="war" --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
+            local jelastic_hooks=''
+            [ -f "$HOOKS_DIR/preDeploy_${PROJECT_NAME}.sh" ] && jelastic_hooks="-Djelastic-predeploy-hook=$HOOKS_DIR/preDeploy_${PROJECT_NAME}.sh"
+            [ -f "$HOOKS_DIR/postDeploy_${PROJECT_NAME}.sh" ] && jelastic_hooks="$jelastic_hooks -Djelastic-postdeploy-hook=$HOOKS_DIR/postDeploy_${PROJECT_NAME}.sh"
+            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:deploy $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST" -Djelastic-properties="$DEPLOY_PROPROPERTIES" -Dcontext="$CONTEXT" -Denvironment="$ENVIRONMENT" -Djelastic-session="$SESSION" -Dpackaging.type="war" $jelastic_hooks --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
             [ $? -eq 0 ] && { 
                 [ -f "$DEPLOY_PROPROPERTIES" ] && rm "$DEPLOY_PROPROPERTIES" ; 
             } || { 
