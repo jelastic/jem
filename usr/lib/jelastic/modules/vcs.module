@@ -432,6 +432,7 @@ function doGetProject(){
   [ ! -z "$AUTHORIZATION_KEY_VAL" ] && { hash=`echo "$AUTHORIZATION_KEY_VAL" | md5sum | $AWK '{print $1}'`; VAL=$VAL" hash=>$hash"; }
   [ ! -z $GIT_AUTORESOLVE_CONFLICT ] && { VAL=$VAL" resolveconflict=>${GIT_AUTORESOLVE_CONFLICT}"; }
   [ ! -z "$BUILDDIR" ] && { VAL=$VAL" subdirectory=>${BUILDDIR}"; }
+  [ ! -z "$NODE_GROUP" ] && { VAL=$VAL" nodegroup=>${NODE_GROUP}"; }
   writeJSONResponseOut "result=>0" ${VAL} ;
 }
 
