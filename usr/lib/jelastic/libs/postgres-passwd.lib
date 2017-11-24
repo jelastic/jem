@@ -28,6 +28,8 @@ LOG_FILE="/var/log/postgresreset.log";
 VERBOSE=0;
 POSTGRES_CONF='/var/lib/pgsql/data/pg_hba.conf';
 
+$PROGRAM 'psql';
+$PROGRAM 'createuser'
 $PROGRAM 'awk';
 $PROGRAM 'sed';
 $PROGRAM 'psql';
@@ -36,88 +38,92 @@ $PROGRAM 'chkconfig';
 ADMINDB='postgres';
 BREAKCOUNT=5;
 
+function checkUserExistance() {
+   [ -n "$($PSQL -U postgres -c '\du'|grep ${user})" ] && return 0 || return 1;
+}
+
 function setPassword() {
 
-	local user='postgres';
+        local user='postgres';
 
-		while [ "$1" != "" ]; 
-		do
-		  case $1 in
-		    -u )       shift
-		      local user=$1
-		      ;;
-		    -p )       shift
-		      local password=$1
-		      ;;
-		  esac
-		  shift
-		done
+                while [ "$1" != "" ]; 
+                do
+                  case $1 in
+                    -u )       shift
+                      local user=$1
+                      ;;
+                    -p )       shift
+                      local password=$1
+                      ;;
+                  esac
+                  shift
+                done
 
 
-	INITD=/etc/rc.d/init.d
-	. $INITD/functions
-	PGPORT=$($GREP PGPORT= $INITD/${SERVICE} | $AWK -F= {'print $2'});
-	PGVERSION=$($GREP PGVERSION= $INITD/${SERVICE} | $AWK -F= {'print $2'});
-	PGMAJORVERSION=$(echo "$PGVERSION" | $SED 's/^\([0-9]*\.[0-9]*\).*$/\1/')
-	[ -f $POSTGRESSysCtl ] && . $POSTGRESSysCtl || pidfile=$( ls  /var/run/postmaster-* | head -n 1);
-	[ -z $pidfile ] && pidfile="/var/run/postmaster-${PGMAJORVERSION}.${PGPORT}.pid";
-	
-	stopService ${SERVICE} >> $LOG_FILE 2>&1;
-	
+        INITD=/etc/rc.d/init.d
+        . $INITD/functions
+        PGPORT=$($GREP PGPORT= $INITD/${SERVICE} | $AWK -F= {'print $2'});
+        PGVERSION=$($GREP PGVERSION= $INITD/${SERVICE} | $AWK -F= {'print $2'});
+        PGMAJORVERSION=$(echo "$PGVERSION" | $SED 's/^\([0-9]*\.[0-9]*\).*$/\1/')
+        [ -f $POSTGRESSysCtl ] && . $POSTGRESSysCtl || pidfile=$( ls  /var/run/postmaster-* | head -n 1);
+        [ -z $pidfile ] && pidfile="/var/run/postmaster-${PGMAJORVERSION}.${PGPORT}.pid";
+
+        stopService ${SERVICE} >> $LOG_FILE 2>&1;
+
     local error=0;
     local count=0;
     local tobreak=0;
     while  [ "$count" -eq 0 ]
     do
-	sleep 2;
+        sleep 2;
         stopService ${SERVICE} >> $LOG_FILE 2>&1;
         status -p $pidfile > /dev/null 2>&1;
         count=$?;
         ((tobreak++))
- 	[ "$tobreak" -eq "$BREAKCOUNT" ] && { error=1 ;break;} ;
+        [ "$tobreak" -eq "$BREAKCOUNT" ] && { error=1 ;break;} ;
 
     done
-	if [ "$error" -eq 1 ] 
-	then
-		echo "Error stopping" > /dev/null 2>&1
-		exit
-	fi
-	
-	$SED -i '/local/s/md5/trust/' $POSTGRES_CONF
-	startService ${SERVICE} >> $LOG_FILE 2>&1;
+        if [ "$error" -eq 1 ] 
+        then
+                echo "Error stopping" > /dev/null 2>&1
+                exit
+        fi
 
-	count=1
-	error=0
-	tobreak=0
-	while  [ "$count" -ne 0 ]
-	do
-		sleep 2
-        	status -p $pidfile > /dev/null 2>&1
-		count=$?
-		((tobreak++))
-		[ "$tobreak" -eq "$BREAKCOUNT" ] && { error=1 ;break;} 
-	done
-	if [ "$error" -eq 1 ] 
-	then
-		echo "Error starting" >> $LOG_FILE
-	else
-		sleep 2;
-		error=0;
-		count=1;
-	    tobreak=0;
+        $SED -i '/local/s/md5/trust/' $POSTGRES_CONF
+        startService ${SERVICE} >> $LOG_FILE 2>&1;
+
+        count=1
+        error=0
+        tobreak=0
         while  [ "$count" -ne 0 ]
-        do	
+        do
                 sleep 2
-		$PSQL  -U $ADMINDB -c "ALTER USER $user WITH PASSWORD '$password'" > /dev/null 2>&1
+                status -p $pidfile > /dev/null 2>&1
                 count=$?
-		((tobreak++))
-	        [ "$tobreak" -eq "$BREAKCOUNT" ] && { error=1 ;break;}
+                ((tobreak++))
+                [ "$tobreak" -eq "$BREAKCOUNT" ] && { error=1 ;break;} 
+        done
+        if [ "$error" -eq 1 ] 
+        then
+                echo "Error starting" >> $LOG_FILE
+        else
+                sleep 2;
+                error=0;
+                count=1;
+            tobreak=0;
+        while  [ "$count" -ne 0 ]
+        do
+                sleep 2
+                checkUserExistance || $CREATEUSER -s $user -U postgres 2>&1 
+                $PSQL  -U $ADMINDB -c "ALTER USER $user WITH PASSWORD '$password'" > /dev/null 2>&1
+                count=$?
+                ((tobreak++))
+                [ "$tobreak" -eq "$BREAKCOUNT" ] && { error=1 ;break;}
         done 
-	fi
+        fi
 
-	stopService ${SERVICE} >> $LOG_FILE 2>&1;
-	$SED -i '/local/s/trust/md5/' $POSTGRES_CONF;
-	startService ${SERVICE} >> $LOG_FILE 2>&1;
+        stopService ${SERVICE} >> $LOG_FILE 2>&1;
+        $SED -i '/local/s/trust/md5/' $POSTGRES_CONF;
+        startService ${SERVICE} >> $LOG_FILE 2>&1;
 
 }
-
