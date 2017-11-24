@@ -479,7 +479,7 @@ function doPanic() {
 
 
 function dofwset() {
-    [ -d "/vz/root/$JELASTIC_RULES_DIR" ] || mkdir -p "/vz/root/$JELASTIC_RULES_DIR"
+    [ -d "/vz/root/${CTID}${JELASTIC_RULES_DIR}" ] || mkdir -p "/vz/root/${CTID}${JELASTIC_RULES_DIR}"
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
     for ruleraw in ${RULES[@]} ; do
