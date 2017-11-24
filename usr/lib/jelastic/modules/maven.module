@@ -120,6 +120,10 @@ while [ "$1" != "" ]; do
                                 shift;
                                 NODE_GROUP=$1
                                 ;;
+    --repohash )
+                                shift;
+                                REPO_HASH=$1
+                                ;;
   esac
   shift
 done
