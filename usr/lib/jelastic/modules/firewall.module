@@ -40,8 +40,9 @@ $PROGRAM 'vzctl'
 
 SAVEFILE='/var/lib/jelastic/firewall'
 CUSTOM_RULES_FILE='/etc/sysconfig/iptables-custom'
-JELASTIC_4RULES_FILE='/etc/sysconfig/iptables4-jelastic'
-JELASTIC_6RULES_FILE='/etc/sysconfig/iptables6-jelastic'
+JELASTIC_RULES_DIR='/etc/sysconfig'
+JELASTIC_4RULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic'
+JELASTIC_6RULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic'
 
 # 7755 - file replication (lsync?)
 # 7979 - for export/import
@@ -478,6 +479,7 @@ function doPanic() {
 
 
 function dofwset() {
+    [ -d "/vz/root/$JELASTIC_RULES_DIR" ] || mkdir -p "/vz/root/$JELASTIC_RULES_DIR"
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
     for ruleraw in ${RULES[@]} ; do
