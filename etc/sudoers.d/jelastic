@@ -40,6 +40,8 @@ Cmnd_Alias JEM = /bin/jem service start, /bin/jem service stop, /bin/jem service
 
 Cmnd_Alias NSCD = /usr/bin/systemctl * nscd, /usr/sbin/nscd *, /usr/bin/systemctl * nscd.socket, /usr/sbin/nscd *
 
+Cmnd_Alias UNFS = /etc/init.d/rpcbind *, /sbin/service rpcbind *, /bin/mount *, /etc/init.d/unfsd.jelastic *, /sbin/service unfsd.jelastic *, /usr/sbin/exportfs *
+
 %ssh-access ALL = NOPASSWD: TOMCAT, TOMCAT_SERVICE, JETTY, JETTY_SERVICE,  MONGO, MONGO_SERVICE, COUCHDB, COUCHDB_SERVICE, MEMCACHED, MEMCACHED_SERVICE, MYSQL, MYSQL_SERVICE, POSTGRESQL, POSTGRESQL_SERVICE, NGINX, NGINX_SERVICE, HTTPD, HTTPD_SERVICE, PHP_FPM, PHP_FPM_SERVICE, GLASSFISH_DOMAIN1, GLASSFISH_DOMAIN1_SERVICE, CARTRIDGE, CARTRIDGE_SERVICE, CUSTOM_IMPR, UNFS, JEM, NSCD
 
 
