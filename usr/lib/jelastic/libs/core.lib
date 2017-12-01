@@ -328,7 +328,7 @@ function doAction() {
     resultFile=$(mktemp)
     export resultFile
 
-    timeout $actiontimeout $(cat <(
+    timeout $actiontimeout cat <(
 
         source "$MANAGE_DEFAULT_ACTIONS" 2>/dev/null || die "Couldn't source ${MANAGE_DEFAULT_ACTIONS}";
         source "${modfile}" 2>/dev/null || die "Couldn't source ${modfile}";
@@ -358,7 +358,7 @@ function doAction() {
     	    }
             return $result
         }
-    ));
+    );
     [[ $? -eq 124 ]] && actionResult="124"
     [ -e "$resultFile" ] && {
         [ -z "${actionResult}" ] && actionResult=$(cat $resultFile );
