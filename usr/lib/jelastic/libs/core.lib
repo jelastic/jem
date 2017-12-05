@@ -220,6 +220,7 @@ function startJemThreadQueueManager(){
             case "$1" in
 	    --eid)
     	        TQctid=${2//-/};
+        	jempidfile="/var/run/jem.${TQctid}.pid";
     		break
     	    ;;
     	    esac
@@ -235,6 +236,8 @@ function startJemThreadQueueManager(){
 	fi
     elif [ "x$action" == "xfilemanager" ] ; then
         jempidfile="/var/run/jem.dc6cbef1.pid"
+    elif [ "x$action" == "xinstall" ] ; then
+        jempidfile="/var/run/jem.fd9de7ac314ec$$.pid"
     elif [ "x$action" == "xdocker" -o "x$action" == "xcommand" ] ; then
 	if [ "x$1" == "xaftercreate" ] ; then
 	    jempidfile="/var/run/jem.f55b442$$.pid";
