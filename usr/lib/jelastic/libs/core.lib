@@ -220,6 +220,7 @@ function startJemThreadQueueManager(){
             case "$1" in
 	    --eid)
     	        TQctid=${2//-/};
+		jempidfile="/var/run/jem.${TQctid}.pid";
     		break
     	    ;;
     	    esac
