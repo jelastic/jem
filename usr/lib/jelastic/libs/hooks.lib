@@ -39,7 +39,7 @@ function getHooksLogName()
         ;;
     esac
 
-    [ -z "${HOOKS_LOG}" ] && HOOKS_LOG="${ACTION_LOG}";    
+    [ -z "${HOOKS_LOG}" ] && HOOKS_LOG="${ACTIONS_LOG}";    
 }
 
 function applyHook(){
@@ -49,11 +49,12 @@ function applyHook(){
         getHooksLogName;
         touch ${HOOKS_LOG};
         chown ${DATA_OWNER} ${HOOKS_LOG};
-        echo -en "$(date) Applying ${hook} hook for ${target} \n" >> ${HOOKS_LOG}; 
+        [ "x${COMPUTE_TYPE}" == "xmaven" ] && local WRITE_OUTPUT_TO="${LOG_DIR}/${PROJECT_NAME}_build.log" || local WRITE_OUTPUT_TO="${ACTIONS_LOG}";
+        echo -en "$(date) Applying ${hook} hook for ${target} \n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         chmod +x "$HOOKS_DIR/${hook}_${target}.sh";
-        runuser -l jelastic -c "$HOOKS_DIR/${hook}_${target}.sh >> ${HOOKS_LOG} 2>>${HOOKS_LOG};"
+        runuser -l jelastic -c "$HOOKS_DIR/${hook}_${target}.sh" 2>&1 | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         result="$?";
-        runuser -l jelastic -c "echo -e \"Result ${result}\\n\" >> ${HOOKS_LOG};"
+        echo -e "${hook} hook execution result is ${result}\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
     else
         return 0;
     fi
