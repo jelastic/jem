@@ -282,7 +282,7 @@ function doUpdate(){
   readProjectConfig || { writeJSONResponseErr "result=>4006" "message=>Error while reading project config!"; return 1; };
   enableVCSLibrary;
   applyHook ${PROJECT_NAME} preUpdate || { writeJSONResponseErr "result=>4127" "message=>Pre-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
-  [ "x{COMPUTE_TYPE}" != "xmaven" ] && applyHook ${PROJECT_NAME} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
+  [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${PROJECT_NAME} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
   if [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" ] && [ "x${PROJECT_NAME}" == "xROOT" ] && [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
   local NEXT_DIR=ROOT_`date +%Y.%m.%d-%H.%M.%S`;
         if [ -h ${WEBROOT}/ROOT ] ; then
@@ -374,7 +374,7 @@ function doUpdate(){
   [ "x${COMPUTE_TYPE}" != "xmaven" ]  && isFunction "setContext" && setContext ${PROJECT_NAME};
   [ "x${COMPUTE_TYPE}" == "xcartridge" ] && recoverBrokenMountPoints && service cartridge build >>  $ACTIONS_LOG  2>&1  && service cartridge deploy >> $ACTIONS_LOG  2>&1;
   applyHook ${PROJECT_NAME} postUpdate || { writeJSONResponseErr "result=>4128" "message=>Post-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
-  [ "x{COMPUTE_TYPE}" != "xmaven" ] && applyHook ${PROJECT_NAME} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
+  [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${PROJECT_NAME} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
   return 0;
 }
 
