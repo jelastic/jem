@@ -49,13 +49,12 @@ function applyHook(){
         getHooksLogName;
         touch ${HOOKS_LOG};
         resultFile=$(mktemp); export resultFile;
-        chown ${DATA_OWNER} ${HOOKS_LOG};
+        chown ${DATA_OWNER} ${HOOKS_LOG} ${resultFile};
         [ "x${COMPUTE_TYPE}" == "xmaven" ] && local WRITE_OUTPUT_TO="${LOG_DIR}/${PROJECT_NAME}_build.log" || local WRITE_OUTPUT_TO="${ACTIONS_LOG}";
         echo -en "$(date) Applying ${hook} hook for ${target} \n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         chmod +x "$HOOKS_DIR/${hook}_${target}.sh";
-        runuser -l jelastic -c "$HOOKS_DIR/${hook}_${target}.sh;" >> ${resultFile} 2>>${resultFile}
-        result="$?";
-        cat ${resultFile} >> ${HOOKS_LOG} | tee -a ${WRITE_OUTPUT_TO}; rm -f ${resultFile}
+        runuser -l jelastic -c "$HOOKS_DIR/${hook}_${target}.sh; echo \$?>${resultFile}" >> ${HOOKS_LOG} | tee -a ${WRITE_OUTPUT_TO}
+        result=$(cat ${resultFile}); rm -f ${resultFile};
         if [ "${result}" == "0" ]; then
             echo -e "${hook} hook applied successfully\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         else
