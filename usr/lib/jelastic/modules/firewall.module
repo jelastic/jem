@@ -479,6 +479,11 @@ function doPanic() {
 
 
 function dofwset() {
+    running=1
+    if ! isContainerRunning ${CTID} ; then
+        running=0
+        vzctl mount ${CTID} >> $ACTIONS_LOG 2>&1
+    fi
     [ -d "/vz/root/${CTID}${JELASTIC_RULES_DIR}" ] || mkdir -p "/vz/root/${CTID}${JELASTIC_RULES_DIR}"
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
@@ -514,17 +519,28 @@ function dofwset() {
         fi
 
         rulecmd="$rulecmd -j $raction"
-        if [ "x$tcptype" == "xIPV4" ] ; then
-            echo $rulecmd >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
-        else
-            echo $rulecmd >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
+
+        if [ "x$proto" != "xall" ] ; then
+            tcprule=$($SED -e 's/all/tcp/g' <<< $rulecmd )
+            udprule=$($SED -e 's/all/tcp/g' <<< $rulecmd )
+            rulecmd="${tcprule}\n${udprule}"
         fi
 
-        echo "CTID $CTID RULE $rulecmd" >> ${JEM_CALLS_LOG} 2>&1;
+        if [ "x$tcptype" == "xIPV4" ] ; then
+            echo -e $rulecmd >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
+        else
+            echo -e $rulecmd >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
+        fi
+
+        echo "CTID $CTID RULE $rulecmd" >> ${JEM_CALLS_LOG} 2>&1
     done
     echo "COMMIT" >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
     echo "COMMIT" >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
-    vzexecRun "jem firewall start"
+    if [[ $running -eq 1 ]] ; then
+        vzexecRun "jem firewall start"
+    else
+        vzctl umount ${CTID} >> $ACTIONS_LOG 2>&1
+    fi
     writeJSONResponseOut "result=>0" "message=>Firewall rules set" "log=>$(vzexecGetLastStdOut) $(vzexecGetLastStdErr)"
     return 0
 }
