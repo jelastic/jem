@@ -174,7 +174,7 @@ $PROGRAM 'ip'
         local erbfilelist=$(mktemp)
         local varlist=$(mktemp)
 
-        find "$CARTRIDGE_HOME" -maxdepth 3 -type f -name *.erb  > $erbfilelist;
+        find "$CARTRIDGE_HOME" -maxdepth 3 -path $CARTRIDGE_HOME/ROOT -prune -type f -name *.erb  > $erbfilelist;
 
         [ ! -s $erbfilelist  ] && return 0;
 
