@@ -522,7 +522,7 @@ function dofwset() {
 
         if [ "x$proto" != "xall" ] ; then
             tcprule=$($SED -e 's/all/tcp/g' <<< $rulecmd )
-            udprule=$($SED -e 's/all/tcp/g' <<< $rulecmd )
+            udprule=$($SED -e 's/all/udp/g' <<< $rulecmd )
             rulecmd="${tcprule}\n${udprule}"
         fi
 
