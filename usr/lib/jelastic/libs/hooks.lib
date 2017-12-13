@@ -54,7 +54,7 @@ function applyHook(){
         [ "x${COMPUTE_TYPE}" == "xmaven" ] && local WRITE_OUTPUT_TO="${LOG_DIR}/${PROJECT_NAME}_build.log" || local WRITE_OUTPUT_TO="${ACTIONS_LOG}";
         echo -e "[INFO] $(date) Applying ${hookDisplayName} hook for ${target} \n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         chmod +x "$HOOKS_DIR/${hook}_${target}.sh";
-        runuser -l jelastic -c "timeout ${actiontimeout} $HOOKS_DIR/${hook}_${target}.sh; echo \$?>${resultFile}" >> ${HOOKS_LOG} | tee -a ${WRITE_OUTPUT_TO}
+	runuser -l jelastic -c "timeout ${actiontimeout} $HOOKS_DIR/${hook}_${target}.sh 2>&1; echo \$?>${resultFile}" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         result=$(cat ${resultFile}); rm -f ${resultFile};
         if [ "${result}" == "0" ]; then
             echo -e "[INFO] ${hookDisplayName} hook applied successfully\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
