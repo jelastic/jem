@@ -490,7 +490,7 @@ function doEditProject(){
                 [ -d "${WEBROOT}/${OLD_PROJECT_NAME}/" ] && mkdir "${WEBROOT}/${PROJECT_NAME}/";
         fi
     fi
-    [ -d "${WEBROOT}/${PROJECT_NAME}/" ] && [ -d "${WEBROOT}/${OLD_PROJECT_NAME}/" ] && { renameContext $PROJECT_NAME $OLD_PROJECT_NAME ; }
+    [ -d "${WEBROOT}/${PROJECT_NAME}/" ] && [ -d "${WEBROOT}/${OLD_PROJECT_NAME}/" ] && { renameContext $PROJECT_NAME $OLD_PROJECT_NAME ; renameHooks $PROJECT_NAME $OLD_PROJECT_NAME; } 
     [ "x${PROJECT_NAME}" != "xROOT" ] && ATOMIC_DEPLOY="false";
   }
   if [ "$changeUrlresult" -eq 0 ]; then
