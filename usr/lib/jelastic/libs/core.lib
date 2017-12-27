@@ -360,7 +360,18 @@ function doAction() {
             return $result
         }
     );
-    [[ $? -eq 124 ]] && actionResult="124"
+    [[ $? -eq 124 ]] && {
+	actionResult="124";
+	local ppid=$!;
+	[ -z "$ppid" ] || {
+	    local ppids=$(pstree -p $ppid | sed -re 's/[a-z]*\(([0-9]*)\)\-*/\1 /g');
+	    [ -z "$ppids" ] || {
+		echo "Killing after timeout $ppids" >> ${JEM_CALLS_LOG} 2>&1
+		disown $ppids >>${JEM_CALLS_LOG} 2>&1 && \
+		kill -9 $ppids >>${JEM_CALLS_LOG} 2>&1;
+	    }
+	}
+    }
     [ -e "$resultFile" ] && {
         [ -z "${actionResult}" ] && actionResult=$(cat $resultFile );
         rm -f "$resultFile";
