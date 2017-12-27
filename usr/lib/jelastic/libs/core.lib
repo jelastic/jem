@@ -381,7 +381,7 @@ function doAction() {
         echo ":[FAIL]      [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
         # stopJemThreadQueueManager;
         # [[ $actionResult -gt 5000 ]] && _manageDoHelp;
-        [[ $actionResult -eq 124 ]] && echo "{\"result\":99, \"Message\": \"Execution timed out\"}"
+        [[ $actionResult -eq 124 ]] && echo "{\"result\":4132, \"message\": \"Execution timed out\"}"
         return ${actionResult};
     };
     echo ":[SUCCESS]   [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
