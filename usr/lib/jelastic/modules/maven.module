@@ -185,7 +185,7 @@ function readProjectConfig(){
           #echo "You must specify version control system";
           return 1;
       }
-      hash idn 2>/dev/null && { ENVIRONMENT=`idn --quiet $ENVIRONMENT`; }
+      [ ! -z "$ENVIRONMENT" ] && hash idn 2>/dev/null && { ENVIRONMENT=`idn --quiet $ENVIRONMENT`; }
       return 0;
       else
             #echo "Couldn't find project options!";
