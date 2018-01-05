@@ -405,8 +405,8 @@ function doAutoUpdate(){
         source ${project}
         enableVCSLibrary;
         [ $AUTOUPDATE == "true" ] && {
-            [ "x${ATOMIC_DEPLOY}" == "xtrue" ] && [ ${LAST_DEPLOYED_COMMIT} == $(getLastRemoteCommit) ] && exit 0;
-            [ "x${ATOMIC_DEPLOY}" == "xtrue" ] && [ $(getLastRemoteCommit) == "00000000000" ] && exit 0;
+            [ ${LAST_DEPLOYED_COMMIT} == $(getLastRemoteCommit) ] && exit 0;
+            [ $(getLastRemoteCommit) == "00000000000" ] && exit 0;
             local next_allowed_update=$(( $LASTUPDATE + $UPDATE_INTERVAL * 60 ));
             local current_timestamp=`date +%s`;
             [ $next_allowed_update -lt $current_timestamp ] && doUpdate >> $JEM_CALLS_LOG && UPDATE_IS_OK="true" && writeProjectConfig;
