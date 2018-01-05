@@ -83,5 +83,5 @@ function renameHooks(){
 function removeHooks(){
     getHooksLogName;
     target="$1"
-    rm -f "$HOOKS_DIR/*_${target}.sh" && echo -e "$(date) All hooks are removed for ${target}" >> ${HOOKS_LOG} || return 0;
+    rm -f "$HOOKS_DIR/*_${target}.sh" && echo -e "[INFO] $(date) All hooks are removed for ${target}" >> ${HOOKS_LOG} || return 0;
 }
