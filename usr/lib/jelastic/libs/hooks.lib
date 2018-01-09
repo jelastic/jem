@@ -75,10 +75,10 @@ function renameHooks(){
     old_target="$2"
     [ ! -d ${HOOKS_DIR} ] && return 0;
     adjustRubyTarget;
-    [ -z "${hooks_to_rename}" ] && hooks_to_rename=$(ls ${HOOKS_DIR}|grep ${old_target})
+    [ -z "${hooks_to_rename}" ] && hooks_to_rename=$(ls ${HOOKS_DIR}|grep "${old_target}.sh")
     for i in ${hooks_to_rename}
     do
-        mv -f ${HOOKS_DIR}/$i ${HOOKS_DIR}/$(echo $i|cut -d"_" -f1)_${target}.sh;
+        [ "${HOOKS_DIR}/$i" != "${HOOKS_DIR}/$(echo $i|cut -d"_" -f1)_${target}.sh" ] && mv -f ${HOOKS_DIR}/$i ${HOOKS_DIR}/$(echo $i|cut -d"_" -f1)_${target}.sh;
     done
 }
 
