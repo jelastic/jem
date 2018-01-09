@@ -91,6 +91,11 @@ function _computeRedirPorts () {
     return 0;
 }
 
+function _getjettyRedirPorts () {
+    echo "PREROUTING:0.0.0.0/0:0.0.0.0/0:80:8080:REDIRECT PREROUTING:0.0.0.0/0:0.0.0.0/0:443:8743:REDIRECT OUTPUT:0.0.0.0/0:127.0.0.0/8:80:8080:REDIRECT";
+    return 0;
+}
+
 function _getapache_rubyRedirPorts() { return 0; }
 function _getcouchdbRedirPorts() { return 0; }
 function _getmysqlRedirPorts() { return 0; }
