@@ -120,7 +120,7 @@ function parseArguments() {
       -a | --atomicdeploy)      shift;
                                   ATOMIC_DEPLOY="$1";
                                   ;;
-      --subdirectory )		shift;
+      --subdirectory )          shift;
                         BUILDDIR=$1;
                                 ;;
     -g | --nodegroup )
@@ -281,9 +281,8 @@ function doUpdate(){
   parseArguments "$@";
   readProjectConfig || { writeJSONResponseErr "result=>4006" "message=>Error while reading project config!"; return 1; };
   enableVCSLibrary;
-  [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && local hook_project=${bundle_type} || local hook_project=${PROJECT_NAME};
-  applyHook ${hook_project} preUpdate || { writeJSONResponseErr "result=>4127" "message=>Pre-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
-  [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${hook_project} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
+  applyHook ${PROJECT_NAME} preUpdate || { writeJSONResponseErr "result=>4127" "message=>Pre-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
+  [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${PROJECT_NAME} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
   if [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" ] && [ "x${PROJECT_NAME}" == "xROOT" ] && [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
   local NEXT_DIR=ROOT_`date +%Y.%m.%d-%H.%M.%S`;
         if [ -h ${WEBROOT}/ROOT ] ; then
@@ -371,11 +370,11 @@ function doUpdate(){
                 updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeProjectConfig;
         fi
   fi
-  [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && return 0;
+  #[ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] && return 0;
   [ "x${COMPUTE_TYPE}" != "xmaven" ]  && isFunction "setContext" && setContext ${PROJECT_NAME};
   [ "x${COMPUTE_TYPE}" == "xcartridge" ] && recoverBrokenMountPoints && service cartridge build >>  $ACTIONS_LOG  2>&1  && service cartridge deploy >> $ACTIONS_LOG  2>&1;
-  applyHook ${hook_project} postUpdate || { writeJSONResponseErr "result=>4128" "message=>Post-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
-  [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${hook_project} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
+  applyHook ${PROJECT_NAME} postUpdate || { writeJSONResponseErr "result=>4128" "message=>Post-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
+  [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${PROJECT_NAME} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
   return 0;
 }
 
@@ -491,9 +490,10 @@ function doEditProject(){
                 [ -d "${WEBROOT}/${OLD_PROJECT_NAME}/" ] && mkdir "${WEBROOT}/${PROJECT_NAME}/";
         fi
     fi
-    [ -d "${WEBROOT}/${PROJECT_NAME}/" ] && [ -d "${WEBROOT}/${OLD_PROJECT_NAME}/" ] && { renameContext $PROJECT_NAME $OLD_PROJECT_NAME ; renameHooks $PROJECT_NAME $OLD_PROJECT_NAME; } 
+    [ -d "${WEBROOT}/${PROJECT_NAME}/" ] && [ -d "${WEBROOT}/${OLD_PROJECT_NAME}/" ] && { renameContext $PROJECT_NAME $OLD_PROJECT_NAME ; } 
     [ "x${PROJECT_NAME}" != "xROOT" ] && ATOMIC_DEPLOY="false";
   }
+  renameHooks $PROJECT_NAME $OLD_PROJECT_NAME;
   if [ "$changeUrlresult" -eq 0 ]; then
         writeProjectConfig ;
         writeProjectresult=$?;
@@ -522,3 +522,4 @@ function doEditProject(){
 function describeUpdate(){
     echo "Update project";
 }
+
