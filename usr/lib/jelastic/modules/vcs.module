@@ -316,22 +316,19 @@ function doUpdate(){
         J_OLD_PROJECT_NAME="${PROJECT_NAME}";
         PROJECT_NAME="${NEXT_DIR}"
     if [ -d "${WEBROOT}/${PROJECT_NAME}/.$(toLowerCase ${VCS_TYPE})" ] ; then
-                updateProject 2>>"$VCS_UPDATE_LOG" && { writeJSONResponseOut "result=>0" "message=>Project updated succesfuly";
-                ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; updateOwnership ${WEBROOT}/ROOT;
+                updateProject 2>>"$VCS_UPDATE_LOG" && { ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; updateOwnership ${WEBROOT}/ROOT;
                 updateOwnership ${WEBROOT}/${PROJECT_NAME};
                 [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}";
     writeProjectConfig; }
                 rcode=$?;
-                [ "$rcode" -eq 1 ] && return 0 || return $rcode
                 } || { updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; return 1; };
         else
-                doCheckout &&  writeJSONResponseOut "result=>0" "message=>Project update completed successfully" || { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; }
+                doCheckout || { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; }
                 updateOwnership ${WEBROOT}/${PROJECT_NAME};
                 ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; updateOwnership ${WEBROOT}/ROOT;
                 [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}";
     writeProjectConfig; }
                 rcode=$?;
-                [ "$rcode" -eq 1 ] && return 0 || return $rcode
         fi
     else
         if [ "x${PROJECT_NAME}" == "xROOT" ] && [ -L ${WEBROOT}/ROOT ]; then
@@ -361,7 +358,6 @@ function doUpdate(){
         fi
         if [ -d "${WEBROOT}/${PROJECT_NAME}/.$(toLowerCase ${VCS_TYPE})" ] ; then
                 updateProject 2>>"$VCS_UPDATE_LOG" && {
-                writeJSONResponseOut "result=>0" "message=>Project updated succesfuly";
                 updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeProjectConfig;
                 } || { updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; return 1; };
         else
@@ -375,7 +371,7 @@ function doUpdate(){
   [ "x${COMPUTE_TYPE}" == "xcartridge" ] && recoverBrokenMountPoints && service cartridge build >>  $ACTIONS_LOG  2>&1  && service cartridge deploy >> $ACTIONS_LOG  2>&1;
   applyHook ${PROJECT_NAME} postUpdate || { writeJSONResponseErr "result=>4128" "message=>Post-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
   [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${PROJECT_NAME} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
-  return 0;
+  writeJSONResponseOut "result=>0" "message=>Project updated successfully"; return 0; 
 }
 
 function doCallProjectUpdate(){
