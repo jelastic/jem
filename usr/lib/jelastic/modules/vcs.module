@@ -357,7 +357,7 @@ function doUpdate(){
             } || { updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; return 1; };
         else
             [ -d "${WEBROOT}/${PROJECT_NAME}" ] && rm -Rf "${WEBROOT}/${PROJECT_NAME}/";
-            doCheckout &&  writeJSONResponseOut "result=>0" "message=>Project update completed successfully" || { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; }
+            doCheckout || { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; }
             updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeProjectConfig;
         fi
     fi
