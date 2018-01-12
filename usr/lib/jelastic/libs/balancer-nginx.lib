@@ -393,13 +393,24 @@ function updateMainNginxConfig(){
 }
 
 function addTCPPortMappings(){
+  if nginx -V 2>&1| grep -q with-stream; then
+    USE_STREAM='ok';
+    NGINX_TCPMAP_TEMPLATE='/etc/nginx/templates/nginx.stream.conf.tpl';
+  else
+    USE_STREAM='no'
+  fi
+
   if [ -e "$NGINX_TCPMAP_CONFIG" ]
   then
   	#cat $NGINX_TCPMAP_TEMPLATE > $TMP_TEMPLATE;
   	OLDIFS=$IFS
   	IFS=$'\n'
     if $GREP pair $NGINX_TCPMAP_CONFIG | $GREP -v '!--' -q ; then
-        echo -e "\ntcp {\n">> $TMP_TEMPLATE;
+        [[ "x$USE_STREAM" == "xok" ]] && {
+    	    echo -e "\nstream {\n\t\tlog_format basic '\$remote_addr [\$time_local] \$protocol \$status \$bytes_sent \$bytes_received \$session_time';\n\n">> $TMP_TEMPLATE;
+        } || {
+    	    echo -e "\ntcp {\n">> $TMP_TEMPLATE;
+    	}
     for line in $( $GREP pair $NGINX_TCPMAP_CONFIG | $GREP -v '!--' )
     do
         cat $NGINX_TCPMAP_TEMPLATE >> $TMP_TEMPLATE;
@@ -407,6 +418,9 @@ function addTCPPortMappings(){
         bend_port=$($GREP "backend_port=" <<< $line | cut -d\" -f4)
         IFS=$OLDIFS
         updateTcpUpstreamSection "$fend_port" "$bend_port"
+        [[ "x$USE_STREAM" == "xok" ]] && {
+    	    sed -i -re "/(upstream|proxy_pass)/s/common/common${fend_port}/g" $TMP_TEMPLATE;
+        }
         updateMainNginxConfig
     done
     echo     "}" >> $NGINX_CONFIG ;
