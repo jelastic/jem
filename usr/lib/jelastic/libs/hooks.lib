@@ -18,6 +18,7 @@
 HOOKSLIB_VERSION="0.1";
 
 HOOKS_DIR="/var/lib/jelastic/hooks";
+[ ! -d ${HOOKS_DIR} ] && mkdir -p ${HOOKS_DIR};
 
 if [ -f /etc/jelastic/redeploy.conf ] && [ -z $(grep ${HOOKS_DIR} /etc/jelastic/redeploy.conf) ]; then
     echo ${HOOKS_DIR} >> /etc/jelastic/redeploy.conf
