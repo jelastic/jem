@@ -300,7 +300,7 @@ $PROGRAM 'ip'
         saveEnvironmentVariables;
         [ ! -d "${J_OPENSHIFT_APPHOME_DIR}/data"  ]  && mkdir -p "${J_OPENSHIFT_APPHOME_DIR}/data";
         [ ! -d "${J_OPENSHIFT_APPHOME_DIR}/tmp"  ]  && mkdir -p "${J_OPENSHIFT_APPHOME_DIR}/tmp";
-	[ -d "$J_OPENSHIFT_APPHOME_DIR" ] &&  [ ! -L "$CARTRIDGE_APP_HOME"  ] && ln -s "$J_OPENSHIFT_APPHOME_DIR" "$CARTRIDGE_APP_HOME";
+	[ -d "$J_OPENSHIFT_APPHOME_DIR" ] &&  [ ! -e "$CARTRIDGE_APP_HOME"  ] && ln -s "$J_OPENSHIFT_APPHOME_DIR" "$CARTRIDGE_APP_HOME";
         [ ! -d "${DEFAULT_JELASTIC_KEY_PATH}"  ]  && mkdir -p "${DEFAULT_JELASTIC_KEY_PATH}";
         [ ! -d "${J_OPENSHIFT_CRON_DIR}"  ]  && mkdir -p "${J_OPENSHIFT_CRON_DIR}";
         [ ! -d "$J_OPENSHIFT_KEYS_DIR" ] && mkdir -p "$J_OPENSHIFT_KEYS_DIR";       
