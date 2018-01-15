@@ -220,7 +220,7 @@ function doBuild(){
         fi
     else
         echo "[ERROR] File pom.xml is absent" >> "${LOG_DIR}/${PROJECT_NAME}_build.log"
-        writeJSONResponseErr "result=>4059" "message=>Build failed, see logs for details" ; return 1 ;
+	writeJSONResponseErr "result=>4133" "message=>File pom.xml is absent" ; return 1 ;
     fi
 }
 
