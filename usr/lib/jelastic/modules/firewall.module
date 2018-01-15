@@ -505,12 +505,14 @@ function dofwset() {
             fi
         fi
 
+        srchost=${srchost/ALL/0.0.0.0\/0}
         if [ "x$srchost" != "x" ] ; then
             rulecmd="$rulecmd -s $srchost"
         fi
 
+        dsthost=${dsthost/ALL/0.0.0.0\/0}
         if [ "x$dsthost" != "x" ] ; then
-            rulecmd="$rulecmd -s $dsthost"
+            rulecmd="$rulecmd -d $dsthost"
         fi
 
         if [ "x$ptype" == "xrange" ] ; then
