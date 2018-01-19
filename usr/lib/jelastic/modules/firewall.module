@@ -306,7 +306,8 @@ function doStart() {
 
     $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited;
     log "saving rules";
-    /sbin/service iptables save 2>/dev/null | $GRAB_OUTPUT;
+    /sbin/service iptables save 2>/dev/null | $GRAB_OUTPUT
+    /sbin/service ip6tables save &> /dev/null
     return 0;
 }
 
@@ -453,6 +454,7 @@ function doDisable() {
     echo "Firewall disabled";
     _setDefaultPolicy "ACCEPT";
     $IPTABLES -F ; service iptables save &> /dev/null;
+    $IP6TABLES -F ; service ip6tables save &> /dev/null;
     writeJSONResponseOut "result=>0" "message=>Firewall has been disabled"
     return 0;
 }
