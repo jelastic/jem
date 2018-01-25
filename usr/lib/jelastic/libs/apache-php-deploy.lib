@@ -39,7 +39,9 @@ function delContext(){
    # Alias /error/ "/var/www/error/"
    
    WEBROOT1=$( $SED "s/\//\\\\\\//g" <<< ${WEBROOT} );
-   $SED -i "/^Alias\s\{0,\}\/${context}\s\{0,\}\"${WEBROOT1}\/${context}\"/d"  $HTTPD_ALIASES_FILE;
+   if [[ "$context" != "$DEFAULT_CONTEXT" ]]; then
+     $SED -i "/^Alias\s\{0,\}\/${context}\s\{0,\}\"${WEBROOT1}\/${context}\"/d"  $HTTPD_ALIASES_FILE;
+   fi
    reloadService ${SERVICE} > /dev/null 2>&1;
 }
 
