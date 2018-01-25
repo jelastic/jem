@@ -243,6 +243,11 @@ function _nfsReexport() {
                 vzexecRun "exportfs -ra"
                 local err=$(vzexecGetLastStdErr)
                 [[ -z "${err// }" ]] && return $TRUE
+
+                if grep -q "does not support NFS export" <<< $err ; then
+                    writeJSONResponseErr "result=>2032" "message=>NFS: wrong configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports) | $err";
+                fi
+
                 writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports) | $err";
                 return 99;
             fi
