@@ -357,7 +357,7 @@ function doAction() {
             [ -w "$resultFile" ] && { 
         	echo $result >$resultFile
     	    }
-            return $result
+            exit $result
         }
     );
     [[ $? -eq 124 ]] && {
