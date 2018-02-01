@@ -25,8 +25,6 @@ echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
 echo ":[EXEC]      [PID: $$] $@" >> ${JEM_CALLS_LOG} 2>&1;
 
 sudo chmod 666 ${JEM_CALLS_LOG};
-sudo chmod 777 /var/log;
-sudo chmod 777 /var/run;
 sudo chmod 555 /usr/bin/jem;
 sudo chmod 655 /usr/lib/jelastic /usr/lib/jelastic/libs /usr/lib/jelastic/modules; 
 sudo chmod 555 /usr/lib/jelastic/libs/* /usr/lib/jelastic/modules/*;
