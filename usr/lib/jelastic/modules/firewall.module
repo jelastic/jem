@@ -510,6 +510,7 @@ function dofwset() {
         srchost=${srchost/ALL/0.0.0.0\/0}
         if [ "x$srchost" != "x" ] ; then
             if grep -q '!' <<< $srchost ; then
+                $srchost=${srchost//'!'/}
                 rulecmd="$rulecmd ! -s $srchost"
             else
                 rulecmd="$rulecmd -s $srchost"
@@ -519,6 +520,7 @@ function dofwset() {
         dsthost=${dsthost/ALL/0.0.0.0\/0}
         if [ "x$dsthost" != "x" ] ; then
             if grep -q '!' <<< $dsthost ; then
+                $dsthost=${dsthost//'!'/}
                 rulecmd="$rulecmd ! -d $dsthost"
             else
                 rulecmd="$rulecmd -d $dsthost"
