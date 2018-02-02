@@ -28,7 +28,6 @@ DEFAULT_DOMAIN="jelastic";
 HOOKS_DIR="/var/lib/jelastic/hooks";
 
 export GIT_SSL_NO_VERIFY=true;
-SCRIPTS_DIR="/root/maven/scripts/"
 JELASTIC_API="api.jelastic.com"
 LOG_DIR="/var/log/maven"
 MVN='/opt/maven/bin/mvn'
@@ -40,18 +39,12 @@ $PROGRAM 'java';
 $PROGRAM 'zip';
 $PROGRAM 'grep';
 $PROGRAM 'awk';
-MAVEN_OPTIONS=""
 APPROOT=$WEBROOT;
 DEPLOY_PROPROPERTIES="/tmp/dep_prop.tmp";
 
 free_mem=`free -m | $GREP Mem | $AWK '{print $2}'`;
 
-function getMavenParam() {
-    Result=$(( $1 - 35))
-    echo "-Xmx${Result}m"
-}
-
-declare -x MAVEN_OPTS=$(getMavenParam $free_mem)
+. /etc/profile &>>/var/log/maven/hooks.log
 
 function parseArguments() {
     decryptPassword $@;
@@ -200,16 +193,23 @@ function doBuild(){
     [ "x$UPDATE" == "xtrue" ] && doUpdate update -n $PROJECT_NAME;
     [[ ${BUILDDIR} =~ pom.xml$ && -f "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}" ]] && BUILDDIR=${BUILDDIR/pom.xml};
     if [ -e "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
-    applyHook ${PROJECT_NAME} preBuild || { writeJSONResponseErr "result=>4129" "message=>Pre-build hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
+        cd "${APPROOT}/${PROJECT_NAME}" &>>"$JEM_CALLS_LOG";
+        echo "export APPROOT=${APPROOT}" >$STACK_PATH/jeltmp 2>>"$JEM_CALLS_LOG";
+        echo "export PROJECT_NAME=${PROJECT_NAME}" >>$STACK_PATH/jeltmp 2>>"$JEM_CALLS_LOG";
+
+        applyHook ${PROJECT_NAME} preBuild || { rm -rf $STACK_PATH/jeltmp; writeJSONResponseErr "result=>4129" "message=>Pre-build hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
         #echo "Building $m_name ..."
-        $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && { 
-	BUILD_IS_OK="true"; applyHook ${PROJECT_NAME} postBuild || { writeJSONResponseErr "result=>4130" "message=>Post-build hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
+        chown "$DATA_OWNER" -R "${LOG_DIR}" &>>"$JEM_CALLS_LOG"
+        PROJECT_MNV_ARGS=$(env | grep -m 1 -i $(echo  MAVEN_RUN_ARGS_$( sed -re 's/(\s|-)/_/g' <<< "$PROJECT_NAME" ))|awk -F= '{$1=""; print}')
+        runuser jelastic -c "$MVN ${PROJECT_MNV_ARGS} ${MAVEN_RUN_ARGS} clean install --file \"${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml\" >> \"${LOG_DIR}/${PROJECT_NAME}_build.log\" 2>&1" && { 
+	BUILD_IS_OK="true"; applyHook ${PROJECT_NAME} postBuild || { rm -rf $STACK_PATH/jeltmp; writeJSONResponseErr "result=>4130" "message=>Post-build hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
+        rm -rf $STACK_PATH/jeltmp;
         if [ "x$BUILD_IS_OK" == "xtrue" ] ; then
                 if [ "x$SKIP_UPLOAD" == "xtrue" ] ; then
 			writeJSONResponseOut "result=>0" "message=>Build success"; 
 			return 0;
                 fi
-            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:publish $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST"  -Djelastic-upload-only=true -Djelastic-session="$SESSION" --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
+          runuser jelastic -c "$MVN ${PROJECT_MNV_ARGS} ${MAVEN_RUN_ARGS} com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:publish $maven_opts -Djelastic-comment=\"${PROJECT_NAME}\" -Djelastic-headers=\"$HOST_HEADERS\" -Djelastic-hoster=\"$API_HOST\"  -Djelastic-upload-only=true -Djelastic-session=\"$SESSION\" --file \"${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml\"" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
                         [ $? -eq 0 ] && {
                                 writeJSONResponseOut "result=>0" "message=>Build success"; return 0;
             } || {
@@ -232,9 +232,11 @@ function doDeploy(){
     #echo "Deploying $m_name ..."
     [[ ${BUILDDIR} =~ pom.xml$ && -f "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}" ]] && BUILDDIR=${BUILDDIR/pom.xml};
     if [ -e "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
+        cd "${APPROOT}/${PROJECT_NAME}" &>>"$JEM_CALLS_LOG"
+        chown "$DATA_OWNER" -R "${LOG_DIR}" &>>"$JEM_CALLS_LOG"
         if [ "x$BUILD" == "xtrue" ]; then
             applyHook ${PROJECT_NAME} preBuild || { writeJSONResponseErr "result=>4129" "message=>Pre-build hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
-            $MVN clean install --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && { BUILD_IS_OK="true"; applyHook ${PROJECT_NAME} postBuild || { writeJSONResponseErr     "result=>4130" "message=>Post-build hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
+            runuser jelastic -c "$MVN ${PROJECT_MNV_ARGS} ${MAVEN_RUN_ARGS} clean install --file \"${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml\"" >> "${LOG_DIR}/${PROJECT_NAME}_build.log" 2>&1 && { BUILD_IS_OK="true"; applyHook ${PROJECT_NAME} postBuild || { writeJSONResponseErr     "result=>4130" "message=>Post-build hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
         else
             BUILD_IS_OK="true";
         fi
@@ -244,7 +246,7 @@ function doDeploy(){
             local jelastic_hooks=''
             [ -f "$HOOKS_DIR/preDeploy_${PROJECT_NAME}.sh" ] && jelastic_hooks="-Djelastic-predeploy-hook=$HOOKS_DIR/preDeploy_${PROJECT_NAME}.sh"
             [ -f "$HOOKS_DIR/postDeploy_${PROJECT_NAME}.sh" ] && jelastic_hooks="$jelastic_hooks -Djelastic-postdeploy-hook=$HOOKS_DIR/postDeploy_${PROJECT_NAME}.sh"
-            $MVN com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:deploy $maven_opts -Djelastic-comment="${PROJECT_NAME}" -Djelastic-headers="$HOST_HEADERS" -Djelastic-hoster="$API_HOST" -Djelastic-properties="$DEPLOY_PROPROPERTIES" -Dcontext="$CONTEXT" -Denvironment="$ENVIRONMENT" -Djelastic-session="$SESSION" -Dpackaging.type="war" $jelastic_hooks --file "${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
+            runuser jelastic -c "$MVN ${PROJECT_MNV_ARGS} ${MAVEN_RUN_ARGS} com.jelastic:jelastic-maven-plugin:${MAVEN_PLUGIN_VERSION}:deploy $maven_opts -Djelastic-comment=\"${PROJECT_NAME}\" -Djelastic-headers=\"$HOST_HEADERS\" -Djelastic-hoster=\"$API_HOST\" -Djelastic-properties=\"$DEPLOY_PROPROPERTIES\" -Dcontext=\"$CONTEXT\" -Denvironment=\"$ENVIRONMENT\" -Djelastic-session=\"$SESSION\" -Dpackaging.type=\"war\" $jelastic_hooks --file \"${APPROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml\"" >> "${LOG_DIR}/${PROJECT_NAME}_deploy.log" 2>&1;
             [ $? -eq 0 ] && { 
                 [ -f "$DEPLOY_PROPROPERTIES" ] && rm "$DEPLOY_PROPROPERTIES" ; 
             } || { 
