@@ -101,7 +101,7 @@ function __injected() {
     label="ssh-gate@jelastic.com"
     response=$(${SSH_KEYGEN} -C $label -P "" -q -f $tmpfile 2>&1);
     log "ssh-keygen response ${response}";
-    $VZCTL exec $CTID "[[ ! -d '/root/.ssh' ]] && [[ ! -L '/root/.ssh' ]] && { mkdir -p /root/.ssh; chmod 0700 /root/.ssh 2>>"$JEM_CALLS_LOG"; }"
+    $VZCTL exec $CTID '[[ ! -d /root/.ssh ]] && [[ ! -L /root/.ssh ]] && [ -L /root ] && [ ! -e $(readlink /root) ] && rm /root && { mkdir -p /root/.ssh; chmod 0700 /root/.ssh 2>>'$JEM_CALLS_LOG'; }'
     pubkey=$(cat "${tmpfile}.pub")
     privkey=$(cat "${tmpfile}")
     $VZCTL exec $CTID "[[ -f '/root/.ssh/authorized_keys' ]] && { $SED -i -re \"/${label}/d;/^s*$/d\" /root/.ssh/authorized_keys; chmod 0400 /root/.ssh/authorized_keys 2>>"$JEM_CALLS_LOG"; }"
