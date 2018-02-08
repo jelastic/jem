@@ -51,7 +51,7 @@ function bundleInstall(){
             shopt -s dotglob;
             chown -hR ${DATA_OWNER} "${APPWEBROOT}" 2>>"$JEM_CALLS_LOG";
             shopt -u dotglob;
-            $SED -i /PATHVENDOR/d /etc/environment
+            $SED -i /PATHVENDOR/d /etc/environment 2>/dev/null;
             tmp_version=`ls "${APPWEBROOT}/vendor/bundle/ruby/" 2>/dev/null`;
             if [ -d "${APPWEBROOT}/vendor/bundle/ruby/$tmp_version/bin" ] ; then
                 echo "
@@ -59,7 +59,7 @@ PATHVENDOR=${APPWEBROOT}/vendor/bundle/ruby/$tmp_version/bin
 export PATH=$PATH:\$PATHVENDOR
 " >> /etc/environment
             fi
-
+	chown -R ${DATA_OWNER} $(dirname ${BUNDLE_INSTALL_LOG})
         }
     else
         startServiceSilent ${SERVICE} ;
