@@ -461,7 +461,7 @@ function doEditProject(){
   }
   [ ! -z "$URL" ] && NEWURL=$URL;
   [ "x$OLDURL" != "x$NEWURL" -o "x$OLDPASSWORD" != "x$PASSWORD" -o "x$OLDLOGIN" != "x$LOGIN" ]  &&  repository_url_was_changed="true";
-  [ "$CLEAN_KEY" -eq 1 ] && { AUTHORIZATION_KEY_VAL="" ; AUTHORIZATION_KEY=""; }
+  [ "$CLEAN_KEY" -eq 1 ] && { AUTHORIZATION_KEY_VAL="" ; AUTHORIZATION_KEY=""; rm -rf "${VCS_CONFIG_DIR}/${PROJECT_NAME}.key"; }
   [ "$CLEAN_PASSWORD" -eq 1 ] && { PASSWORD=""; }
   if [ "x$repository_url_was_changed" ==  "xtrue" -a  -d "${WEBROOT}/${PROJECT_NAME}/.$(toLowerCase ${VCS_TYPE})" ] ; then
     enableVCSLibrary;
