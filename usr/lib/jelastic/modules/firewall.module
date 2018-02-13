@@ -502,9 +502,7 @@ function dofwset() {
 
         rulecmd="-A $chain"
         if [ "x$proto" != "x" ] ; then
-            if [ "x$dport" != "x" ] ; then
-                rulecmd="$rulecmd -p $proto"
-            fi
+            rulecmd="$rulecmd -p $proto"
         fi
 
         srchost=${srchost/ALL/0.0.0.0\/0}
