@@ -46,6 +46,7 @@ function getHooksLogName()
 function applyHook(){
     target="$1"
     hook="$2"
+    [ "x${target}" == "xroot" ] && target="ROOT";
     adjustRubyTarget;
     hookDisplayName=$(echo $hook | sed -r 's/([a-z0-9])([A-Z])/\1-\L\2/g'|sed 's/.*/\u&/')
     if [ -f "$HOOKS_DIR/${hook}_${target}.sh" ]; then
