@@ -36,8 +36,8 @@ declare -i CTID=""
 declare -i _MOVEDATA=0
 declare _SOURCE=""
 declare _DESTINATION=""
-declare _DEFAULT_NFS_MOUNT_OPTS="soft,timeo=120,retrans=20,udp,nolock,vers=3,_netdev"
-declare CONTAINER_MOUNTS_STORAGE="/etc/fstab"
+declare _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,udp,soft,timeo=120,retrans=20,_netdev"
+declare CONTAINER_MOUNTS_STORAGE="/etc/autofs.jelastic"
 declare _IPLIST
 declare -a UNKNOWN_ARG
 declare SAVE_CONFIG="true"
@@ -48,7 +48,7 @@ declare FALSE=1
 FORCE_UMOUNT=$TRUE
 FORCE_MOUNT=$FALSE
 
-MOUNTPROG="/sbin/mount.nfs"
+MOUNTPROG="/usr/sbin/automount"
 MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-utils.tar.gz"
 _UI_RESULT=0
 
@@ -156,16 +156,6 @@ function preparePath() {
     return 0;
 }
 
-function remountPath() {
-    local share=${1}
-    local remountCmd="umount -l ${share} ; mount ${share}"
-    out=$($EXEC "$remountCmd" 2>&1)
-    if [[ -z "${out}" ]] ; then
-       log "$out"
-    fi
-    return $?
-}
-
 function processnfs() {
     local sourceIP=${1:?"Source address required"}
     local sourceMount=${2:?"Source share name required"}
@@ -181,22 +171,10 @@ function processnfs() {
 
     [[ ! -e "/vz/root/${_CTID}${MOUNTPROG}" ]] && dosetupUtils ${_CTID}
 
-    local aCurrentMounts=($($SED -nre '/nfs(3|4)?/{s/([^:]+:)(\S+).*/\1\2/g;p}' ${MOUNTS_STORAGE}))
-
-    #TODO:
-    # jem storage mount --source 'rw:nfs:node182-env-qqq.dev2.jelastic.com:/storage' --destination '/client2' --ctid '1192' ;
-    #
-    # cat /etc/fstab
-    #node182-env-qqq.dev2.jelastic.com:/storage      /client nfs     hard,intr,tcp,nolock,vers=3     0       0
-    #
-    #if indexOf "${aCurrentMounts[*]}" "${sourceIP}:${sourceMount}" ; then
-    #    echo "share ${sourceIP}:${sourceMount} already mounted";
-    #    return 0;
-    #fi
-
     preparePath "${_DESTINATION}" "${_CTID}"
-    local mntEntry="${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")\t${destinationEsc}\tnfs\t${_DEFAULT_NFS_MOUNT_OPTS}\t0\t0"
-    local cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE};"
+    local mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
+
+    local cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
 
     if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
         log "registering ${sourceIP}:${sourceMount} in ${_CTID}"
@@ -209,27 +187,8 @@ function processnfs() {
     msg=""
     res=0
     if [[ $running -eq 0 ]] ; then
-        mntcmd="mount \"$($SED -re 's/("\*|\$|\?|\|\^|`|'\'')/\\\1/g' <<< "${_DESTINATION}")\""
+        mntcmd="systemctl restart autofs"
         vzexecRun "${mntcmd}"
-        res="$(vzexecGetLastErrCode)"
-        msg="$(vzexecGetLastStdErr)"
-        if [[ $res -gt "0" ]] && [[ $FORCE_MOUNT -eq $FALSE ]] ; then
-            local mntEntryCheck="${sourceIP}:$($SED -re 's/(\$|\[|\]|\*|\(|\)|\?|\||\^)/\\\1/g' -e 's/\\\\\$/$/g' <<< ${sourceMount})/? on $($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\||\^|`)/\\\1/g' <<< ${destinationEsc})"
-            vzexecRun "mount | $GREP -P \"$mntEntryCheck\""
-            res=$(vzexecGetLastErrCode)
-            if [[ $res -ne $TRUE ]] ; then
-                #remove the /etc/fstab entry
-                cmdUnregisterMount="/$(echo -e $mntEntry | $SED -r -e 's/\t/\\\s+/g;' -e 's/\//\\\//g' -e 's/\./\\./g' -e 's/(\[|\]|\*|\(|\)|\$|\?|\||\^)/\\\1/g')/d"
-                if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
-                    out=$($SED -i -re "$cmdUnregisterMount" ${MOUNTS_STORAGE} 2>&1)
-                fi
-                log $out
-                msg="${msg}. Server IP is: $(host ${sourceIP}), RPC connection: $(timeout 1 bash -c "cat < /dev/null > /dev/tcp/${sourceIP}/111" 2>/dev/null; echo $?)"
-                res=4111
-            else
-                res=0
-            fi
-        fi
     else
         log "unmounting"
         $VZCTL umount $CTID > /dev/null 2>&1
@@ -303,13 +262,8 @@ function processlocal() {
 }
 
 function doRemount() {
-    local shares=(${_DESTINATION})
-    [[ -z ${_DESTINATION} ]] && {
-        shares=($($SED -nre "/\snfs(3|4)?\s/{s/\s*(\S+)\s*(\S+).*/\2/;p}" "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" ))
-    }
-    for share in ${shares[*]} ; do
-        remountPath "$share"
-    done
+    mntcmd="systemctl restart autofs"
+    vzexecRun "${mntcmd}"
     return 0;
 }
 
@@ -317,10 +271,6 @@ function dosetupUtils() {
     local issue_file="/vz/root/${CTID}/etc/issue";
     local release_files="/vz/root/${CTID}/etc/*-release";
 
-    if [[ ! -e "${MOUNTPACKAGE}" ]] ; then
-        log "${MOUNTPACKAGE} not found!"
-        exit 1;
-    fi
     issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
     OS=$(detectOS "$issue_string")
     OS_ver=$(getOSVersion "$issue_string")
@@ -328,16 +278,23 @@ function dosetupUtils() {
 
     #JE-25896
     if [[ "x$OS" == "xalpine" ]] ; then
-        installCmd=$(installPackageCmd $OS install nfs-utils)
+        installCmd=$(installPackageCmd $OS install nfs-utils autofs)
         vzexecRun "$installCmd"
         vzexecRun "rc-update add netmount default"
         return 0
     fi
-    $TAR hzxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
+    installCmd=$(installPackageCmd $OS install autofs nfs-utils)
+    vzexecRun "$installCmd"
 
     if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
-        vzexecRun "chkconfig netfs on"
+        vzexecRun "chkconfig autofs on"
     fi
+    if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "7" ] ; then
+        $SED -i -re '/automount/d' "/vz/root/${CTID}/etc/nsswitch.conf"
+        echo -e "\nautomount:  files" >> "/vz/root/${CTID}/etc/nsswitch.conf"
+    fi
+    echo '/- /etc/autofs.jelastic' >> "/vz/root/${CTID}/etc/auto.master"
+    vzexecRun "systemctl enable autofs"
     return 0
 }
 
@@ -431,7 +388,7 @@ function doUmount() {
 
         if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
             if [ $rescode -eq 0 ] ; then
-                local dpath="\s+$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+(nfs|none)\s+";
+                local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+-fstype=nfs.*";
                 out=$($SED -i -re /${dpath}/d ${MOUNTS_STORAGE} 2>&1)
                 [[ ! -z "${out}" ]] && log "${out}";
                 retfunc="writeJSONResponseOut result=>0"
@@ -445,6 +402,9 @@ function doUmount() {
 
     if [[ $running -ne 0 ]] ; then
         $VZCTL umount $CTID > /dev/null 2>&1
+    else
+        mntcmd="systemctl restart autofs"
+        vzexecRun "${mntcmd}"
     fi
     $retfunc "message=>$msg";
     return 0;
