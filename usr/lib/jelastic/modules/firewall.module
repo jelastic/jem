@@ -449,8 +449,7 @@ function doDisable() {
     [ ! -e "${META_FILE}" ] && touch ${META_FILE}
     if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
         $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=0/g" ${META_FILE};
-    fi;
-    chkconfig iptables off 2>&1 | $GRAB_OUTPUT;
+    fi
     echo "Firewall disabled";
     _setDefaultPolicy "ACCEPT";
     $IPTABLES -F ; service iptables save &> /dev/null;
