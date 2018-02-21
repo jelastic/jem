@@ -83,8 +83,8 @@ function loadConfig() {
 function loadINISection() {
     local inifile=${1} section=${2} ini
     ini="$(<$inifile)";
-    ini="${ini//[/\[}";
-    ini="${ini//]/\]}";
+    ini="${ini//[/\\[}";
+    ini="${ini//]/\\]}";
     OIFS=${IFS};
     IFS=$'\n' && ini=( ${ini} );
     ini=( ${ini[*]//;*/} );
