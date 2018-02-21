@@ -20,7 +20,7 @@ DESCRIPTION="Firewall module";
 VERSION="1.1";
 DEFAULT_ACTION="Usage";
 
-inherit tests os envinfo log net config vzexec;
+inherit tests os envinfo log net config vzexec virtuozzo
 include cartridge-common;
 
 $PROGRAM 'iptables'
@@ -40,8 +40,9 @@ $PROGRAM 'vzctl'
 
 SAVEFILE='/var/lib/jelastic/firewall'
 CUSTOM_RULES_FILE='/etc/sysconfig/iptables-custom'
-JELASTIC_4RULES_FILE='/etc/sysconfig/iptables4-jelastic'
-JELASTIC_6RULES_FILE='/etc/sysconfig/iptables6-jelastic'
+JELASTIC_RULES_DIR='/etc/sysconfig'
+JELASTIC_4RULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic'
+JELASTIC_6RULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic'
 
 # 7755 - file replication (lsync?)
 # 7979 - for export/import
@@ -86,6 +87,11 @@ function _defaultComputeNodeRedirPorts () {
 }
 
 function _computeRedirPorts () {
+    echo "PREROUTING:0.0.0.0/0:0.0.0.0/0:80:8080:REDIRECT PREROUTING:0.0.0.0/0:0.0.0.0/0:443:8743:REDIRECT OUTPUT:0.0.0.0/0:127.0.0.0/8:80:8080:REDIRECT";
+    return 0;
+}
+
+function _getjettyRedirPorts () {
     echo "PREROUTING:0.0.0.0/0:0.0.0.0/0:80:8080:REDIRECT PREROUTING:0.0.0.0/0:0.0.0.0/0:443:8743:REDIRECT OUTPUT:0.0.0.0/0:127.0.0.0/8:80:8080:REDIRECT";
     return 0;
 }
@@ -274,30 +280,6 @@ function doStart() {
 
     $IPTABLES -A INPUT -m state --state NEW -s 10.0.0.0/27 -j ACCEPT;
 
-    log "getting Infra adresses";
-    getInfraAddresses infraAddr;
-
-    isValidIP ${CORE_ADDR} && {
-        $IPTABLES -A INPUT -m state --state NEW -s ${CORE_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
-    } || {
-        $IPTABLES -A INPUT -m state --state NEW -s 0.0.0.0/0 -m tcp -p tcp --dport 22 -j ACCEPT;
-    }
-
-    for jaddr in ${JEL_CORE_ADDR}; do
-        isValidIP ${jaddr} && {
-            $IPTABLES -A INPUT -m state --state NEW -s ${jaddr} -m tcp -p tcp --dport 22 -j ACCEPT;
-        }
-    done
-
-    for gaddr in ${GATE_ADDR}; do
-        isValidIP ${gaddr} && {
-            $IPTABLES -A INPUT -m state --state NEW -s ${gaddr} -m tcp -p tcp --dport 22 -j ACCEPT;
-        }
-    done
-
-    [ ! -z "${CORE1_ADDR}" ] && isValidIP ${CORE1_ADDR} && $IPTABLES -A INPUT -m state --state NEW -s ${CORE1_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
-    [ ! -z "${CORE2_ADDR}" ] && isValidIP ${CORE2_ADDR} && $IPTABLES -A INPUT -m state --state NEW -s ${CORE2_ADDR} -m tcp -p tcp --dport 22 -j ACCEPT;
-
     redirPorts=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts; } || _defaultComputeNodeRedirPorts));
 
     # process input chain NAT
@@ -318,13 +300,14 @@ function doStart() {
         echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_4RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
 
-    [ -f "${JELASTIC_6RULES_FILE}" ] && { $IP6TABLES_RESTORE -n < "${JELASTIC_6RULES_FILE}" 2>>$ACTIONS_LOG ;
+    [ -f "${JELASTIC_6RULES_FILE}" ] && { $IP6TABLES_RESTORE < "${JELASTIC_6RULES_FILE}" 2>>$ACTIONS_LOG ;
         echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_6RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
 
     $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited;
     log "saving rules";
-    /sbin/service iptables save 2>/dev/null | $GRAB_OUTPUT;
+    /sbin/service iptables save 2>/dev/null | $GRAB_OUTPUT
+    /sbin/service ip6tables save &> /dev/null
     return 0;
 }
 
@@ -466,11 +449,11 @@ function doDisable() {
     [ ! -e "${META_FILE}" ] && touch ${META_FILE}
     if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
         $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=0/g" ${META_FILE};
-    fi;
-    chkconfig iptables off 2>&1 | $GRAB_OUTPUT;
+    fi
     echo "Firewall disabled";
     _setDefaultPolicy "ACCEPT";
-    $IPTABLES -F INPUT; service iptables save &> /dev/null;
+    $IPTABLES -F ; service iptables save &> /dev/null;
+    $IP6TABLES -F ; service ip6tables save &> /dev/null;
     writeJSONResponseOut "result=>0" "message=>Firewall has been disabled"
     return 0;
 }
@@ -502,6 +485,12 @@ function doPanic() {
 
 
 function dofwset() {
+    running=1
+    if ! isContainerRunning ${CTID} ; then
+        running=0
+        vzctl mount ${CTID} >> $ACTIONS_LOG 2>&1
+    fi
+    [ -d "/vz/root/${CTID}${JELASTIC_RULES_DIR}" ] || mkdir -p "/vz/root/${CTID}${JELASTIC_RULES_DIR}"
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
     for ruleraw in ${RULES[@]} ; do
@@ -512,17 +501,27 @@ function dofwset() {
 
         rulecmd="-A $chain"
         if [ "x$proto" != "x" ] ; then
-            if [ "x$dport" != "x" ] ; then
-                rulecmd="$rulecmd -p $proto"
+            rulecmd="$rulecmd -p $proto"
+        fi
+
+        srchost=${srchost/ALL/0.0.0.0\/0}
+        if [ "x$srchost" != "x" ] ; then
+            if grep -q '!' <<< $srchost ; then
+                srchost=${srchost//'!'/}
+                rulecmd="$rulecmd ! -s $srchost"
+            else
+                rulecmd="$rulecmd -s $srchost"
             fi
         fi
 
-        if [ "x$srchost" != "x" ] ; then
-            rulecmd="$rulecmd -s $srchost"
-        fi
-
+        dsthost=${dsthost/ALL/0.0.0.0\/0}
         if [ "x$dsthost" != "x" ] ; then
-            rulecmd="$rulecmd -s $dsthost"
+            if grep -q '!' <<< $dsthost ; then
+                dsthost=${dsthost//'!'/}
+                rulecmd="$rulecmd ! -d $dsthost"
+            else
+                rulecmd="$rulecmd -d $dsthost"
+            fi
         fi
 
         if [ "x$ptype" == "xrange" ] ; then
@@ -536,17 +535,28 @@ function dofwset() {
         fi
 
         rulecmd="$rulecmd -j $raction"
-        if [ "x$tcptype" == "xIPV4" ] ; then
-            echo $rulecmd >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
-        else
-            echo $rulecmd >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
+
+        if [ "x$proto" == "xall" ] ; then
+            tcprule=$($SED -e 's/all/tcp/g' <<< $rulecmd )
+            udprule=$($SED -e 's/all/udp/g' <<< $rulecmd )
+            rulecmd="${tcprule}\n${udprule}"
         fi
 
-        echo "CTID $CTID RULE $rulecmd" >> ${JEM_CALLS_LOG} 2>&1;
+        if [ "x$tcptype" == "xIPV4" ] ; then
+            echo -e $rulecmd >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
+        else
+            echo -e $rulecmd >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
+        fi
+
+        echo "CTID $CTID RULE $rulecmd" >> ${JEM_CALLS_LOG} 2>&1
     done
     echo "COMMIT" >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
     echo "COMMIT" >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
-    vzexecRun "jem firewall start"
+    if [[ $running -eq 1 ]] ; then
+        vzexecRun "jem firewall start"
+    else
+        vzctl umount ${CTID} >> $ACTIONS_LOG 2>&1
+    fi
     writeJSONResponseOut "result=>0" "message=>Firewall rules set" "log=>$(vzexecGetLastStdOut) $(vzexecGetLastStdErr)"
     return 0
 }

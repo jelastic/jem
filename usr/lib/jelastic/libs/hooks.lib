@@ -18,6 +18,7 @@
 HOOKSLIB_VERSION="0.1";
 
 HOOKS_DIR="/var/lib/jelastic/hooks";
+[ ! -d ${HOOKS_DIR} ] && mkdir -p ${HOOKS_DIR};
 
 if [ -f /etc/jelastic/redeploy.conf ] && [ -z $(grep ${HOOKS_DIR} /etc/jelastic/redeploy.conf) ]; then
     echo ${HOOKS_DIR} >> /etc/jelastic/redeploy.conf
@@ -39,19 +40,33 @@ function getHooksLogName()
         ;;
     esac
 
-    [ -z "${HOOKS_LOG}" ] && HOOKS_LOG="${ACTION_LOG}";    
+    [ -z "${HOOKS_LOG}" ] && HOOKS_LOG="${ACTIONS_LOG}";    
 }
 
 function applyHook(){
     target="$1"
     hook="$2"
-    if [ -f "$HOOKS_DIR/${hook}_${target}.sh" ]; then 
+    [ "x${target}" == "xroot" ] && target="ROOT";
+    adjustRubyTarget;
+    hookDisplayName=$(echo $hook | sed -r 's/([a-z0-9])([A-Z])/\1-\L\2/g'|sed 's/.*/\u&/')
+    if [ -f "$HOOKS_DIR/${hook}_${target}.sh" ]; then
         getHooksLogName;
         touch ${HOOKS_LOG};
-        chown ${DATA_OWNER} ${HOOKS_LOG};
-        echo -en "$(date) Applying ${hook} hook for ${target} \n" >> ${HOOKS_LOG}; 
-        chmod +x "$HOOKS_DIR/${hook}_${target}.sh"; 
-        runuser -l jelastic -c "$HOOKS_DIR/${hook}_${target}.sh >> ${HOOKS_LOG} 2>>${HOOKS_LOG};"
+        resultFile=$(mktemp); export resultFile;
+        chown ${DATA_OWNER} ${HOOKS_LOG} ${resultFile} ;
+        [ "x${COMPUTE_TYPE}" == "xmaven" ] && local WRITE_OUTPUT_TO="${LOG_DIR}/${PROJECT_NAME}_build.log" || local WRITE_OUTPUT_TO="${ACTIONS_LOG}";
+        echo -e "[INFO] $(date) Applying ${hookDisplayName} hook for ${target} \n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
+        chmod +x "$HOOKS_DIR/${hook}_${target}.sh";
+        runuser -l jelastic -c "timeout ${actiontimeout} $HOOKS_DIR/${hook}_${target}.sh 2>&1; echo \$?>${resultFile}" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
+        result=$(cat ${resultFile}); rm -f ${resultFile};
+        if [ "${result}" == "0" ]; then
+            echo -e "[INFO] ${hookDisplayName} hook applied successfully\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
+        elif [ "${result}" == "124" ]; then
+            echo -e "[ERROR] ${hookDisplayName} hook execution timed out. Exit code ${result}\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG}; die -q;
+        else
+            echo -e "[ERROR] ${hookDisplayName} hook execution failed. Exit code ${result}\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
+        fi
+        return ${result}
     else
         return 0;
     fi
@@ -61,15 +76,21 @@ function renameHooks(){
     target="$1"
     old_target="$2"
     [ ! -d ${HOOKS_DIR} ] && return 0;
-    hooks_to_rename=$(ls ${HOOKS_DIR}|grep ${old_target})
+    adjustRubyTarget;
+    [ -z "${hooks_to_rename}" ] && hooks_to_rename=$(ls ${HOOKS_DIR}|grep "${old_target}.sh")
     for i in ${hooks_to_rename}
     do
-        mv -f ${HOOKS_DIR}/$i ${HOOKS_DIR}/$(echo $i|cut -d"_" -f1)_${target}.sh;
+        [ "${HOOKS_DIR}/$i" != "${HOOKS_DIR}/$(echo $i|cut -d"_" -f1)_${target}.sh" ] && mv -f ${HOOKS_DIR}/$i ${HOOKS_DIR}/$(echo $i|cut -d"_" -f1)_${target}.sh;
     done
 }
 
 function removeHooks(){
     getHooksLogName;
     target="$1"
-    rm -f "$HOOKS_DIR/*_${target}.sh" && echo -e "$(date) All hooks are removed for ${target}" >> ${HOOKS_LOG} || return 0;
+    adjustRubyTarget;
+    rm -f "$HOOKS_DIR/*_${target}.sh" && echo -e "[INFO] $(date) All hooks are removed for ${target}" >> ${HOOKS_LOG} || return 0;
+}
+
+function adjustRubyTarget(){
+    [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && { target="${bundle_type}"; hooks_to_rename=$(ls ${HOOKS_DIR}); }
 }

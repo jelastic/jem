@@ -122,6 +122,13 @@ function switchEngine(){
                 rm -rf "${WEBROOT}/ROOT/vendor"
                 set +f
         fi
+
+	if [ -d "${WEBROOT}/ROOT/.bundle" ] ; then
+                set -f
+                rm -rf "${WEBROOT}/ROOT/.bundle"
+                set +f
+        fi
+
         if [ -f "${WEBROOT}/ROOT/Gemfile.lock" ] ; then
                 set -f
                 rm -rf "${WEBROOT}/ROOT/Gemfile.lock"

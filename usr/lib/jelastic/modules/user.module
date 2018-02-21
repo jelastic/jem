@@ -101,13 +101,13 @@ function __injected() {
     label="ssh-gate@jelastic.com"
     response=$(${SSH_KEYGEN} -C $label -P "" -q -f $tmpfile 2>&1);
     log "ssh-keygen response ${response}";
-    $VZCTL exec $CTID "[[ ! -d '/root/.ssh' ]] && { mkdir -p /root/.ssh; chmod 0700 /root/.ssh 2>>"$JEM_CALLS_LOG"; }"
+    $VZCTL exec $CTID 'if ! cd /root/.ssh 2>/dev/null >/dev/null; then mkdir -p /root/.ssh 2>/dev/null >/dev/null || rm /root && mkdir -p /root/.ssh; chmod 0700 /root/.ssh; fi'
     pubkey=$(cat "${tmpfile}.pub")
     privkey=$(cat "${tmpfile}")
     $VZCTL exec $CTID "[[ -f '/root/.ssh/authorized_keys' ]] && { $SED -i -re \"/${label}/d;/^s*$/d\" /root/.ssh/authorized_keys; chmod 0400 /root/.ssh/authorized_keys 2>>"$JEM_CALLS_LOG"; }"
     $VZCTL exec $CTID "echo -e \"\n${pubkey}\n\" >> /root/.ssh/authorized_keys"
     $VZCTL exec $CTID "echo -e \"${privkey}\" >> /root/.ssh/id_rsa"
-    $VZCTL exec $CTID "$SED -i -re 's/#?[Ss][Tt][Rr][Ii][Cc][Tt][Mm][Oo][Dd][Ee][Ss]\s+[Yy][Ee][Ss]/StrictModes no/g' /etc/ssh/sshd_config"
+    $VZCTL exec $CTID "$SED -i -re 's/#?[Ss][Tt][Rr][Ii][Cc][Tt][Mm][Oo][Dd][Ee][Ss]\s+[Yy][Ee][Ss]/StrictModes no/g' /etc/ssh/sshd_config >/dev/null 2>&1"
     $VZCTL exec $CTID "service sshd reload >/dev/null 2>&1 || service ssh reload >/dev/null 2>&1"
     echo "{\"result\":\"0\",\"message\":\"$(cat ${tmpfile})\"}"
     rm "${tmpfile}"
@@ -170,7 +170,7 @@ function preAddCallback(){
     _SUPPLEMENTARY_GROUPS="$_SSH_ACCESS_GROUP";
 
     if [ ! -z "${_EID}" ]; then
-        _CTID=$($GREP -l "${_EID}" /vz/private/*/.vza/eid.conf |  $SED -re 's;/vz/private/([0-9]+)/.*;\1;')
+        _CTID=$($SED -nr '/^<ns1:veid>([[:digit:]]+)<[/]ns1:veid>$/{s//\1/p; q}' "/var/opt/pva/agent/etc/configs/${_EID}" 2>/dev/null || :)
         [[ -z "${_CTID}" ]] && {
             writeJSONResponseErr "result=>4105" "message=>Container not found"
             die -q
@@ -191,7 +191,7 @@ function preAddCallback(){
 
         fi
     fi
-        
+
 	isFunction "getAppUserInfo" && { log "Call getAppUserInfo"; "getAppUserInfo" "${_USER_NAME}"; } || {  writeJSONResponseErr "result=>4048" "message=>Can not get user info!"; die -q; };
 	[ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
 }

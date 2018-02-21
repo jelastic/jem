@@ -18,6 +18,7 @@
 APACHEPHPDEPLOYLIB_VERSION="0.1";
 
 HTTPD_ALIASES_FILE="/etc/httpd/conf.d/aliases.conf";
+DEFAULT_CONTEXT="ROOT";
 include os;
 $PROGRAM 'sed';
 
@@ -26,7 +27,9 @@ function setContext(){
     
    # Alias /error/ "/var/www/error/"
    $SED -i "/Alias\s\{1,\}\/${context}\s\{1,\}.*/d" $HTTPD_ALIASES_FILE;
-   echo "Alias /${context} \"${WEBROOT}/${context}\"" >> $HTTPD_ALIASES_FILE;
+   if [[ "$context" != "$DEFAULT_CONTEXT" ]]; then
+     echo "Alias /${context} \"${WEBROOT}/${context}\"" >> $HTTPD_ALIASES_FILE;
+   fi
    reloadService ${SERVICE} > /dev/null 2>&1;
 }
 
@@ -36,7 +39,9 @@ function delContext(){
    # Alias /error/ "/var/www/error/"
    
    WEBROOT1=$( $SED "s/\//\\\\\\//g" <<< ${WEBROOT} );
-   $SED -i "/^Alias\s\{0,\}\/${context}\s\{0,\}\"${WEBROOT1}\/${context}\"/d"  $HTTPD_ALIASES_FILE;
+   if [[ "$context" != "$DEFAULT_CONTEXT" ]]; then
+     $SED -i "/^Alias\s\{0,\}\/${context}\s\{0,\}\"${WEBROOT1}\/${context}\"/d"  $HTTPD_ALIASES_FILE;
+   fi
    reloadService ${SERVICE} > /dev/null 2>&1;
 }
 
@@ -45,6 +50,8 @@ function rename(){
     local newContext=$1;
     local oldContext=$2;
     WEBROOT1=$( $SED "s/\//\\\\\\//g" <<< ${WEBROOT} );
-    $SED -i "s/^Alias\s\{0,\}\/${oldContext}\s\{0,\}\"${WEBROOT1}\/${oldContext}\"/Alias \/${newContext} \"${WEBROOT1}\/${newContext}\"/" $HTTPD_ALIASES_FILE;
+    if [[ "$oldContext" != "$DEFAULT_CONTEXT" ]]; then
+      $SED -i "s/^Alias\s\{0,\}\/${oldContext}\s\{0,\}\"${WEBROOT1}\/${oldContext}\"/Alias \/${newContext} \"${WEBROOT1}\/${newContext}\"/" $HTTPD_ALIASES_FILE;
+    fi
     reloadService ${SERVICE} > /dev/null 2>&1;
 }
