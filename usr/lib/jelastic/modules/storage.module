@@ -169,7 +169,7 @@ function processnfs() {
         $VZCTL mount $CTID > /dev/null 2>&1
     }
 
-    [[ ! -e "/vz/root/${_CTID}${MOUNTPROG}" ]] && dosetupUtils ${_CTID}
+    $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" || dosetupUtils ${_CTID}
 
     preparePath "${_DESTINATION}" "${_CTID}"
     local mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
@@ -316,7 +316,7 @@ function doMount() {
     }
 
     local mtype sourceIP sourceMount
-    [ -f "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" ] || touch "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" 2>/dev/null
+    [ -f "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" ] || { touch "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" 2>/dev/null ; dosetupUtils ${_CTID}; }
 
     # parse connection string
     _SOURCE="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< "$_SOURCE")"
