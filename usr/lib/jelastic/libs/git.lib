@@ -140,12 +140,22 @@ function getLastRemoteCommit(){
     fi
 
     if [ "x${LOGIN}" == "xgit" ]; then
-        last_remote_commit=$(git ls-remote git@$URL $BRANCH 2>/dev/null | $AWK '{print $1}');
+        last_remote=$(git ls-remote git@$URL $BRANCH 2>&1);
+        result=$?;
     else
-        last_remote_commit=$(git ls-remote $preparedUrl $BRANCH | $AWK '{print $1}');
+        last_remote=$(git ls-remote $preparedUrl $BRANCH 2>&1 );
+        result=$?;
     fi
-        [ -z $last_remote_commit ] && last_remote_commit="00000000000";
-        echo $last_remote_commit;
+
+    if [ $result -eq 0 ] ;then
+        last_remote_commit=$(echo $last_remote | $AWK '{print $1}' );
+    else
+        echo $last_remote | sed -re "s/${AUTH}//" >> "$VCS_UPDATE_LOG"
+        last_remote_commit="00000000000";
+    fi
+
+    [ -z $last_remote_commit ] && last_remote_commit="00000000000";
+    echo $last_remote_commit;
 }
 
 function vcsChangeUrl(){
