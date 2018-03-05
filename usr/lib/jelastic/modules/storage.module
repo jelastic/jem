@@ -51,6 +51,8 @@ FORCE_MOUNT=$FALSE
 MOUNTPROG="/usr/sbin/automount"
 MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-utils.tar.gz"
 _UI_RESULT=0
+USERID=0
+GROUPID=0
 
 EXEC="/bin/bash -c "
 
@@ -62,7 +64,7 @@ function onModLoadCallback() {
     log "Preload callback";
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -o c:,s:,d:,l:,m: -l ctid:,source:,destination:,ip:,movedata:,saveconfig::,force:: -- "$@" 2>/dev/null`;
+    local temp=`getopt -o c:,s:,d:,u:,g:,l:,m: -l ctid:,source:,destination:,ip:,uid:,gid:,movedata:,saveconfig::,force:: -- "$@" 2>/dev/null`;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
@@ -105,6 +107,16 @@ function onModLoadCallback() {
             -m | --movedata)
                 shift;
                 _MOVEDATA=$1;
+                shift;
+                ;;
+            -u | --uid)
+                shift;
+                USERID=$1;
+                shift;
+                ;;
+            -g | --gid)
+                shift;
+                GROUPID=$1;
                 shift;
                 ;;
             --)
@@ -172,7 +184,7 @@ function processnfs() {
     $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" || dosetupUtils ${_CTID}
 
     preparePath "${_DESTINATION}" "${_CTID}"
-    local mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
+    local mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
 
     local cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
 
