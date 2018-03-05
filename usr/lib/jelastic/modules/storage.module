@@ -168,6 +168,11 @@ function preparePath() {
     return 0;
 }
 
+function migrateConfig() {
+    $SED -nre '/nfs(3|4)?/p' "/vz/root/${CTID}/etc/fstab" | awk '{print $2" -fstype=nfs,nfsvers=3,nolock,udp,soft,timeo=120,retrans=20,uid=1,gid=1,_netdev,rw "$1}' >> "${MOUNTS_STORAGE}"
+    $SED -i -re '/nfs(3|4)?/d' "/vz/root/${CTID}/etc/fstab"
+}
+
 function processnfs() {
     local sourceIP=${1:?"Source address required"}
     local sourceMount=${2:?"Source share name required"}
@@ -182,6 +187,7 @@ function processnfs() {
     }
 
     $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" || dosetupUtils ${_CTID}
+    $GREP -qP 'nfs(3|4)?' "/vz/root/${CTID}/etc/fstab" && migrateConfig ${_CTID}
 
     preparePath "${_DESTINATION}" "${_CTID}"
     local mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
