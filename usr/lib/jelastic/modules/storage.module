@@ -301,12 +301,20 @@ function dosetupUtils() {
         vzexecRun "rc-update add netmount default"
         return 0
     fi
-    installCmd=$(installPackageCmd $OS install autofs nfs-utils)
+
+    if [ "x$OS" == "xubuntu" ] ; then
+        installCmd=$(installPackageCmd $OS install autofs nfs-common)
+    else
+        installCmd=$(installPackageCmd $OS install autofs nfs-utils)
+    fi
     vzexecRun "$installCmd"
 
-    if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
-        vzexecRun "chkconfig autofs on"
+    if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xsuse" ] ; then
+        if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
+            vzexecRun "chkconfig autofs on"
+        fi
     fi
+
     if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "7" ] ; then
         $SED -i -re '/automount/d' "/vz/root/${CTID}/etc/nsswitch.conf"
         echo -e "\nautomount:  files" >> "/vz/root/${CTID}/etc/nsswitch.conf"
