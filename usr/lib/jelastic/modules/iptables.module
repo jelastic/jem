@@ -62,11 +62,11 @@ function __iptablesManip() {
             -A)
                 items=("${items[@]#$ip}");
                 items=("${items[@]}" "$ip")
-                if ! "${IPTABLES}" -L INPUT  -n | $GREP -q "${ip}"; then ${IPTABLES} ${mode} INPUT -s ${ip} -j ACCEPT;fi
+                if ! "${IPTABLES}" -L INPUT  -n | $GREP -q "${ip}"; then ${IPTABLES} ${mode} INPUT -s ${ip} -j ACCEPT > /dev/null 2>&1;fi
                 ;;
             -D)
                 items=(${items[@]/"$ip"});
-                $IPTABLES $mode INPUT -s $ip -j ACCEPT;
+                $IPTABLES $mode INPUT -s $ip -j ACCEPT > /dev/null 2>&1;
                 ;;
         esac;
 #	$IPTABLES $mode INPUT -s $ip -j ACCEPT;
@@ -91,7 +91,7 @@ function describeAddParameters() {
 function describeAddOptions() {
     echo "-l: range of IPs to act with";
 }
-    
+
 function describeRemove() {
     echo "Remove ip from allowed list";
 }
