@@ -205,7 +205,7 @@ function processnfs() {
     msg=""
     res=0
     if [[ $running -eq 0 ]] ; then
-        mntcmd="systemctl restart autofs"
+        mntcmd="systemctl restart autofs || service autofs restart"
         vzexecRun "${mntcmd}"
     else
         log "unmounting"
@@ -302,7 +302,7 @@ function dosetupUtils() {
         return 0
     fi
 
-    if [ "x$OS" == "xubuntu" ] ; then
+    if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
         installCmd=$(installPackageCmd $OS install autofs nfs-common)
     else
         installCmd=$(installPackageCmd $OS install autofs nfs-utils)
