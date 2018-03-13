@@ -169,7 +169,7 @@ function preparePath() {
 }
 
 function migrateConfig() {
-    $SED -nre '/nfs(3|4)?/p' "/vz/root/${CTID}/etc/fstab" | awk '{print $2" -fstype=nfs,nfsvers=3,nolock,udp,soft,timeo=120,retrans=20,uid=1,gid=1,_netdev,rw "$1}' >> "${MOUNTS_STORAGE}"
+    $SED -nre '/nfs(3|4)?/p' "/vz/root/${CTID}/etc/fstab" | awk "{print \$2\" ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} \"\$1}" >> "${MOUNTS_STORAGE}"
     $SED -i -re '/nfs(3|4)?/d' "/vz/root/${CTID}/etc/fstab"
 }
 
@@ -310,7 +310,7 @@ function dosetupUtils() {
     vzexecRun "$installCmd"
 
     if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "7" ] ; then
-        $SED -i -re 's/PROG=automount/PROG=automount\n_SYSTEMCTL_SKIP_REDIRECT="true"/' "/vz/root/${CTID}/etc/init.d/autofs"
+        [ -e "/vz/root/${CTID}/etc/init.d/autofs" ] && $SED -i -re 's/PROG=automount/PROG=automount\n_SYSTEMCTL_SKIP_REDIRECT="true"/' "/vz/root/${CTID}/etc/init.d/autofs"
     fi
 
     if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xsuse" ] ; then
