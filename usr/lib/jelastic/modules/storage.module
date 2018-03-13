@@ -309,6 +309,10 @@ function dosetupUtils() {
     fi
     vzexecRun "$installCmd"
 
+    if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "7" ] ; then
+        $SED -i -re 's/PROG=automount/PROG=automount\n_SYSTEMCTL_SKIP_REDIRECT="true"/' "/vz/root/${CTID}/etc/init.d/autofs"
+    fi
+
     if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xsuse" ] ; then
         if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
             vzexecRun "chkconfig autofs on"
