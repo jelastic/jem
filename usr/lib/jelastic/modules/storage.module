@@ -49,6 +49,7 @@ FORCE_UMOUNT=$TRUE
 FORCE_MOUNT=$FALSE
 
 MOUNTPROG="/usr/sbin/automount"
+MOUNTPROG_APK="/sbin/mount.nfs"
 MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-utils.tar.gz"
 _UI_RESULT=0
 USERID=0
@@ -168,6 +169,16 @@ function preparePath() {
     return 0;
 }
 
+function remountPath() {
+    local share=${1}
+    local remountCmd="umount -l ${share} ; mount ${share}"
+    out=$($EXEC "$remountCmd" 2>&1)
+    if [[ -z "${out}" ]] ; then
+       log "$out"
+    fi
+    return $?
+}
+
 function migrateConfig() {
     $SED -nre '/nfs(3|4)?/p' "/vz/root/${CTID}/etc/fstab" | awk "{print \$2\" ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} \"\$1}" >> "${MOUNTS_STORAGE}"
     $SED -i -re '/nfs(3|4)?/d' "/vz/root/${CTID}/etc/fstab"
@@ -186,13 +197,34 @@ function processnfs() {
         $VZCTL mount $CTID > /dev/null 2>&1
     }
 
-    $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" || dosetupUtils ${_CTID}
-    $GREP -qP 'nfs(3|4)?' "/vz/root/${CTID}/etc/fstab" && migrateConfig ${_CTID}
+    local issue_file="/vz/root/${CTID}/etc/issue";
+    local release_files="/vz/root/${CTID}/etc/*-release";
+    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+    OS=$(detectOS "$issue_string")
+    OS_ver=$(getOSVersion "$issue_string")
+    OS_ver=${OS_ver%%.*}
+
+    if [[ "x$OS" == "xalpine" ]] ; then
+        log "OS is ALPINE"
+        [[ ! -e "/vz/root/${_CTID}${MOUNTPROG_APK}" ]] && dosetupUtils ${_CTID}
+
+        [[ ! -z "${CTID}" ]] && {
+            MOUNTS_STORAGE="/vz/root/${CTID}/etc/fstab"
+        }
+
+        _DEFAULT_NFS_MOUNT_OPTS="$($SED -re 's/-fstype=nfs,//g' <<< $_DEFAULT_NFS_MOUNT_OPTS)"
+        mntEntry="${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")\t${destinationEsc}\tnfs\t${_DEFAULT_NFS_MOUNT_OPTS}\t0\t0"
+        cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE};"
+
+    else
+        $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" || dosetupUtils ${_CTID}
+        $GREP -qP 'nfs(3|4)?' "/vz/root/${CTID}/etc/fstab" && migrateConfig ${_CTID}
+
+        mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
+        cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
+    fi
 
     preparePath "${_DESTINATION}" "${_CTID}"
-    local mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
-
-    local cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
 
     if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
         log "registering ${sourceIP}:${sourceMount} in ${_CTID}"
@@ -204,6 +236,35 @@ function processnfs() {
 
     msg=""
     res=0
+
+    if [[ "x$OS" == "xalpine" ]] ; then
+        if [[ $running -eq 0 ]] ; then
+            mntcmd="mount \"$($SED -re 's/("\*|\$|\?|\|\^|`|'\'')/\\\1/g' <<< "${_DESTINATION}")\""
+            vzexecRun "${mntcmd}"
+            res="$(vzexecGetLastErrCode)"
+            msg="$(vzexecGetLastStdErr)"
+            if [[ $res -gt "0" ]] && [[ $FORCE_MOUNT -eq $FALSE ]] ; then
+                local mntEntryCheck="${sourceIP}:$($SED -re 's/(\$|\[|\]|\*|\(|\)|\?|\||\^)/\\\1/g' -e 's/\\\\\$/$/g' <<< ${sourceMount})/? on $($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\||\^|`)/\\\1/g' <<< ${destinationEsc})"
+                vzexecRun "mount | $GREP -P \"$mntEntryCheck\""
+                res=$(vzexecGetLastErrCode)
+                if [[ $res -ne $TRUE ]] ; then
+                    #remove the /etc/fstab entry
+                    cmdUnregisterMount="/$(echo -e $mntEntry | $SED -r -e 's/\t/\\\s+/g;' -e 's/\//\\\//g' -e 's/\./\\./g' -e 's/(\[|\]|\*|\(|\)|\$|\?|\||\^)/\\\1/g')/d"
+                    if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
+                        out=$($SED -i -re "$cmdUnregisterMount" ${MOUNTS_STORAGE} 2>&1)
+                    fi
+                    log $out
+                    msg="${msg}. Server IP is: $(host ${sourceIP}), RPC connection: $(timeout 1 bash -c "cat < /dev/null > /dev/tcp/${sourceIP}/111" 2>/dev/null; echo $?)"
+                    res=4111
+                else
+                    res=0
+                fi
+            fi
+        fi
+        [[ -z "$msg" ]] && echo "successfuly mounted" || echo $msg
+        [[ "$res" -gt 0 ]] && return 1;
+    fi
+
     if [[ $running -eq 0 ]] ; then
         mntcmd="systemctl restart autofs || service autofs restart"
         vzexecRun "${mntcmd}"
@@ -280,6 +341,25 @@ function processlocal() {
 }
 
 function doRemount() {
+    local issue_file="/vz/root/${CTID}/etc/issue";
+    local release_files="/vz/root/${CTID}/etc/*-release";
+    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+    OS=$(detectOS "$issue_string")
+    OS_ver=$(getOSVersion "$issue_string")
+    OS_ver=${OS_ver%%.*}
+
+    if [[ "x$OS" == "xalpine" ]] ; then
+        log "OS is ALPINE"
+        local shares=(${_DESTINATION})
+        [[ -z ${_DESTINATION} ]] && {
+            [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="/vz/root/${CTID}/etc/fstab"
+            shares=($($SED -nre "/\snfs(3|4)?\s/{s/\s*(\S+)\s*(\S+).*/\2/;p}" "$MOUNTS_STORAGE" ))
+        }
+        for share in ${shares[*]} ; do
+            remountPath "$share"
+        done
+        return 0
+    fi
     mntcmd="systemctl restart autofs"
     vzexecRun "${mntcmd}"
     return 0;
@@ -296,7 +376,7 @@ function dosetupUtils() {
 
     #JE-25896
     if [[ "x$OS" == "xalpine" ]] ; then
-        installCmd=$(installPackageCmd $OS install nfs-utils autofs)
+        installCmd=$(installPackageCmd $OS install nfs-utils)
         vzexecRun "$installCmd"
         vzexecRun "rc-update add netmount default"
         return 0
@@ -384,6 +464,13 @@ function doUmount() {
 
     isContainerRunning ${CTID} ; running=$?
 
+    local issue_file="/vz/root/${CTID}/etc/issue";
+    local release_files="/vz/root/${CTID}/etc/*-release";
+    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+    OS=$(detectOS "$issue_string")
+    OS_ver=$(getOSVersion "$issue_string")
+    OS_ver=${OS_ver%%.*}
+
     for i in $(seq 0 $((${#UNKNOWN_ARG[@]}-1))); do
         if [ ! -z "${UNKNOWN_ARG[$i]}" ] ; then
             [ ${#shares[*]} -gt 0 ] && shares=("${shares[@]}" "${UNKNOWN_ARG[$i]}") || shares=("${UNKNOWN_ARG[$i]}")
@@ -392,6 +479,11 @@ function doUmount() {
 
     if [[ ! -z ${_DESTINATION} ]] ; then
         shares+=("${_DESTINATION}")
+    fi
+
+    if [[ "x$OS" == "xalpine" ]] ; then
+        log "OS is ALPINE"
+        [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="/vz/root/${CTID}/etc/fstab"
     fi
 
     OIFS=$IFS; IFS=$'\n'
@@ -418,7 +510,11 @@ function doUmount() {
 
         if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
             if [ $rescode -eq 0 ] ; then
-                local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+-fstype=nfs.*";
+                if [[ "x$OS" == "xalpine" ]] ; then
+                    local dpath="\s+$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+(nfs|none)\s+";
+                else
+                    local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+-fstype=nfs.*";
+                fi
                 out=$($SED -i -re /${dpath}/d ${MOUNTS_STORAGE} 2>&1)
                 [[ ! -z "${out}" ]] && log "${out}";
                 retfunc="writeJSONResponseOut result=>0"
