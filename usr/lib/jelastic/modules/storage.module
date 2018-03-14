@@ -184,6 +184,14 @@ function migrateConfig() {
     $SED -i -re '/nfs(3|4)?/d' "/vz/root/${CTID}/etc/fstab"
 }
 
+function checkMount() {
+    #skip check if CTID is empty
+    [[ -z "${CTID}" ]] && return 0
+    localCIPs="$($SED -re 's/\./\\\./g' -e 's/\s+/\|/g' <<< $(getTargetIPs $CTID))"
+    vzexecRun "showmount -e $1 2>/dev/null | grep $2 | grep -qP \"$localCIPs\""
+    return $(vzexecGetLastErrCode)
+}
+
 function processnfs() {
     local sourceIP=${1:?"Source address required"}
     local sourceMount=${2:?"Source share name required"}
@@ -192,10 +200,10 @@ function processnfs() {
     local running
 
     isContainerRunning ${CTID} ; running=$?
-    [[ $running -ne 0 ]] && {
+    if [[ $running -ne 0 ]] ; then
         log "Container $CTID is not running. Mounting"
         $VZCTL mount $CTID > /dev/null 2>&1
-    }
+    fi
 
     local issue_file="/vz/root/${CTID}/etc/issue";
     local release_files="/vz/root/${CTID}/etc/*-release";
@@ -222,6 +230,13 @@ function processnfs() {
 
         mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
         cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
+    fi
+
+    if [[ $running -eq 0 ]] ; then
+        if ! checkMount $sourceIP $sourceMountUnEsc ; then
+            echo "Destination NFS server is not reachable"
+            return 1
+        fi
     fi
 
     preparePath "${_DESTINATION}" "${_CTID}"
