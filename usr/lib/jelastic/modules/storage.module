@@ -478,6 +478,7 @@ function doUmount() {
     local -a shares
 
     isContainerRunning ${CTID} ; running=$?
+    [[ $running -ne 0 ]] && $VZCTL mount $CTID > /dev/null 2>&1
 
     local issue_file="/vz/root/${CTID}/etc/issue";
     local release_files="/vz/root/${CTID}/etc/*-release";
