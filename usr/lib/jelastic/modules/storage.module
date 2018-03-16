@@ -441,6 +441,7 @@ function doMount() {
     }
 
     local mtype sourceIP sourceMount
+    [[ $running -ne 0 ]] && $VZCTL mount $CTID > /dev/null 2>&1
     [ -f "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" ] || { touch "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" 2>/dev/null ; dosetupUtils ${_CTID}; }
 
     # parse connection string
