@@ -426,6 +426,7 @@ function doEnable() {
         $SED -i -re '/^$/d' ${META_FILE}
     fi
     chkconfig --level 345 iptables on 2>&1 | $GRAB_OUTPUT
+    chkconfig --level 345 ip6tables on 2>&1 | $GRAB_OUTPUT
     writeJSONResponseOut "result=>0" "message=>Firewall has been enabled"
     return 0
 }
