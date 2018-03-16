@@ -227,48 +227,51 @@ function startJemThreadQueueManager(){
         shift;
         done
     elif [ "x$action" == "xauth" ] ; then
-	if [ "x$1" == "xadd" -o "x$1" == "xremove" ]; then
-	    jempidfile="/var/run/jem.5283f514f.pid";
-	fi
-    elif [ "x$action" == "xstorage" ] ; then
-	if [ "x$1" == "xmount" -o "x$1" == "xumount" ]; then
-	    jempidfile="/var/run/jem.86a06296.pid";
-	fi
+        if [ "x$1" == "xadd" -o "x$1" == "xremove" ]; then
+            jempidfile="/var/run/jem.5283f514f.pid";
+        fi
+    elif [ "x$action" == "xstorage" -a "x$1" != "xmount" ] ; then
+#        if [ "x$1" == "xmount" -o "x$1" == "xumount" ]; then
+#         if [ "x$1" == "xmount" -o "x$1" == "xumount" ]; then
+            jempidfile="/var/run/jem.86a06296$$.pid";
+#        fi
     elif [ "x$action" == "xfilemanager" ] ; then
         jempidfile="/var/run/jem.dc6cbef1.pid"
     elif [ "x$action" == "xinstall" ] ; then
         jempidfile="/var/run/jem.fd9de7ac314ec$$.pid"
     elif [ "x$action" == "xisolation" ] ; then
         jempidfile="/var/run/jem.23b9ec1f564e4.pid"
-    elif [ "x$action" == "xdocker" -o "x$action" == "xcommand" ] ; then
-	if [ "x$1" == "xaftercreate" ] ; then
-	    jempidfile="/var/run/jem.f55b442$$.pid";
-	else
-	while [ "$1" != "" ]
-        do
-        case "$1" in
-        --ctid)
-            TQctid=$2;
-            break
-        ;;
-        'getpcstemplate')
-            setgetTPL=$1;
-        ;;
-        --name)
-            nameTPL=$2;
-            ;;
-        --version)
-            versionTPL=$2;
-            ;;
-        esac
-        shift;
-        done
-        fi
+    elif [ "x$action" == "xdocker" -o "x$action" == "xcommand" -o "x$action" == "xstorage" ] ; then
+            while [ "$1" != "" ]
+            do
+                case "$1" in
+                    --ctid)
+                        TQctid=$2;
+                        break
+                        ;;
+                    'getpcstemplate')
+                        setgetTPL=$1;
+                        ;;
+                    --name)
+                        nameTPL=$2;
+                        ;;
+                    --version)
+                        versionTPL=$2;
+                        ;;
+                esac
+                shift;
+            done
+
         [ -z "$TQctid" ]  && TQctid="${$}$action";
         [ ! -z "$setgetTPL" ] && {
             [ ! -z "$nameTPL" -o ! -z "$versionTPL" ] && TQctid=$(md5sum <<< "${nameTPL}${versionTPL}X" | awk '{print $1}' )
         }
-        jempidfile="/var/run/jem.${TQctid}.pid";
+
+        if [ "x$1" == "xaftercreate" -o "x$1" == "xmount" ] ; then
+            jempidfile="/var/run/jem.f55b442${TQctid}.pid";
+        else
+            jempidfile="/var/run/jem.${TQctid}.pid";
+        fi
     fi
 
     [ -f $jempidfile ] && {
@@ -354,7 +357,7 @@ function doAction() {
                     result=$?;
                 fi
             fi
-            [ -w "$resultFile" ] && { 
+            [ -w "$resultFile" ] && {
         	echo $result >$resultFile
     	    }
             exit $result
