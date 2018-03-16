@@ -231,10 +231,7 @@ function startJemThreadQueueManager(){
             jempidfile="/var/run/jem.5283f514f.pid";
         fi
     elif [ "x$action" == "xstorage" -a "x$1" != "xmount" ] ; then
-#        if [ "x$1" == "xmount" -o "x$1" == "xumount" ]; then
-#         if [ "x$1" == "xmount" -o "x$1" == "xumount" ]; then
             jempidfile="/var/run/jem.86a06296$$.pid";
-#        fi
     elif [ "x$action" == "xfilemanager" ] ; then
         jempidfile="/var/run/jem.dc6cbef1.pid"
     elif [ "x$action" == "xinstall" ] ; then
