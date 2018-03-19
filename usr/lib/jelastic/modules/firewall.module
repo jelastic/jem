@@ -44,11 +44,6 @@ JELASTIC_RULES_DIR='/etc/sysconfig'
 JELASTIC_4RULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic'
 JELASTIC_6RULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic'
 
-# 7755 - file replication (lsync?)
-# 7979 - for export/import
-# 4000,5000,8743 - HA
-DMZ_PORTS="4000,5000,7755,7979,8743";
-
 declare PublicIP;
 declare FTPPort;
 declare RSLV_ADDR;
@@ -263,9 +258,6 @@ function doStart() {
     # for internal services:
     intips=($(getLANIPs));
     for ip in ${intips[@]} ; do
-        $IPTABLES -A INPUT -p tcp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
-        $IPTABLES -A INPUT -p udp -m multiport --dports ${DMZ_PORTS} -d ${ip} -j ACCEPT;
-
         for nfsip in ${NFSIPS[@]} ; do
             if [[ "${#NFSPort}" -gt 0 ]] ; then
                 $IPTABLES -A INPUT -p tcp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT;
