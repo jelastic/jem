@@ -20,7 +20,7 @@ EXCEPTORLIB_VERSION="0.1";
 inherit fsutils;
 include output;
 
-$PROGRAM 'curl';   
+$PROGRAM 'curl';
 $PROGRAM 'gzip';
 $PROGRAM 'grep';
 $PROGRAM 'file';
@@ -32,8 +32,8 @@ function ensureDiskSpaceIsOK() {
     local disk_space_usage_critical_state=97;
     local disk_inode_usage_critical_state=97;
     local fstype="$(getFSType '/')";
-    local disk_space_usage_percentage=$(df -h 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1);
-    local disk_inode_usage_percentage=$(df -i 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1);
+    local disk_space_usage_percentage=$(df -l -h 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1);
+    local disk_inode_usage_percentage=$(df -l -i 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1);
     [ ${disk_space_usage_percentage} -lt ${disk_space_usage_critical_state} ] || { writeJSONResponseErr "result=>4075" "message=>No free diskspace"; die -q; }
 
     [[ "${fstype}" == "reiserfs" ]] && return 0;
@@ -45,11 +45,11 @@ function ensureFileCanBeUncompressed(){
     VERBOSE=1;
     local fileToUncompress=$1;
     local uncompressed_zip_size=0;
-    [ -z ${resource_data_dize} ] && { resource_data_dize=0; freebytesleft=$(( 1024 *  $(df  2>/dev/null | $GREP "/$" | $AWK '{ print $4 }' | head -n 1 2>/dev/null)-1024*1024)); }
+    [ -z ${resource_data_dize} ] && { resource_data_dize=0; freebytesleft=$(( 1024 *  $(df -l 2>/dev/null | $GREP "/$" | $AWK '{ print $4 }' | head -n 1 2>/dev/null)-1024*1024)); }
     local uncompressed_size;
 
     mimeType=$($FILE --mime-type "${fileToUncompress}" | $AWK '{print $2}')
-    
+
     case ${mimeType} in
         "application/x-bzip2")
             uncompressed_size=$(( $($TAR -tvjf "$1" | $AWK '{i+=$3} END{print i}')+1048576))
@@ -77,7 +77,7 @@ function ensureFileCanBeUncompressed(){
 function ensureFileCanBeDownloaded(){
     local resource_url=$1;
     resource_data_dize=$($CURL -s --head $resource_url | $GREP "Content-Length" | $AWK -F ":" '{ print $2 }'| $SED 's/[^0-9]//g');
-    freebytesleft=$(( 1024 *  $(df  | $GREP "/$" | $AWK '{ print $4 }' | head -n 1)-1024*1024));
+    freebytesleft=$(( 1024 *  $(df -l | $GREP "/$" | $AWK '{ print $4 }' | head -n 1)-1024*1024));
     [ -z ${resource_data_dize} ] && return 0;
     [ ${resource_data_dize} -lt  ${freebytesleft} ] || { writeJSONResponseErr "result=>4075" "message=>No free diskspace"; die -q; }
     return 0;
