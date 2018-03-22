@@ -270,7 +270,7 @@ function doStart() {
         done
     done;
 
-    $IPTABLES -A INPUT -m state --state NEW -s 10.0.0.0/27 -j ACCEPT;
+    $IPTABLES -A INPUT -i tap -j ACCEPT;
 
     redirPorts=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts; } || _defaultComputeNodeRedirPorts));
 
