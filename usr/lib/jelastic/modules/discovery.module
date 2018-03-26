@@ -91,7 +91,6 @@ function doApply(){
         chmod "${tplPermissions:-644}" "/${tpl}" >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
         [ -f "/${tpl}" ] && head -n 1 /${tpl} | ${GREP} -q "^#rights=" && $SED -ri '1,1'd /${tpl} >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
     done
-    doPostDiscovery;
     if [ $localResult == 0 ]
     then
         writeJSONResponseOut "result=>0" "message=>Ok";
