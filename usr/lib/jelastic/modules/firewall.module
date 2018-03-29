@@ -488,12 +488,14 @@ function doFWStop() {
 }
 
 function _isFWEnabled() {
-    local status=$($SED -rne '/FIREWALL_ENABLED/{s/FIREWALL_ENABLED=([0-1]){1}/\1/;p}' ${META_FILE});
-    local cartridge_config="/opt/repo/jelastic/jelastic.conf";
-    [ -f "$cartridge_config"  ] && status=$($GREP Firewall_Enabled "$cartridge_config" | $AWK -F "=" '{ print $2 }');
-    [ -z "${status}" ] && status="1";
-    [[ "${status}" -eq "1" ]] && return 0;
-    return 1;
+    local status=$($SED -rne '/FIREWALL_ENABLED/{s/FIREWALL_ENABLED=([0-1]){1}/\1/;p}' ${META_FILE})
+    local cartridge_config="/opt/repo/jelastic/jelastic.conf"
+    if [ -f "$cartridge_config"  ] ; then 
+	status=$($GREP Firewall_Enabled "$cartridge_config" | $AWK -F "=" '{ print $2 }')
+        [ -z "${status}" ] && status="1"
+    fi
+    [[ "${status}" -eq "1" ]] && return 0
+    return 1
 }
 
 function doisEnabled() {
