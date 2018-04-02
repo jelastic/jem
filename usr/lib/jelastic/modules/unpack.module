@@ -119,7 +119,7 @@ function doArchive() {
     stopService ${SERVICE} > /dev/null 2>&1;
 
     [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" ] && [[ -d /var/www/webroot/ROOT/ && ! -h /var/www/webroot/ROOT ]] && rm -rf /var/www/webroot/ROOT/;
-    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && [[ -d /opt/repo/ROOT/ && ! -h /opt/repo/ROOT ]] && rm -rf /opt/repo/ROOT/;
+    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && [[ -d /opt/repo/ROOT/ && ! -h /opt/repo/ROOT ]] && rm -rf /opt/repo/ROOT/*;
 
     ${ARC_UTILITY} ${ARCH_OPT} "$package_name" ${ARCH_DEST_OPT} "$DESTINATION" >> $ACTIONS_LOG 2>&1;
     result=$?;
