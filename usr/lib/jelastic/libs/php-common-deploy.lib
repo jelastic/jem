@@ -112,17 +112,6 @@ function shiftContentFromSubdirectory(){
 }
 
 
-function clearCache(){
-    if [[ -d "$DOWNLOADS" ]]
-    then
-       shopt -s dotglob;
-       set -f
-       rm -Rf ${DOWNLOADS}/*;
-       set +f
-       shopt -u dotglob;
-    fi
-}
-
 function updateOwnership(){
     shopt -s dotglob;
     APPWEBROOT=$1;
@@ -142,7 +131,6 @@ function deploy(){
     local package_url=$1;
     local context=$2;
     local ext=$3;
-    [ ! -d "$DOWNLOADS" ] && { mkdir -p "$DOWNLOADS"; }
     clearCache;
     prepareContext ${context} ;
 

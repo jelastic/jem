@@ -60,17 +60,6 @@ function verifyUnpackedContent(){
     done
 }
 
-function clearCache(){
-        if [[ -d "$DOWNLOADS" ]]
-        then
-                shopt -s dotglob;
-                set -f
-                rm -Rf ${DOWNLOADS}/*;
-                set +f
-                shopt -u dotglob;
-        fi
-}
-
 function deploy(){
 
     if [[ -z "$package_url" || -z "$context" ]]
