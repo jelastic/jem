@@ -150,7 +150,11 @@ function doDeploy(){
         writeJSONResponseErr "result=>$result" "message=>Deploy failed" ; return 1;
     };
 
-    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && { service cartridge build ; service cartridge deploy; }
+    if [ "x${COMPUTE_TYPE}" == "xcartridge" ]; then
+        [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+        $SUDO service cartridge build ; 
+        $SUDO service cartridge deploy;
+    fi
 
     applyHook ${context} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }
 
