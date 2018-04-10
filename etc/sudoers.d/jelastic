@@ -31,8 +31,8 @@ Cmnd_Alias PHP_FPM_SERVICE = /sbin/service php-fpm start, /sbin/service php-fpm 
 Cmnd_Alias GLASSFISH_DOMAIN1 = /etc/init.d/glassfish-domain1 stop, /etc/init.d/glassfish-domain1 start, /etc/init.d/glassfish-domain1 restart, /etc/init.d/glassfish-domain1 condrestart, /etc/init.d/glassfish-domain1 status
 Cmnd_Alias GLASSFISH_DOMAIN1_SERVICE = /sbin/service glassfish-domain1 stop, /sbin/service glassfish-domain1 start, /sbin/service glassfish-domain1 restart, /sbin/service glassfish-domain1 condrestart, /sbin/service glassfish-domain1 status
 
-Cmnd_Alias CARTRIDGE = /etc/init.d/cartridge stop, /etc/init.d/cartridge start, /etc/init.d/cartridge restart, /etc/init.d/cartridge condrestart, /etc/init.d/cartridge status, /usr/bin/npm, /usr/bin/pip
-Cmnd_Alias CARTRIDGE_SERVICE = /sbin/service cartridge stop, /sbin/service cartridge start, /sbin/service cartridge restart, /sbin/service cartridge condrestart, /sbin/service cartridge status
+Cmnd_Alias CARTRIDGE = /etc/init.d/cartridge stop, /etc/init.d/cartridge start, /etc/init.d/cartridge restart, /etc/init.d/cartridge condrestart, /etc/init.d/cartridge status, /etc/init.d/cartridge build, /etc/init.d/cartridge deploy, /usr/bin/npm, /usr/bin/pip
+Cmnd_Alias CARTRIDGE_SERVICE = /sbin/service cartridge stop, /sbin/service cartridge start, /sbin/service cartridge restart, /sbin/service cartridge condrestart, /sbin/service cartridge status, /sbin/service cartridge build, /sbin/service cartridge deploy
 
 Cmnd_Alias CUSTOM_IMPR = /usr/bin/passwd jelastic-ftp, /usr/bin/jem firewall fwstart, /usr/bin/jem balancer rebuildconfig, /usr/bin/jem firewall list *, /usr/bin/chmod * /var/log*, /usr/bin/chmod * /var/run*, /usr/bin/chmod * /usr/lib/jelastic*, /usr/bin/chmod * /usr/bin/jem
 
