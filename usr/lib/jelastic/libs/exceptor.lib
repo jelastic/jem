@@ -92,6 +92,7 @@ function getPackageName() {
         package_path=$(dirname "${package_url:7}")
         [ -f "${package_path}/${package_name}" ] || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
     else
+	[ ! -d "$DOWNLOADS" ] && { mkdir -p "$DOWNLOADS"; }
         ensureFileCanBeDownloaded $package_url;
         $WGET --no-check-certificate --content-disposition --directory-prefix="$DOWNLOADS" $package_url >> $ACTIONS_LOG 2>&1 || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
         package_name="$(ls ${DOWNLOADS})";
@@ -105,3 +106,15 @@ function getPackageName() {
         }
     fi
 }
+
+function clearCache(){
+    if [[ -d "$DOWNLOADS" ]]
+    then
+       shopt -s dotglob;
+       set -f
+       rm -Rf ${DOWNLOADS}/*;
+       set +f
+       shopt -u dotglob;
+    fi
+}
+
