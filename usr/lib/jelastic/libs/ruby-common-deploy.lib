@@ -37,7 +37,10 @@ function setContext(){
 function prepareContext(){
     local context=$1;
     if ! $GREP -q ${context} <<< "development production test" ; then
-            writeJSONResponseErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
+        writeJSONResponseErr "result=>4079" "message=>Invalid context name specified" ; exit 4079;
+    fi
+    if [[ "$UID" != '0' ]]; then
+        sudo chown ${DATA_OWNER} /var/lib/jelastic/env
     fi
     echo "${context}" > /var/lib/jelastic/env;
     bundle_type=$context;
