@@ -92,7 +92,7 @@ function getPackageName() {
         package_path=$(dirname "${package_url:7}")
         [ -f "${package_path}/${package_name}" ] || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
     else
-	[ ! -d "$DOWNLOADS" ] && { mkdir -p "$DOWNLOADS"; }
+	[ ! -d "$DOWNLOADS" ] && createDownloadsDir;
         ensureFileCanBeDownloaded $package_url;
         $WGET --no-check-certificate --content-disposition --directory-prefix="$DOWNLOADS" $package_url >> $ACTIONS_LOG 2>&1 || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
         package_name="$(ls ${DOWNLOADS})";
@@ -106,6 +106,13 @@ function getPackageName() {
         }
     fi
 }
+
+function createDownloadsDir() {
+    [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+    ${SUDO} /usr/bin/mkdir -p ${DOWNLOADS}
+    ${SUDO} /usr/bin/setfacl -Rm g:ssh-access:xwr,d:g:ssh-access:xwr,d:u::xwr ${DOWNLOADS}
+}
+
 
 function clearCache(){
     if [[ -d "$DOWNLOADS" ]]
