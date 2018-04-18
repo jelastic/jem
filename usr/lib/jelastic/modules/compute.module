@@ -151,7 +151,6 @@ function doDeploy(){
     };
 
     if [ "x${COMPUTE_TYPE}" == "xcartridge" ]; then
-        [[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
         $SUDO service cartridge build ; 
         $SUDO service cartridge deploy;
     fi
