@@ -21,7 +21,11 @@ set -o errtrace
 DESCRIPTION="No description available!";
 VERSION="1";
 DEFAULT_ACTION="usage";
-ACTIONS_LOG="/var/log/actions$$.log";
+if [[ "$UID" == '0' ]]; then
+    ACTIONS_LOG="/var/log/actions$$.log";
+else
+    ACTIONS_LOG="/tmp/actions$$.log";
+fi
 $PROGRAM 'grep';
 $PROGRAM 'sed';
 
