@@ -34,7 +34,7 @@ Cmnd_Alias GLASSFISH_DOMAIN1_SERVICE = /sbin/service glassfish-domain1 stop, /sb
 Cmnd_Alias CARTRIDGE = /etc/init.d/cartridge stop, /etc/init.d/cartridge start, /etc/init.d/cartridge restart, /etc/init.d/cartridge condrestart, /etc/init.d/cartridge status, /etc/init.d/cartridge build, /etc/init.d/cartridge deploy, /usr/bin/npm, /usr/bin/pip
 Cmnd_Alias CARTRIDGE_SERVICE = /sbin/service cartridge stop, /sbin/service cartridge start, /sbin/service cartridge restart, /sbin/service cartridge condrestart, /sbin/service cartridge status, /sbin/service cartridge build, /sbin/service cartridge deploy
 
-Cmnd_Alias CUSTOM_IMPR = /usr/bin/passwd jelastic-ftp, /usr/bin/jem firewall fwstart, /usr/bin/jem balancer rebuildconfig, /usr/bin/jem firewall list *, /usr/bin/chmod * /var/log*, /usr/bin/chmod * /var/run*, /usr/bin/chmod * /usr/lib/jelastic*, /usr/bin/chmod * /usr/bin/jem, /usr/bin/mkdir * /var/cache/downloads, /usr/bin/setfacl * /var/cache/downloads
+Cmnd_Alias CUSTOM_IMPR = /usr/bin/passwd jelastic-ftp, /usr/bin/jem firewall fwstart, /usr/bin/jem balancer rebuildconfig, /usr/bin/jem firewall list *, /usr/bin/chmod * /var/log*, /usr/bin/chmod * /var/run*, /usr/bin/rm -f /var/run*, /usr/bin/touch /var/run*, /usr/bin/chmod * /usr/lib/jelastic*, /usr/bin/chmod * /usr/bin/jem, /usr/bin/mkdir * /var/cache/downloads, /usr/bin/setfacl * /var/cache/downloads
 
 Cmnd_Alias JEM = /bin/jem service start, /bin/jem service stop, /bin/jem service restart, /bin/jem compute deploy *
 
