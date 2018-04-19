@@ -52,7 +52,6 @@ function deploy(){
     local package_url=$1;
     local context=$2;
     local ext=$3;
-    [ ! -d "$DOWNLOADS" ] && { mkdir -p "$DOWNLOADS"; }
     clearCache;
     ensureFileCanBeDownloaded $package_url;
     prepareContext ${context} ;
