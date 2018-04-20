@@ -92,5 +92,5 @@ function removeHooks(){
 }
 
 function adjustRubyTarget(){
-    [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && { target="${bundle_type}"; [ -d ${HOOKS_DIR} ] && hooks_to_renam    e=$(ls ${HOOKS_DIR}); }
+    [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && { target="${bundle_type}"; [ -d ${HOOKS_DIR} ] && hooks_to_rename=$(ls ${HOOKS_DIR}); }
 }
