@@ -108,8 +108,8 @@ function getPackageName() {
 }
 
 function createDownloadsDir() {
-    [ ! -d "$DOWNLOADS" ] && ${SUDO} /usr/bin/mkdir -p ${DOWNLOADS}
-    ${SUDO} /usr/bin/setfacl -Rm g:ssh-access:xwr,d:g:ssh-access:xwr,d:u::xwr ${DOWNLOADS}
+    [ ! -d "$DOWNLOADS" ] && ${SUDO_COMMAND} /usr/bin/mkdir -p ${DOWNLOADS}
+    ${SUDO_COMMAND} /usr/bin/setfacl -Rm g:ssh-access:xwr,d:g:ssh-access:xwr,d:u::xwr ${DOWNLOADS}
 }
 
 
