@@ -23,7 +23,15 @@ DEBUG=${DEBUG:=0};
 PROGRAM='searchProg';
 declare -a __CORE_INCLUDE_LIST;
 
-[[ "$UID" != '0' ]] && SUDO="sudo" || SUDO=""
+function setSudoCommand(){
+    if [ "$UID" != '0' ]; then
+        groups|grep -qw ssh-access && SUDO_COMMAND="sudo" || SUDO_COMMAND=""
+    else
+        SUDO_COMMAND=""
+    fi
+}
+
+setSudoCommand;
 
 # checkDo
 # 	check if the function is exists and run it
@@ -284,8 +292,8 @@ function startJemThreadQueueManager(){
         echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
         echo ":[PROCESSING][PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
     }
-    ${SUDO} touch $jempidfile;
-    ${SUDO} chmod 666 $jempidfile;
+    ${SUDO_COMMAND} touch $jempidfile;
+    ${SUDO_COMMAND} chmod 666 $jempidfile;
     echo "$$" > $jempidfile;
 }
 
@@ -293,7 +301,7 @@ function stopJemThreadQueueManager(){
     [ -f $jempidfile ] && {
           echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
           echo ":[CLEANING UP][PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
-          ${SUDO} rm -f $jempidfile
+          ${SUDO_COMMAND} rm -f $jempidfile
     }
 }
 function sourceOverride(){
