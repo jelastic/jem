@@ -93,7 +93,7 @@ function enableService() {
 # $1 - service name
 function startService() {
     local name=${1};
-    $SUDO ${SERVICE_CMD} ${name} start;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} start;
     sleep 1;
     return ${?};
 }
@@ -101,7 +101,7 @@ function startService() {
 # $1 - service name
 function startServiceSilent() {
     local name=${1};
-    $SUDO ${SERVICE_CMD} ${name} start > /dev/null 2>&1;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} start > /dev/null 2>&1;
     sleep 1;
     return ${?};
 }
@@ -109,7 +109,7 @@ function startServiceSilent() {
 
 function stopService() {
     local name=${1};
-    $SUDO ${SERVICE_CMD} ${name} stop;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} stop;
     sleep 1;
     return ${?};
 };
@@ -117,26 +117,26 @@ function stopService() {
 # $1 - service name
 function stopServiceSilent() {
     local name=${1};
-    $SUDO ${SERVICE_CMD} ${name} stop > /dev/null 2>&1;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} stop > /dev/null 2>&1;
     sleep 1;
     return ${?};
 }
 
 function reloadService() {
     local name=${1};
-    $SUDO ${SERVICE_CMD} ${name} reload;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} reload;
     return ${?};
 }
 
 function reloadServiceSilent() {
     local name=${1};
-    $SUDO ${SERVICE_CMD} ${name} reload > /dev/null 2>&1;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} reload > /dev/null 2>&1;
     return ${?};
 }
 
 function restartServiceSilent() {
     local name=${1};
-    $SUDO ${SERVICE_CMD} ${name} restart > /dev/null 2>&1;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} restart > /dev/null 2>&1;
     return ${?};
 }
 
