@@ -151,11 +151,13 @@ function __processNotVDS(){
 function preAddCallback(){
 	log "$@";
 
-    options=`getopt -o n,u,e -l uid:,new,eid -- "$@"`;
+    options=`getopt -o n,d,u,e -l uid:,new,eid -- "$@"`;
     while [ $# -gt 0 ]
     do
             case $1 in
             # for options with required arguments, an additional shift is required
+            -d) _DISABLE_PASS_AUTH="true";;
+            (--) shift; break;;
             -n|--new) _REGENERATE_KEY="yes";;
             (--) shift; break;;
             -e|--eid)

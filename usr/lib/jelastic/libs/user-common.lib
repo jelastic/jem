@@ -182,4 +182,10 @@ function postAddReform(){
             chmod -f 700 "${_User_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
     fi
 
+    retval="$?" 
+
+    [ "x${_DISABLE_PASS_AUTH}" == "xtrue" ] && doAction user access --action disable --type pwd &>>JEM_CALLS_LOG;
+
+    return $retval
+
 }
