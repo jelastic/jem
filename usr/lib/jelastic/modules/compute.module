@@ -151,8 +151,8 @@ function doDeploy(){
     };
 
     if [ "x${COMPUTE_TYPE}" == "xcartridge" ]; then
-        $SUDO service cartridge build ; 
-        $SUDO service cartridge deploy;
+        ${SUDO_COMMAND} service cartridge build ; 
+        ${SUDO_COMMAND} service cartridge deploy;
     fi
 
     applyHook ${context} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }
