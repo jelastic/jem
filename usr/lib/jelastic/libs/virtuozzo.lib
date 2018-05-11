@@ -108,3 +108,18 @@ function getCtVeConf(){
         echo /vz/private/${CTID}/ve.conf
     fi
 }
+
+#
+# isContainerMounted
+#
+# ARGS:
+#       CTID:integer - container CTID
+# RESULT:
+#       0 - container status is mounted (either running or stopped/suspended but explicitly mounted)
+#       1 - container is not mounted
+function isContainerMounted() {
+    : ${1:?"Missing CTID param"};
+    local CTID=$1
+    out=$($VZLIST -Ho status $CTID)
+    [ "x$out" == "xmounted" -o "x$out" == "xrunning" ]
+}
