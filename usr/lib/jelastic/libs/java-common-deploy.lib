@@ -87,9 +87,9 @@ function deploy(){
     if [[ ${ext} == "ear" ]]
     then
         [ ! -d  $APPS_DIR ] && mkdir -p $APPS_DIR && chown -R  $DATA_OWNER  ${APPS_DIR} 2>>"$JEM_CALLS_LOG";
-        /usr/bin/cp "${package_path}/${package_name}" "${APPS_DIR}/${context}.${ext}";
+        /bin/cp "${package_path}/${package_name}" "${APPS_DIR}/${context}.${ext}";
     else
-        /usr/bin/cp "${package_path}/${package_name}" "${WEBROOT}/${context}.${ext}";
+        /bin/cp "${package_path}/${package_name}" "${WEBROOT}/${context}.${ext}";
     fi
 
     applyPostDeploy;
