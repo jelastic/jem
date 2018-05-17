@@ -125,9 +125,12 @@ function __processVDS(){
 
 function __injected_not_vds_add() {
     CTID=$1
+    if [ "x$_DISABLE_PASS_AUTH" == "xtrue" ] ; then
+        local DISABLE_PASS_FLAG="-d";
+    fi
     vzexecSetCTID ${CTID}
     #vzctl exec ${_CTID} "jem user add"
-    vzexecRun jem user add
+    vzexecRun jem user add ${DISABLE_PASS_FLAG}
     if [ "$(vzexecGetLastErrCode)" -eq 0 ]; then
         _homedir="${prefix}$(vzexecGetLastStdOut | $SED -rn 's/.*["]homedir["]:[[:blank:]]*["]([^"]+)["].*/\1/p')"
         DATA_OWNER="$(vzexecGetLastStdOut | $SED -rn 's/.*["]data_owner["]:[[:blank:]]*["]([^"]+)["].*/\1/p')"
@@ -298,6 +301,7 @@ function describeAddParameters() {
 }
 
 function describeAddOptions() {
+	echo "-d: disables access by password";
 	echo "-e|--eid: environment id";
 	echo "-n|--new: regenerate keys";
 	echo "-u|--uid: user id";
