@@ -66,6 +66,9 @@ function unpack(){
 
 function deployLog(){
         echo -en "$(date) "$@ '\n' >> "$DEPLOY_LOG";
+        if [ "$UID" == '0' ]; then
+                [ -f "$DEPLOY_LOG" ] && chown -f "$DATA_OWNER" "$DEPLOY_LOG"; 
+        fi
 }
 
 function shiftContentFromSubdirectory(){
