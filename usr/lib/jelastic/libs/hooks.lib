@@ -35,7 +35,7 @@ function getHooksLogName()
         jetty)
                 HOOKS_LOG="/opt/jetty/logs/hooks.log";
         ;;
-        glassfish|payara)
+        glassfish|payara|wildfly)
                 HOOKS_LOG="/var/log/hooks.log";
         ;;
     esac
