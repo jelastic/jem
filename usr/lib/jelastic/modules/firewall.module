@@ -248,8 +248,9 @@ function doStart() {
     $IPTABLES -t nat -F;
     _setDefaultPolicy;
 
-    $IPTABLES -A INPUT -i lo -j ACCEPT;
-    $IPTABLES -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT;
+    $IPTABLES -A INPUT -i lo -j ACCEPT
+    $IPTABLES -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+    $IPTABLES -A INPUT -p icmp -j ACCEPT
 
     #exports
     NFSIPS=()
@@ -297,6 +298,7 @@ function doStart() {
     }
 
     if [ -f /proc/net/if_inet6 ] ; then
+        $IP6TABLES -I INPUT -p icmp -j ACCEPT
         $IP6TABLES -I INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
         $IP6TABLES -I INPUT -i lo -j ACCEPT
     fi
