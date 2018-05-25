@@ -298,7 +298,7 @@ function doStart() {
     }
 
     if [ -f /proc/net/if_inet6 ] ; then
-        $IP6TABLES -I INPUT -p icmp -j ACCEPT
+        $IP6TABLES -I INPUT -p icmpv6 -j ACCEPT
         $IP6TABLES -I INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
         $IP6TABLES -I INPUT -i lo -j ACCEPT
     fi
