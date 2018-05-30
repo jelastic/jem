@@ -207,7 +207,7 @@ function doBuild(){
         tmpUpload=$(mktemp --suffix mvn)
         chmod a+w $tmpUpload 2>/dev/null
         [ -f "$tmpUpload" ] && EXTRA_BUILD_DEPLOY_PARAM="${EXTRA_BUILD_DEPLOY_PARAM} -DuploadLogPath=$tmpUpload"        
-        PROJECT_MNV_ARGS=$(env | grep -m 1 -i $(echo  MAVEN_RUN_ARGS_$( sed -re 's/(\s|-)/_/g' <<< "$PROJECT_NAME" ))|awk -F= '{$1=""; print}')
+        PROJECT_MNV_ARGS=$(env | grep -m 1 -i $(echo  MAVEN_RUN_ARGS_$( sed -re 's/(\s|-)/_/g' <<< "$PROJECT_NAME" ))|cut -f 1 -d '=' --complement)
         echo "[RUN-INFO] mvn clean ${PROJECT_MNV_ARGS} ${MAVEN_RUN_ARGS} clean install --file \"${APP_ROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml\"" >> "${LOG_DIR}/${PROJECT_NAME}_build.log";
         chown "$DATA_OWNER" -R "${LOG_DIR}" &>>"$JEM_CALLS_LOG"
         runuser jelastic -c "$MVN ${PROJECT_MNV_ARGS} ${MAVEN_RUN_ARGS} clean install --file \"${APP_ROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml\" ${EXTRA_BUILD_DEPLOY_PARAM} >> \"${LOG_DIR}/${PROJECT_NAME}_build.log\" 2>&1" && { 
@@ -248,7 +248,7 @@ function doDeploy(){
     if [ -e "${APP_ROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml" ] ; then
         cd "${APP_ROOT}/${PROJECT_NAME}" &>>"$JEM_CALLS_LOG"
         chown "$DATA_OWNER" -R "${LOG_DIR}" &>>"$JEM_CALLS_LOG"
-        PROJECT_MNV_ARGS=$(env | grep -m 1 -i $(echo  MAVEN_RUN_ARGS_$( sed -re 's/(\s|-)/_/g' <<< "$PROJECT_NAME" ))|awk -F= '{$1=""; print}')
+        PROJECT_MNV_ARGS=$(env | grep -m 1 -i $(echo  MAVEN_RUN_ARGS_$( sed -re 's/(\s|-)/_/g' <<< "$PROJECT_NAME" ))| cut -f 1 -d '=' --complement )
         if [ "x$BUILD" == "xtrue" ]; then
             applyHook ${PROJECT_NAME} preBuild || { writeJSONResponseErr "result=>4129" "message=>Pre-build hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
             echo "[RUN-INFO] mvn clean ${PROJECT_MNV_ARGS} ${MAVEN_RUN_ARGS} clean install --file \"${APP_ROOT}/${PROJECT_NAME}/${BUILDDIR}/pom.xml\"" >> "${LOG_DIR}/${PROJECT_NAME}_build.log";
