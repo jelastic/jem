@@ -74,7 +74,7 @@ function finishDeploy(){
     bundleInstall;
     updateOwnership $APPWEBROOT;
     clearCache;
-    reloadServiceSilent ${SERVICE} ;
+    reloadServiceSilent ${SERVICE} || restartServiceSilent ${SERVICE};
 }
 
 function undeploy(){
