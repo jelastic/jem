@@ -281,7 +281,7 @@ function doStart() {
         $IPTABLES -t nat -A ${ruleParams[0]} -s ${ruleParams[1]} -d ${ruleParams[2]} -m tcp -p tcp --dport ${ruleParams[3]} -j ${ruleParams[5]} --to-port ${ruleParams[4]};
     done;
 
-    [ ${COMPUTE_TYPE} == "cartridge" ] && {
+    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
         [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" >>$JEM_CALLS_LOG 2>&1;
     }
 
