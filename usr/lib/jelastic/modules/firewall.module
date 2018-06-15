@@ -54,6 +54,7 @@ declare -a OPENPORTS;
 declare -a CLOSEDPORTS;
 
 declare -r ERR_NO_METADATA=4080;
+CTID=0
 
 function _getbalancerRedirPorts() { return 0; }
 function _getapache_phpRedirPorts { return 0; }
@@ -323,12 +324,16 @@ function doList() {
 }
 
 function doFWStart() {
-    local resultMsg;
-    declare -i result;
-    log "FWSTART configuring firewall";
-    resultMsg=$(doStart); result=$?;
-    [[ "${result}" -eq "0" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been started" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}";
-    return ${result};
+    local resultMsg
+    declare -i result
+    if [[ $CTID -eq 0 ]] ; then
+        log "FWSTART configuring firewall"
+        resultMsg=$(doStart); result=$?
+    else
+        resultMsg=$(vzctl exec2 $CTID "jem firewall start"); result=$?
+    fi
+    [[ "$result" -eq "0" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been started" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}"
+    return $result
 }
 
 function describeStop() {
@@ -437,10 +442,14 @@ function describeFWEnable() {
 }
 
 function doFWEnable() {
-    local resultMsg;
-    declare -i result;
-    resultMsg=$(doEnable); result=$?;
-    [[ "${result}" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been enabled" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}";
+    declare -i result
+    if [[ $CTID -eq 0 ]] ; then
+        local resultMsg
+        resultMsg=$(doEnable); result=$?
+    else
+        resultMsg=$(vzctl exec2 $CTID "jem firewall Enable"); result=$?
+    fi
+    [[ "${result}" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been enabled" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}"
 }
 
 function describeDisable() {
@@ -465,10 +474,15 @@ function describeDisable() {
 }
 
 function doFWDisable() {
-    local resultMsg;
-    declare -i result;
-    resultMsg=$(doDisable); result=$?;
-    [[ "${result}" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been disabled" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}";
+    local resultMsg
+    declare -i result
+    if [[ $CTID -eq 0 ]] ; then
+        resultMsg=$(doDisable); result=$?
+    else
+        resultMsg=$(vzctl exec2 $CTID "jem firewall Disable"); result=$?
+    fi
+
+    [[ "${result}" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been disabled" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}"
 }
 
 function describePanic() {
