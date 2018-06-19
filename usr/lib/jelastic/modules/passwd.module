@@ -103,7 +103,7 @@ function doSetos(){
                         response=$($GREP -q "^${user}:" /etc/passwd);
                         userExists=$?;
                         if [ ${userExists} -eq 0 ]; then
-                            writeJSONResponseOut "result=>4045" "message=>ERROR adding user!"
+                            writeJSONResponseOut "result=>4045" "message=>ERROR adding user!"; die -q;
                         else
                             /usr/bin/mkdir -p $homeDirectory;
                             /usr/sbin/adduser --home-dir $homeDirectory --shell /bin/false $user 2>/dev/null;
