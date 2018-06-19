@@ -94,14 +94,21 @@ function doSetos(){
 		  shift
 		done
 
-		[ -z "$password" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
+                [ -z "$password" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
                 if [ "$user" == "jelastic-ftp" -a -d "/etc/vsftpd/" ]; then
                         include vsftpd;
                         setvsFtpCert;
                 else
-                        /usr/bin/mkdir -p $homeDirectory
-                        /usr/sbin/adduser --home-dir $homeDirectory --shell /bin/false $user 2>/dev/null;
-                        chown -R $user:$user $homeDirectory
+                        [ -z "$homeDirectory" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
+                        response=$($GREP -q "^${user}:" /etc/passwd);
+                        userExists=$?;
+                        if [ ${userExists} -eq 0 ]; then
+                            writeJSONResponseOut "result=>4045" "message=>ERROR adding user!"
+                        else
+                            /usr/bin/mkdir -p $homeDirectory;
+                            /usr/sbin/adduser --home-dir $homeDirectory --shell /bin/false $user 2>/dev/null;
+                            /usr/bin/chown -R $user:$user $homeDirectory;
+                        fi
                 fi
 
  		echo "$user:$password" | $CHPASSWD > /dev/null 2>&1 && writeJSONResponseOut "result=>0" "message=>Password set succesfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
