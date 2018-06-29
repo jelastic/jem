@@ -137,6 +137,9 @@ function __injected_not_vds_add() {
         _UID=${DATA_OWNER/:*}
         _GUID=${DATA_OWNER/*:}
         [ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
+        if [ "x${COMPUTE_TYPE}" == "xgate" ] ;then
+            return 0;
+        fi
         bashRestricts 2>>"$JEM_CALLS_LOG" && vzexecGetLastStdOut && return 0 || { writeJSONResponseErr "result=>4119" "message=>Can not fix user rights"; return 4119; }
     else
         writeJSONResponseErr "result=>4045" "message=>${vzexecGetLastStdErr}"

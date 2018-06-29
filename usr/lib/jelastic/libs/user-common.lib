@@ -120,7 +120,9 @@ function getAppUserInfo(){
                 _homedir=$( getent passwd "${_appuser}" | cut -d: -f6 )
             ;;
         esac
-        bashRestricts;
+        if [ "x${COMPUTE_TYPE}" != "xgate" ] ;then
+            bashRestricts;
+        fi
 		#check if not empty
 	}
 	# || retern error
@@ -170,7 +172,7 @@ function postAddReform(){
             } || {
                     authkey=$($SSH_KEYGEN -y -f $keyfile);
                     echo "${authkey} $(whoami)@$(hostname)" > ${_AuthorizedKeysFile} ;
-                    cat "$_AuthorizedKeysFile" >> "$_User_AuthorizedKeysFile"
+                    cat "$_AuthorizedKeysFile" >> "$_User_AuthorizedKeysFile" 2>/dev/null
             }
 
             chown -fR root:root "${_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
