@@ -435,6 +435,20 @@ function _addNativeip() {
         $VZCTL umount $CTID > /dev/null 2>&1
     else
         _nfsReexport
+        retries=5
+        vzexecRun "showmount -e  2>/dev/null | grep -qP \"$IPLIST\""
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: checking exports" >> ${JEM_CALLS_LOG};
+        while [[ $retries -gt 0 ]] ; do
+            if [[ "$(vzexecGetLastErrCode)" -gt 0 ]]; then
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: $(vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG};
+                sleep 4
+                vzexecRun "showmount -e  2>/dev/null | grep -qP \"$IPLIST\""
+                retries=$((retries-1))
+            else
+                return $(vzexecGetLastErrCode)
+            fi
+        done
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: timeout has elapsed" >> ${JEM_CALLS_LOG};
     fi
     return $?
 }
