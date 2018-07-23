@@ -146,7 +146,7 @@ function getTargetIPs() {
     if [ -z ${lctid} ] ; then
         $IFCONFIG | $AWK '/inet addr/{print substr($2,6)}'
     else
-        $VZLIST -H -o ctid,ip | $SED -nre "/\s${lctid}\s/{s/\s*${lctid}\s+(.*)/\1/g;p}"
+        $VZLIST -H -o ip ${lctid}
     fi
 }
 
@@ -188,7 +188,20 @@ function checkMount() {
     #skip check if CTID is empty
     [[ -z "${CTID}" ]] && return 0
     localCIPs="$($SED -re 's/\./\\\./g' -e 's/\s+/\|/g' <<< $(getTargetIPs $CTID))"
+    retries=5
     vzexecRun "showmount -e $1 2>/dev/null | grep $2 | grep -qP \"$localCIPs\""
+
+    while [[ $retries -gt 0 ]] ; do
+        if [[ "$(vzexecGetLastErrCode)" -gt 0 ]]; then
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: $(vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG};
+            sleep 4
+            vzexecRun "showmount -e $1 2>/dev/null | grep $2 | grep -qP \"$localCIPs\""
+            retries=$((retries-1))
+        else
+            return $(vzexecGetLastErrCode)
+        fi
+    done
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: timeout has elapsed" >> ${JEM_CALLS_LOG};
     return $(vzexecGetLastErrCode)
 }
 
