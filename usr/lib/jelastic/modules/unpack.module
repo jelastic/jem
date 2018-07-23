@@ -61,15 +61,15 @@ function onModLoadCallback(){
 
 
 function doArchive() {
-    [ -z "$ARCHIVE_URL" ] && { 
-	writeJSONResponseErr "result=>4050" "message=>URL is not valid!" ; 
+    [ -z "$ARCHIVE_URL" ] && {
+	writeJSONResponseErr "result=>4050" "message=>URL is not valid!" ;
         return 1;
     }
     [ ! -d "$DOWNLOADS" ] && { mkdir -p "$DOWNLOADS"; }
 
-    shopt -s dotglob; 
+    shopt -s dotglob;
     rm -Rf "$DOWNLOADS"/*;
-    shopt -u dotglob; 
+    shopt -u dotglob;
 
     if $GREP -qE "^file:" <<< ${ARCHIVE_URL} ; then
 	#local file
@@ -77,12 +77,12 @@ function doArchive() {
     else
 	cd $DOWNLOADS
 	$CURL ${CURL_OPTIONS} -O ${ARCHIVE_URL} >> $ACTIONS_LOG 2>&1;
-        [ $? -gt 0 ] && { 
+        [ $? -gt 0 ] && {
             	cd $DOWNLOADS
 		http_url=$($SED 's/^https/http/' <<< ${ARCHIVE_URL})
 		$CURL ${CURL_OPTIONS} -O ${http_url} >> $ACTIONS_LOG 2>&1;
 		[ $? -gt 0 ] && {
-			writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q; 
+			writeJSONResponseErr "result=>4078" "message=>Error loading file from URL" ; die -q;
 		}
 	};
 	cd /
@@ -113,10 +113,10 @@ function doArchive() {
 	ARC_UTILITY="$TAR";
 	ARCH_OPT=" --overwrite -xpjf ";
 	ARCH_DEST_OPT=" -C ";
-    fi    
+    fi
 
-    [ ! -d "$DESTINATION" ] && { mkdir "$DESTINATION"; }
-    stopService ${SERVICE} > /dev/null 2>&1;
+    [ ! -d "$DESTINATION" ] && { mkdir -p "$DESTINATION"; }
+    [[ "x${SERVICE}" != "x" ]] && stopService ${SERVICE} > /dev/null 2>&1;
 
     [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" ] && [[ -d /var/www/webroot/ROOT/ && ! -h /var/www/webroot/ROOT ]] && rm -rf /var/www/webroot/ROOT/;
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && [[ -d /opt/repo/ROOT/ && ! -h /opt/repo/ROOT ]] && { shopt -s dotglob; rm -rf /opt/repo/ROOT/*; shopt -u dotglob; }
@@ -124,7 +124,7 @@ function doArchive() {
     ${ARC_UTILITY} ${ARCH_OPT} "$package_name" ${ARCH_DEST_OPT} "$DESTINATION" >> $ACTIONS_LOG 2>&1;
     result=$?;
 
-    startService ${SERVICE} >> $ACTIONS_LOG 2>&1;	
+    [[ "x${SERVICE}" != "x" ]] && startService ${SERVICE} >> $ACTIONS_LOG 2>&1;
     # writeJSONResponseErr "result=>4052" "message=>Context does not exist";
     writeJSONResponseOut "result=>0" "message=>Unpacked succesfuly";
     return 0;
