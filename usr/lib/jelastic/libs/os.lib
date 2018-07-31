@@ -344,3 +344,25 @@ function installPackageCmd() {
     esac
     echo "$PM $pmaction $PKGS"
 }
+
+function checkPackageCmd() {
+    : ${1:?"Missing param: OS"};
+    local OS=$1; shift
+
+    case $OS in
+        debian|ubuntu|kali)
+            ltpl='dpkg -s %s >/dev/null 2>&1 || echo "%s" ;'
+            ;;
+        centos|redhat|fedora|suse)
+            ltpl='rpm -q %s >/dev/null 2>&1 || echo "%s" ;'
+            ;;
+        alpine)
+            ltpl='[ -n "$(apk list -I %s)" ] || echo "%s" ;'
+            ;;
+    esac
+    for arg do
+        printf -v cmd "$ltpl" "$arg" "$arg"
+        res="$res $cmd"
+    done
+    echo $res
+}

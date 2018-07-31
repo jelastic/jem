@@ -103,8 +103,8 @@ function dosetupUtils() {
     isContainerRunning ${CTID} && {
         local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
         if [[ "xstorage" == "x$computetype" ]] ; then
-		vzexecRun "systemctl enable nfs-server"
-    		return $TRUE
+            vzexecRun "systemctl enable nfs-server"
+            return $TRUE
         fi
     }
 
@@ -117,6 +117,8 @@ function dosetupUtils() {
     OS_ver=$(getOSVersion "$issue_string")
     OS_ver=${OS_ver%%.*}
     installCmd=$(installPackageCmd $OS install rpcbind libtirpc)
+    checkCmd=$(checkPackageCmd $OS rpcbind )
+
     #JE-25896
     if [ "x$OS" == "xalpine" ] ; then
         echo "Alpine linux is not supported"
@@ -137,6 +139,14 @@ function dosetupUtils() {
     [[ -d "/vz/root/${CTID}/lib/systemd/system" ]] && echo "$SystemDUnit" > "/vz/root/${CTID}/lib/systemd/system/unfsd.service"
     isContainerRunning ${CTID} && {
         vzexecRun "$installCmd"
+
+        vzexecRun "eval $checkCmd"
+        stdout=$(vzexecGetLastStdOut)
+        if [[ -n "$stdout" ]] ; then
+            writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $stdout"
+            return 1
+        fi
+
         if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" -o "x$OS" == "xsuse" ] ; then
             vzexecRun 'ln -s "/etc/rc.d/init.d/unfsd.jelastic" "/etc/init.d/unfsd.jelastic"'
         fi
@@ -389,19 +399,11 @@ function _addNativeip() {
         $VZCTL mount $CTID > /dev/null 2>&1
     else
         if ! vzexecRun "which rpcbind" ; then
-            out=$(dosetupUtils $CTID)
-            if [[ $? -ne $TRUE ]]; then
-                writeJSONResponseOut "result=>4112" "message=>$out" ;
-                return $FALSE
-            fi
+            dosetupUtils $CTID || return 1
         fi
 
         if [[ ! -e "/vz/root/${CTID}${MOUNTPROG}" ]] ; then
-            out=$(dosetupUtils $CTID)
-            if [[ $? -ne $TRUE ]]; then
-                writeJSONResponseOut "result=>4112" "message=>$out" ;
-                return $FALSE
-            fi
+            dosetupUtils $CTID || return 1
         fi
     fi
 
