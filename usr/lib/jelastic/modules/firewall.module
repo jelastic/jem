@@ -209,7 +209,7 @@ function onModLoadCallback() {
                 shift;
                 oldifs=$IFS;
                 IFS=';';
-                RULES=($1);
+                RULES=(${1// /});
                 IFS=${oldifs};
                 shift;
                 ;;
