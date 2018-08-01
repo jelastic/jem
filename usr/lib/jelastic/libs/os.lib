@@ -348,6 +348,7 @@ function installPackageCmd() {
 function checkPackageCmd() {
     : ${1:?"Missing param: OS"};
     local OS=$1; shift
+    local res=""
 
     case $OS in
         debian|ubuntu|kali)
