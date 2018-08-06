@@ -31,7 +31,7 @@ function bundleInstall(){
     source /usr/local/rvm/environments/base
 #    echo "${bundle_type}" > /var/lib/jelastic/env
     setEnvApp ${bundle_type} ;
-    bundle config --global silence_root_warning 1;
+    bundle config --global silence_root_warning 1 &>/dev/null;
     [ -z "${APPWEBROOT}" ] && { APPWEBROOT="/var/www/webroot/ROOT"; }  
     # restartServiceSilent $SERVICE;    <---- need to check is OK to remove this line
     if  [ -f "${APPWEBROOT}/Gemfile" ] ; then  
