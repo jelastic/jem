@@ -358,7 +358,7 @@ function checkPackageCmd() {
             ltpl='rpm -q %s >/dev/null 2>&1 || echo "%s" ;'
             ;;
         alpine)
-            ltpl='[ -n "$(apk list -I %s)" ] || echo "%s" ;'
+            ltpl='p="%s";if apk | grep -q list ; then [ -n "$(apk list -I $p)" ] || echo $p ; else [ -z "$(apk version -q $p)" ] && echo %s; fi ;'
             ;;
     esac
     for arg do
