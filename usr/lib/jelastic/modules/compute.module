@@ -45,7 +45,7 @@ function doUsage() {
     showUsageMessage;
 }
 
-function doDeploy(){
+function preDeployCallback(){
     ensureDiskSpaceIsOK;
     local temp=$(getopt -o u:,c:,e:,a:  -- $@);
     [[ $? != 0 ]] && die -q "Terminating...";
@@ -85,7 +85,12 @@ function doDeploy(){
                 writeJSONResponseErr "result=>4058" "message=>Wrong arguments for deploy" ;
                 exit 1
         fi
+    local result=0
+    isFunction "postPreDeploy" && { postPreDeploy; result=$?; }
+    return $result;
+}
 
+function doDeploy(){
     # Contexts validation
 
     [ -n "$Context_Regex" ] && context_regex="/${Context_Regex}/p";
