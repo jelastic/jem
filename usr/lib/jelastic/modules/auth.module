@@ -89,6 +89,7 @@ function onModLoadCallback() {
         esac;
     done;
     [[ ! -z "${CTID}" ]] && {
+        vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; 
         NFS_CONFIG_DIR="/vz/root/${CTID}${NFS_CONFIG_DIR}"
         NFS_CONFIG_FILE="/vz/root/${CTID}${NFS_CONFIG_FILE}"
         EXPORTS_FILE="/vz/root/${CTID}${CONTAINER_EXPORTS_FILE}"

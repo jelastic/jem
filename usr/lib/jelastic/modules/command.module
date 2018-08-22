@@ -58,6 +58,7 @@ function onModLoadCallback() {
                 ;;
         esac;
     done;
+    [ -n "$CTID" ] && { vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; }
 }
 
 function doExec() {
