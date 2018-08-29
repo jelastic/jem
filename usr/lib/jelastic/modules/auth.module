@@ -89,7 +89,7 @@ function onModLoadCallback() {
         esac;
     done;
     [[ ! -z "${CTID}" ]] && {
-        vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; 
+        vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; };
         NFS_CONFIG_DIR="/vz/root/${CTID}${NFS_CONFIG_DIR}"
         NFS_CONFIG_FILE="/vz/root/${CTID}${NFS_CONFIG_FILE}"
         EXPORTS_FILE="/vz/root/${CTID}${CONTAINER_EXPORTS_FILE}"
@@ -113,11 +113,21 @@ function dosetupUtils() {
         log "${MOUNTPACKAGE} not found!"
         exit 1;
     fi
+
+    local addPackages=""
+
     issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
     OS=$(detectOS "$issue_string")
     OS_ver=$(getOSVersion "$issue_string")
     OS_ver=${OS_ver%%.*}
-    installCmd=$(installPackageCmd $OS install rpcbind libtirpc)
+
+    if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" ] ; then
+        addPackages="libtirpc"
+    elif [ "x$OS" == "xdebian" -o "x$OS" == "xubuntu" ] ; then
+        addPackages="libtirpc1"
+    fi
+
+    installCmd=$(installPackageCmd $OS install rpcbind $addPackages)
     checkCmd=$(checkPackageCmd $OS rpcbind )
 
     #JE-25896
@@ -140,6 +150,9 @@ function dosetupUtils() {
     [[ -d "/vz/root/${CTID}/lib/systemd/system" ]] && echo "$SystemDUnit" > "/vz/root/${CTID}/lib/systemd/system/unfsd.service"
     isContainerRunning ${CTID} && {
         vzexecRun "$installCmd"
+
+        #log output from package manager
+        echo "CTID:$CTID Detected OS: $OS package manager response: $(vzexecGetLastStdOut) $(vzexecGetLastStdErr)" >> $ACTIONS_LOG
 
         vzexecRun "eval $checkCmd"
         stdout=$(vzexecGetLastStdOut)
