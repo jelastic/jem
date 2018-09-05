@@ -136,6 +136,7 @@ function parseArguments() {
   done
   PASSWORD=$(getPassword $PASSWORD);
   [ "x${COMPUTE_TYPE}" == "xapache-ruby" -o "x${COMPUTE_TYPE}" == "xnginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && {
+    [ "x${PROJECT_NAME}" == "xROOT" ] && [ ! -z ${OLD_PROJECT_NAME} ] && PROJECT_NAME=${OLD_PROJECT_NAME};
     [ ! -z "$PROJECT_NAME" ] && { bundle_type="${PROJECT_NAME}" ;  PROJECT_NAME="ROOT"; } ;
   }
 
