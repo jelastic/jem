@@ -39,7 +39,7 @@ function unpack(){
     set +f
     shopt -u dotglob;
 
-    ensureFileCanBeUncompressed "${package_name}";
+    ensureFileCanBeUncompressed "${package_path}/${package_name}";
     [[ ! -d "$APPWEBROOT" ]] && { mkdir -p $APPWEBROOT;}
     if [[ ${package_url} =~ .zip$ ]] || [[ ${package_name} =~ .zip$ ]]
     then
