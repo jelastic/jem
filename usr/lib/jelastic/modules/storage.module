@@ -126,6 +126,7 @@ function onModLoadCallback() {
                 ;;
         esac;
     done;
+    [ -n "$CTID" ] && { vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; }
     for arg do UNKNOWN_ARG+=("$arg") ; done
     [[ ! -z "${CTID}" ]] && {
         MOUNTS_STORAGE="/vz/root/${CTID}${CONTAINER_MOUNTS_STORAGE}"

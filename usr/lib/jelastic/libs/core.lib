@@ -212,19 +212,20 @@ function startJemThreadQueueManager(){
     jempidfile="/var/run/jem.pid";
     local sleep_period="1s"
     ensureDiskSpaceIsOK;
-
-    if [ "x$action" == "xvcs" -a "x$1" == "xautoupdate" ] ; then
+    local subaction=$1;
+    if [ "x$action" == "xvcs" -a "x$subaction" == "xautoupdate" ] ; then
 	[[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]] && {
-		echo "$(date +%D.%k:%M:%S.%N): $1 - other process is running" >> $JEM_CALLS_LOG
- 		writeJSONResponseOut "result=>0" "message=>$1: other process is running"
+		echo "$(date +%D.%k:%M:%S.%N): $subaction - other process is running" >> $JEM_CALLS_LOG
+ 		writeJSONResponseOut "result=>0" "message=>$subaction: other process is running"
 		exit 0;
 	}
     fi
+
     if [ "x$action" == "xbalancer" -a "x$1" == "xUpdatePortMapping" ] ; then
         jempidfile="/var/run/jem.294e8f74.pid";
-    elif [ "x$action" == "xhn" -a "x$1" == "xstat" ] ; then
+    elif [ "x$action" == "xhn" -a "x$subaction" == "xstat" ] ; then
         jempidfile="/var/run/jem.42c7a29c9.pid";
-    elif [ "x$action" == "xuser" -a "x$1" == "xadd" ] ; then
+    elif [ "x$action" == "xuser" -a "x$subaction" == "xadd" ] ; then
 	while [ "$1" != "" ]
         do
             case "$1" in
@@ -237,7 +238,7 @@ function startJemThreadQueueManager(){
         shift;
         done
     elif [ "x$action" == "xauth" ] ; then
-        if [ "x$1" == "xadd" -o "x$1" == "xremove" ]; then
+        if [ "x$subaction" == "xadd" -o "x$subaction" == "xremove" ]; then
             jempidfile="/var/run/jem.5283f514f.pid";
         fi
     elif [ "x$action" == "xstorage" -a "x$1" != "xmount" ] ; then
@@ -274,7 +275,7 @@ function startJemThreadQueueManager(){
             [ ! -z "$nameTPL" -o ! -z "$versionTPL" ] && TQctid=$(md5sum <<< "${nameTPL}${versionTPL}X" | awk '{print $1}' )
         }
 
-        if [ "x$1" == "xaftercreate" -o "x$1" == "xmount" ] ; then
+        if [ "x$subaction" == "xaftercreate" -o "x$subaction" == "xmount" ] ; then
             jempidfile="/var/run/jem.f55b442${TQctid}.pid";
         else
             jempidfile="/var/run/jem.${TQctid}.pid";
