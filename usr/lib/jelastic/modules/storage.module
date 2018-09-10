@@ -147,7 +147,7 @@ function getTargetIPs() {
     if [ -z ${lctid} ] ; then
         $IFCONFIG | $AWK '/inet addr/{print substr($2,6)}'
     else
-        $VZLIST -H -o ip ${lctid}
+        $AWK '/[ \t]*'${lctid}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo
     fi
 }
 
