@@ -40,7 +40,7 @@ function vzCreateContainer() {
 function vzIsContainerExists() {
     : ${1:?"Missing CTID param"};
     local ctid=$1
-    vzlist -H1  $CTID &>/dev/null
+    vzlist -H1  $ctid &>/dev/null
     return $?
 }
 
