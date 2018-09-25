@@ -92,12 +92,12 @@ function setPassword() {
 		val=$(sed 's/\.//' <<< $COMPUTE_TYPE_FULL_VERSION )
 		[ -z "$val" ] && val=0 ;
                if [ "x$COMPUTE_TYPE" == "xmysql" -a $val -ge 57  ] ; then
-                       $MYSQL $db --execute="UPDATE user SET authentication_string=PASSWORD('${password}') WHERE user='${user}';"
+                       $MYSQL $db --execute="UPDATE mysql.user SET authentication_string=PASSWORD('${password}') WHERE user='${user}';"
         	       $MYSQL $db --execute="UPDATE mysql.user SET password_expired='N' WHERE user='${user}';"
                else
-                       $MYSQL $db --execute="UPDATE user SET password=PASSWORD('${password}') WHERE user='${user}';"
+                       $MYSQL $db --execute="UPDATE mysql.user SET password=PASSWORD('${password}') WHERE user='${user}';"
                fi
-		$MYSQL $db --execute="DELETE FROM user WHERE user = '';"
+		$MYSQL $db --execute="DELETE FROM mysql.user WHERE user = '';"
 		$MYSQL $db --execute="FLUSH PRIVILEGES;"
 
 		sleep 2
