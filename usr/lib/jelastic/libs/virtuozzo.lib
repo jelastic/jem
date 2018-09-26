@@ -123,3 +123,8 @@ function isContainerMounted() {
     out=$($VZLIST -Ho status $CTID)
     [ "x$out" == "xmounted" -o "x$out" == "xrunning" ]
 }
+
+function isContainerLocked() {
+    : ${1:?"Missing CTID param"}
+    [ -e "/vz/lock/$1.lck" ]
+}
