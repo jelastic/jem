@@ -256,7 +256,7 @@ function _nfsReexport() {
     log "ReExporting shares"
     _checkConfigs || {
         writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)" ;
-        return 99;
+        return 1;
     }
     _adjustFirewall
 
@@ -273,7 +273,7 @@ function _nfsReexport() {
                 fi
 
                 writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports) | $err";
-                return 99;
+                return 1;
             fi
         fi
     }
@@ -282,10 +282,16 @@ function _nfsReexport() {
     if [[ ! -z "${PID}" ]] ; then
          vzctl exec ${CTID} kill -HUP $PID > /dev/null 2>&1
     fi
+    return 0
 }
 
 function doRestart() {
-    _nfsReexport
+    if ! _nfsReexport ; then
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not reload configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)"
+        return 1
+    fi
+    writeJSONResponseOut "result=>0" "message=>Success"
+    return 0
 }
 
 function getGaneshaCfgValue() {
@@ -450,7 +456,11 @@ function _addNativeip() {
     if [[ $running -ne 0 ]] ; then
         $VZCTL umount $CTID > /dev/null 2>&1
     else
-        _nfsReexport
+        if ! _nfsReexport ; then
+            _removeNativeip
+            writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
+            return 1
+        fi
         retries=5
         vzexecRun "showmount -e  2>/dev/null | grep -qP \"$IPLIST\""
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: checking exports" >> ${JEM_CALLS_LOG};
