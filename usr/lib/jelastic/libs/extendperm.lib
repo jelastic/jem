@@ -25,6 +25,7 @@ function ExtendPerm(){
     dirp="g:$_SSH_ACCESS_GROUP:xwr"
     filep="g:$_SSH_ACCESS_GROUP:wr"
     [ $UID -eq 0 -a -f /etc/sudoers.d/jelastic ] && {
+        set +f;
         sudo chmod 440 /etc/sudoers.d/* >>$JEM_CALLS_LOG 2>&1;
     }
 
