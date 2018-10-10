@@ -46,7 +46,7 @@ function doGather(){
         log  "Module: $action Action: $subaction index: $n element: ${iniVarNames[$n]}" ;
         fName=$( sed -re 's/_all$//' -e 's/.*_(.*)/\1/' <<< ${iniVarNames[$n]} ) ;
         isFunction "$fName" && { 
-            var=$($fName) ;
+            var=$($fName ${iniVarNames[$n]}) ;
             sed -i "s|${iniVarNames[$n]}\s*=.*|${iniVarNames[$n]}=${var}|" ${CONF_FILE} ;
         } || { 
             echo "Extra gather for $fName" >>$JEM_CALLS_LOG ; 
