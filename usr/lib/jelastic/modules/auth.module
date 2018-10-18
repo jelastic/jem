@@ -475,6 +475,7 @@ function _addNativeip() {
             fi
         done
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: timeout has elapsed" >> ${JEM_CALLS_LOG};
+        return $(vzexecGetLastErrCode)
     fi
     return $?
 }
