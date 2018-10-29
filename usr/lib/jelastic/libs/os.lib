@@ -367,3 +367,46 @@ function checkPackageCmd() {
     done
     echo $res
 }
+
+function getExportedDirList()
+{
+    [ ! -f "$1" ] && return 1
+    OIFS=$IFS;IFS=$'\n'
+    adir=("${adir[@]}" $(sed -rne '/^#/d' -e '/^"/d' -e 's/([^ ]+)\s+.*/\1/' -e '/^$/d' -e p "$1"))
+    adir=("${adir[@]}" $(sed -rne '/^#/d' -e '/^[^"]/d' -e 's/"(.*)"\s+.*/"\1"/' -e '/^$/d' -e p "$1"))
+    IFS=$OIFS
+    for a in "${adir[@]}"; do
+        b="${a/#\"/}"
+        b=${b/%\"/}
+        echo "$b"
+    done
+    return 0
+}
+
+function isShareExistsOnDisk() {
+    [ -d "$1" ]
+}
+
+# $1 - share name
+# $2 - exports file
+function LookupShare() {
+    [ ! -f "$2" ] && return 1
+    [[ "x${1:$((${#1}-1)):1}" == "x/" ]] && shareName=${1/%\//} || shareName=$1
+    dpath="^\"?($(sed -re 's/\//\\\//g' <<< $(sed -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/(\\\\040|\\s)/g' <<< "$shareName")))\/?\"?\s+";
+    [[ "$dpath" != "${dpath/\\\\040/}" ]] && brf="\3" || brf="\2"
+    opts=()
+    while read l ; do
+        eval "$l";
+        opts=("${opts[@]}" $soptions)
+    done <<< $(sed -re '/'$dpath'/!d' -e 's/'$dpath'(.*)/sname="\1";soptions="'$brf'"/' "$2")
+    echo ${opts[*]}
+    [[ ${#opts} -gt 0 ]] && return 0;
+}
+
+# $1 - share name
+# $2 - exports file
+function isValidShare()
+{
+    [ ! -f "$2" ] && return 1
+
+}
