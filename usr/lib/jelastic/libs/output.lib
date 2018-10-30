@@ -83,6 +83,16 @@ function writeJSONResponseErr(){
     echo "$(writeJSONResponseOut "$@")" 1>&2;
 }
 
+function escapeJSONSymbols() {
+    o=$1
+    o=${o//   /\\t}
+    o=${o//\n/\\\n}
+    o=${o//^M/\\\r}
+    o=${o//^L/\\\f}
+    o=${o//^H/\\\b}
+    echo $o
+}
+
 function _space() {
     local n ret="";
     for (( n = 1 ; n <= ${1} ; ++n )) ; do
