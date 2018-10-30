@@ -268,7 +268,7 @@ function _nfsReexport() {
                 local err=$(vzexecGetLastStdErr)
                 [[ -z "${err// }" ]] && return $TRUE
 
-                if grep -q "does not support NFS export" <<< $err ; then
+                if grep -q "does not support NFS export" <<< $err 2>&1; then
                     writeJSONResponseErr "result=>2032" "message=>NFS: wrong configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports) | $err";
                 fi
 

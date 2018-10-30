@@ -246,10 +246,10 @@ function processnfs() {
         cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE};"
 
     else
-        if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" ; then
+        if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" 2>&1; then
             dosetupUtils ${_CTID} || return 1
         fi
-        $GREP -qP 'nfs(3|4)?' "/vz/root/${CTID}/etc/fstab" && migrateConfig ${_CTID}
+        $GREP -qP 'nfs(3|4)?' "/vz/root/${CTID}/etc/fstab" 2>&1 && migrateConfig ${_CTID}
 
         mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
         cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
