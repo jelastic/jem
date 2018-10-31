@@ -193,7 +193,7 @@ function die() {
     }
 
     kill ${MANAGE_KILL_TARGET} 2>/dev/null;
-    [ -w "$resultFile" ] && {
+    [ -w "$resultFile"  -a -n "$result" ] && {
         echo $result >$resultFile
     }
     exit 249
@@ -366,7 +366,7 @@ function doAction() {
                     result=$?;
                 fi
             fi
-            [ -w "$resultFile" ] && {
+            [ -w "$resultFile" -a -n "$result" ] && {
         	echo $result >$resultFile
     	    }
             exit $result
