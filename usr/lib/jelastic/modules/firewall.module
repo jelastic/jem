@@ -573,6 +573,7 @@ function dofwset() {
     else
         vzctl umount ${CTID} >> $ACTIONS_LOG 2>&1
     fi
-    writeJSONResponseOut "result=>0" "message=>Firewall rules set" "log=>$(vzexecGetLastStdOut) $(vzexecGetLastStdErr)"
+    log="$(vzexecGetLastStdOut) $(vzexecGetLastStdErr)"
+    writeJSONResponseOut "result=>0" "message=>Firewall rules set" "log=>${log//\"/\\\"}"
     return 0
 }
