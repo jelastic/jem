@@ -59,7 +59,11 @@ function setModificationDate(){
 function enableSSL(){
 	[ ! -f "$PASS_FILE" ] && return 0;
 	[ ! -f "$GF_KEYSTORE_ORIG" ] && cp "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG";
-	local msg=$(doAction keystore install);
+	local msg
+	msg=$(doAction keystore install 2>&1);
+	local result=$?;
+	[ -z "$msg" ] || echo "$msg" | $SED -re 's|.*result.*message\":||' -e 's|\}||' >>$ACTIONS_LOG;
+	[ "$result" -ne 0 ] && return $result;
 	mergeGFKeystore;
 	chown "$DATA_OWNER" "$GF_KEYSTORE" "$GF_KEYSTORE_ORIG" 2>>"$JEM_CALLS_LOG";
 	local ip_bind="0.0.0.0";
