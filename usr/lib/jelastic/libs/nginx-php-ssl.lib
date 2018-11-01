@@ -45,8 +45,11 @@ function removeChain(){
 function enableSSL(){
 	local err;
 	stopServiceSilent "$SERVICE";
-	local msg=$(doAction keystore DownloadKeys);
-	err=$?; [[ ${err} -gt 0 ]] && exit "$err";
+	local msg;
+	msg=$(doAction keystore DownloadKeys 2>&1);
+	err=$?;
+	[ -z "$msg" ] || echo "$msg" | $SED -re 's|.*result.*message\":||' -e 's|\}||' >>$ACTIONS_LOG;
+	[[ ${err} -gt 0 ]] && exit "$err";
 	createChain;
 	[ -f "${SSL_XML_CONFIG}.disabled" ] && mv "${SSL_XML_CONFIG}.disabled" "$SSL_XML_CONFIG";
 	startServiceSilent "$SERVICE" ;
