@@ -123,6 +123,7 @@ function dosetupUtils() {
 
     if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" ] ; then
         addPackages="libtirpc"
+        [[ "$OS_ver" -eq "7" ]] && addPackages="$addPackages nfs-utils"
     elif [ "x$OS" == "xdebian" -o "x$OS" == "xubuntu" ] ; then
         addPackages="libtirpc1"
     fi
