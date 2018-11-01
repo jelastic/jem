@@ -26,7 +26,11 @@ START_SECTION_PATTERN="PROTO_Dl231aIDsW4";
 END_SECTION_PATTERN="PROTO_Dl541aINsMx";
 
 function enableSSL(){
-        local msg=$(doAction keystore install);
+        local msg;
+        msg=$(doAction keystore install 2>&1);
+        local result=$?;
+        [ -z "$msg" ] || echo "$msg" | $SED -re 's|.*result.*message\":||' -e 's|\}||' >>$ACTIONS_LOG;
+        [ "$result" -ne 0 ] && return $result;
         stopServiceSilent "$SERVICE" ;
         $SED -i '/<!--/d' $SERVER_XML_CONFIG;
         $SED -i '/-->/d' $SERVER_XML_CONFIG;
