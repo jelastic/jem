@@ -40,6 +40,7 @@ $PROGRAM 'vzctl'
 
 SAVEFILE='/var/lib/jelastic/firewall'
 CUSTOM_RULES_FILE='/etc/sysconfig/iptables-custom'
+CUSTOM_6RULES_FILE='/etc/sysconfig/ip6tables-custom'
 JELASTIC_RULES_DIR='/etc/sysconfig'
 JELASTIC_4RULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic'
 JELASTIC_6RULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic'
@@ -288,6 +289,10 @@ function doStart() {
 
     [ -f "${CUSTOM_RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${CUSTOM_RULES_FILE}" 2>>$ACTIONS_LOG ;
         echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_RULES_FILE}" >> $JEM_CALLS_LOG ;
+    }
+
+    [ -f "${CUSTOM_6RULES_FILE}" ] && { $IP6TABLES_RESTORE -n < "${CUSTOM_6RULES_FILE}" 2>>$ACTIONS_LOG ;
+        echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_6RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
 
     [ -f "${JELASTIC_4RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${JELASTIC_4RULES_FILE}" 2>>$ACTIONS_LOG ;
