@@ -257,7 +257,7 @@ function processnfs() {
 
     if [[ $running -eq 0 ]] ; then
         if ! checkMount $sourceIP $sourceMountUnEsc ; then
-            echo "Destination NFS server is not reachable"
+            echo "Destination NFS server is not reachable. Server IP: $(vzctl exec2 188977 host ${sourceIP} 2>/dev/null), Client IP: $($AWK '/[ \t]*'${CTID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo )"
             return 1
         fi
     fi
