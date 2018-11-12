@@ -430,6 +430,8 @@ function describeEnableOptions() {
 
 function doEnable() {
     [ ! -e "${META_FILE}" ] && touch ${META_FILE}
+    [ ! -e "${CUSTOM_6RULES_FILE}" ] && touch ${CUSTOM_6RULES_FILE}
+    [ -n "$DATA_OWNER" ] && chown "$DATA_OWNER" "${CUSTOM_6RULES_FILE}" &>>"$JEM_CALLS_LOG"
     if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
         $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=1/g" ${META_FILE}
     else
