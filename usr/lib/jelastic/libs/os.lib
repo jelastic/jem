@@ -279,21 +279,29 @@ function getOSVersion() {
         OS_version=$($GREP -h DISTRIB_RELEASE <<< "$issue_string" 2>/dev/null | $SED -nre 's/.*=\s?\"?([0-9.]*).*/\1/;p;n');
         if [ -z "$OS_version" ] ; then
             if $GREP -hqi "jessie" <<< "$issue_string" 2>/dev/null ; then
-                OS_version="8";
-            elif [ -z "$OS_version" ] ; then
-                # for  devopsil/puppet
-                OS_version=$($GREP -m 1 -h "CentOS release" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z ]*\s([0-9.]*).*/\1/;p;n');
+                OS_version="8"
+            elif $GREP -hqi "stretch" <<< "$issue_string" 2>/dev/null ; then
+                OS_version="9"
+            elif $GREP -hqi "buster" <<< "$issue_string" 2>/dev/null ; then
+                OS_version="10"
             fi
+
             if [ -z "$OS_version" ] ; then
-                OS_version=$($GREP -m 1 -h "Debian" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z\/ ]*\s([0-9.]*).*/\1/;p;n');
+                OS_version=$($GREP -m 1 -h "CentOS release" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z ]*\s([0-9.]*).*/\1/;p;n')
             fi
+
             if [ -z "$OS_version" ] ; then
-                OS_version=$($GREP -m 1 -h "Alpine" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z\/ ]*\s([0-9]*).*/\1/;p;n');
-                $GREP -q "Alpine" <<< "$issue_string" && OS_version=3;
+                OS_version=$($GREP -m 1 -h "Debian" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z\/ ]*\s([0-9.]*).*/\1/;p;n')
             fi
+
+            if [ -z "$OS_version" ] ; then
+                OS_version=$($GREP -m 1 -h "Alpine" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z\/ ]*\s([0-9]*).*/\1/;p;n')
+                $GREP -q "Alpine" <<< "$issue_string" && OS_version=3
+            fi
+
             if [ -z "$OS_version" ] ; then
                 #Oracle Linux Server release 6.6
-                OS_version=$($GREP -m 1 -h "release" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z ]*\s([0-9.]*).*/\1/;p;n');
+                OS_version=$($GREP -m 1 -h "release" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z ]*\s([0-9.]*).*/\1/;p;n')
             fi
         fi
     fi
@@ -408,5 +416,8 @@ function LookupShare() {
 function isValidShare()
 {
     [ ! -f "$2" ] && return 1
-
+    isShareExistsOnDisk $1 || return 1
+    local opts=$(LookupShare "$1" "$2")
+    [[ -z "$opts" ]] && return 1
+    return 0
 }
