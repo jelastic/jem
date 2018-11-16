@@ -234,9 +234,34 @@ function _adjustFirewall() {
     fi
 }
 
+function validateExports() {
+    : ${1:?"Missing param: file to check"};
+    OIFS=$IFS;IFS=$'\n'
+    dd=($(getExportedDirList $1));
+    #IFS=$OIFS
+    if [[ $? -eq 0 ]] ; then
+        for (( i = 0; i < ${#dd[@]}; i++)) ; do
+            isValidShare "${dd[$i]}" $1 || invalidExports=("${invalidExports[@]}" "${dd[$i]}")
+        done
+        cp -f $1 "/tmp/exports.backup-$(date +%D.%k:%M:%S.%N)" > /dev/null 2>&1
+        for (( i = 0; i < ${#invalidExports[@]}; i++)) ; do
+            lineToComment="/$(sed -re 's/\//\\\//g' <<< $(sed -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/(\\\\040|\\s)/g' <<< "${invalidExports[$i]}"))/ s/^#*/#/"
+            sed -i -re "$lineToComment" $1
+            echo "${invalidExports[$i]}"
+        done
+    else
+        IFS=$OIFS
+        return 1
+    fi
+    IFS=$OIFS
+    return 0
+}
+
+
 function _checkConfigs() {
     local UNFSDBIN='/sbin/unfsd'
     [[ ! -e "/vz/root/${CTID}/etc/exports" ]] && return 1
+    validateExports "/vz/root/${CTID}/etc/exports" || return 1
 
     isContainerRunning ${CTID} && {
         local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
