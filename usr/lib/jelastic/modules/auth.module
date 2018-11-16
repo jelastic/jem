@@ -254,6 +254,7 @@ function validateExports() {
         return 1
     fi
     IFS=$OIFS
+    $AWK -i inplace -v INPLACE_SUFFIX=.bak '!seen[$0]++' "$1"
     return 0
 }
 
