@@ -241,13 +241,13 @@ function validateExports() {
     #IFS=$OIFS
     if [[ $? -eq 0 ]] ; then
         for (( i = 0; i < ${#dd[@]}; i++)) ; do
-            isValidShare "${dd[$i]}" $1 || invalidExports=("${invalidExports[@]}" "${dd[$i]}")
+            isValidShare ${dd[$i]} $1 "/vz/root/${CTID}" || invalidExports=("${invalidExports[@]}" "${dd[$i]}")
         done
-        cp -f $1 "/tmp/exports.backup-$(date +%D.%k:%M:%S.%N)" > /dev/null 2>&1
+        local backup="$1.backup-$(date +%d-%m-%Y.%k:%M:%S.%N)"
+        cp -f "$1" "$backup" > /dev/null 2>&1
         for (( i = 0; i < ${#invalidExports[@]}; i++)) ; do
             lineToComment="/$(sed -re 's/\//\\\//g' <<< $(sed -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/(\\\\040|\\s)/g' <<< "${invalidExports[$i]}"))/ s/^#*/#/"
-            sed -i -re "$lineToComment" $1
-            echo "${invalidExports[$i]}"
+            sed -i -re "$lineToComment" "$1"
         done
     else
         IFS=$OIFS

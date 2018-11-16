@@ -413,10 +413,11 @@ function LookupShare() {
 
 # $1 - share name
 # $2 - exports file
+# $3 - share prefix
 function isValidShare()
 {
     [ ! -f "$2" ] && return 1
-    isShareExistsOnDisk $1 || return 1
+    isShareExistsOnDisk $3$1 || return 1
     local opts=$(LookupShare "$1" "$2")
     [[ -z "$opts" ]] && return 1
     return 0
