@@ -242,7 +242,7 @@ function doCreateProject(){
   parseArguments "$@";
 
   isValidURL $URL || { writeJSONResponseErr "result=>4050" "message=>URL is not valid!"; return 1; };
-      local incorrect_login_regex="[~\!\#\$%^&\*\(\)\-\+\{\}\\\/=]";
+  local incorrect_login_regex="[~\!\#\$%^&\*\(\)\{\}\\\/=]";
 
   [[ $LOGIN  =~ $incorrect_login_regex ]] && { writeJSONResponseErr "result=>4053" "message=>Login is not valid!"; return 1; };
   [ -z $LOGIN ] && LOGIN="$DEFAULT_LOGIN";
