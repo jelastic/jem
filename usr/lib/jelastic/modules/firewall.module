@@ -43,7 +43,9 @@ CUSTOM_RULES_FILE='/etc/sysconfig/iptables-custom'
 CUSTOM_6RULES_FILE='/etc/sysconfig/ip6tables-custom'
 JELASTIC_RULES_DIR='/etc/sysconfig'
 JELASTIC_4RULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic'
+JELASTIC_4NATRULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic-nat'
 JELASTIC_6RULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic'
+JELASTIC_6NATRULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic-nat'
 
 declare PublicIP;
 declare FTPPort;
@@ -285,6 +287,10 @@ function doStart() {
 
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
         [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" >>$JEM_CALLS_LOG 2>&1;
+    }
+
+    [ -f "${CUSTOM_RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${CUSTOM_RULES_FILE}" 2>>$ACTIONS_LOG ;
+        echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
 
     [ -f "${CUSTOM_RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${CUSTOM_RULES_FILE}" 2>>$ACTIONS_LOG ;
