@@ -249,7 +249,6 @@ function processnfs() {
         if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" 2>&1; then
             dosetupUtils ${_CTID} || return 2
         fi
-        $GREP -qP 'nfs(3|4)?' "/vz/root/${CTID}/etc/fstab" 2>&1 && migrateConfig ${_CTID}
 
         autofsdest="$($SED -e 's/\s/\\ /g' <<< $_DESTINATION)"
         mntEntry="$autofsdest ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
