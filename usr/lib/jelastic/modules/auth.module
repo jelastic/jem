@@ -464,7 +464,7 @@ function _addNativeip() {
     for i in "${IPLIST[@]}" ; do
         isValidIP $i || continue
         if [[ -f "/vz/root/${CTID}${destinationPath}" ]] ; then
-            writeJSONResponseOut "result=>4112" "message=>Exporting regular file is not supported" ;
+            writeJSONResponseOut "result=>4150" "message=>Exporting regular file is not supported" ;
             return $FALSE
         fi
 
