@@ -234,7 +234,7 @@ function processnfs() {
     if [[ "x$OS" == "xalpine" ]] ; then
         log "OS is ALPINE"
         if [[ ! -e "/vz/root/${_CTID}${MOUNTPROG_APK}" ]] ; then
-            dosetupUtils ${_CTID} || return 1
+            dosetupUtils ${_CTID} || return 2
         fi
 
         [[ ! -z "${CTID}" ]] && {
@@ -247,7 +247,7 @@ function processnfs() {
 
     else
         if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" 2>&1; then
-            dosetupUtils ${_CTID} || return 1
+            dosetupUtils ${_CTID} || return 2
         fi
 
         mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
@@ -429,7 +429,7 @@ function dosetupUtils() {
     fi
 
     if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
-        installCmd=$(installPackageCmd $OS install autofs nfs-common)
+        installCmd="apt update ; $(installPackageCmd $OS install autofs nfs-common)"
         checkCmd=$(checkPackageCmd $OS autofs nfs-common)
     else
         installCmd=$(installPackageCmd $OS install autofs nfs-utils)
@@ -505,8 +505,9 @@ function doMount() {
     }
     _DEFAULT_NFS_MOUNT_OPTS="${_DEFAULT_NFS_MOUNT_OPTS},${atype}"
     msg=$(process${mtype} "${sourceIP}" "${sourceMount}"); res=$?
-    [[ "$res" -gt 0 ]] && res="4111"
-    writeJSONResponseOut "result=>$res" "message=>${msg}" ;
+    [[ "$res" -gt 0 ]] && result="4111"
+    [[ "$res" -eq 2 ]] && return 1
+    writeJSONResponseOut "result=>$result" "message=>${msg}" ;
     return 0
 }
 
