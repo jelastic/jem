@@ -27,6 +27,7 @@ declare -a IPLIST;
 declare -i CTID;
 declare FALSE=1
 declare TRUE=0
+declare _BACKUP_COUNT=5
 
 EXPORTS_PATH="/etc/exports"
 EXPORTS_EXT=""
@@ -245,6 +246,18 @@ function validateExports() {
         done
         local backup="$1.backup-$(date +%d-%m-%Y.%k:%M:%S.%N)"
         cp -f "$1" "$backup" > /dev/null 2>&1
+
+        keeplist=$(mktemp)
+        fulllist=$(mktemp)
+        ls $1.backup-??-??-????.??:??:??.* -1t | head -n $_BACKUP_COUNT > "$keeplist" 2>/dev/null
+        ls $1.backup-??-??-????.??:??:??.* -1t > "$fulllist" 2>/dev/null
+        comm -13 --nocheck-order $keeplist $fulllist 2>/dev/null | while read f ; do
+            echo "removing backup file $f " >> $ACTIONS_LOG
+            rm -f "$f"
+        done
+        rm -f $keeplist
+        rm -f $fulllist
+
         for (( i = 0; i < ${#invalidExports[@]}; i++)) ; do
             lineToComment="/$(sed -re 's/\//\\\//g' <<< $(sed -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/(\\\\040|\\s)/g' <<< "${invalidExports[$i]}"))/ s/^#*/#/"
             sed -i -re "$lineToComment" "$1"
