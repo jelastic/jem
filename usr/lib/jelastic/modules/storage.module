@@ -505,6 +505,7 @@ function doMount() {
     }
     _DEFAULT_NFS_MOUNT_OPTS="${_DEFAULT_NFS_MOUNT_OPTS},${atype}"
     msg=$(process${mtype} "${sourceIP}" "${sourceMount}"); res=$?
+    result="$res"
     [[ "$res" -gt 0 ]] && result="4111"
     [[ "$res" -eq 2 ]] && return 1
     writeJSONResponseOut "result=>$result" "message=>${msg}" ;
