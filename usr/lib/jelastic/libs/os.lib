@@ -334,7 +334,7 @@ function installPackageCmd() {
                 PM="zypper --quiet --non-interactive"
             ;;
         debian|ubuntu|kali)
-                PM="DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::=\"--force-confold\""
+                PM="DEBIAN_FRONTEND=noninteractive apt-get -y --allow-unauthenticated -o Dpkg::Options::=\"--force-confold\""
             ;;
         centos|redhat|fedora)
                 PM="yum -y"
