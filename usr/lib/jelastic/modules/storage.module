@@ -190,12 +190,12 @@ function checkMount() {
     [[ -z "${CTID}" ]] && return 0
     localCIPs="$($SED -re 's/\./\\\./g' -e 's/\s+/\|/g' <<< $(getTargetIPs $CTID))"
     retries=5
-    vzexecRun "showmount -e $1 2>/dev/null | grep $2 | grep -qP \"$localCIPs\""
+    vzexecRun "showmount -e $1 2>/dev/null | grep \"$2\" | grep -qP \"$localCIPs\""
 
     while [[ $retries -gt 0 ]] ; do
         if [[ "$(vzexecGetLastErrCode)" -gt 0 ]]; then
             sleep 4
-            vzexecRun "showmount -e $1 2>/dev/null | grep $2 | grep -qP \"$localCIPs\""
+            vzexecRun "showmount -e $1 2>/dev/null | grep \"$2\" | grep -qP \"$localCIPs\""
             retries=$((retries-1))
         else
             return $(vzexecGetLastErrCode)
@@ -203,7 +203,7 @@ function checkMount() {
     done
 
     if [[ "$(vzexecGetLastErrCode)" -gt 0 ]]; then
-        vzexecRun "showmount -e $1 | grep $2 | grep -qP \"$localCIPs\""
+        vzexecRun "showmount -e $1 | grep \"$2\" | grep -qP \"$localCIPs\""
          echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: StdErr: $(vzexecGetLastStdErr) StdOut": $(vzexecGetLastStdErr) >> ${JEM_CALLS_LOG};
     fi
 
@@ -214,7 +214,7 @@ function checkMount() {
 function processnfs() {
     local sourceIP=${1:?"Source address required"}
     local sourceMount=${2:?"Source share name required"}
-    local sourceMountUnEsc=$($SED -re 's/\\(\/|\(|\)|\]|\[|\\)/\1/g' -e 's/\s/\\\\040/g' <<< "$sourceMount")
+    local sourceMountUnEsc=$($SED -re 's/\\(\/|\(|\)|\]|\[|\\)/\1/g' <<< "$sourceMount")
     local destinationEsc=$($SED -re 's/\s/\\\\040/g' <<< "${_DESTINATION}" )
     local running
 
@@ -251,12 +251,13 @@ function processnfs() {
         fi
         $GREP -qP 'nfs(3|4)?' "/vz/root/${CTID}/etc/fstab" 2>&1 && migrateConfig ${_CTID}
 
-        mntEntry="${destinationEsc} ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
+        autofsdest="$($SED -e 's/\s/\\ /g' <<< $_DESTINATION)"
+        mntEntry="$autofsdest ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
         cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
     fi
 
     if [[ $running -eq 0 ]] ; then
-        if ! checkMount $sourceIP $sourceMountUnEsc ; then
+        if ! checkMount $sourceIP "$sourceMountUnEsc" ; then
             echo "Destination NFS server is not reachable. Server IP: $(vzctl exec2 ${CTID} host ${sourceIP} 2>/dev/null), Client IP: $($AWK '/[ \t]*'${CTID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo )"
             return 1
         fi
@@ -574,9 +575,9 @@ function doUmount() {
                 if [[ "x$OS" == "xalpine" ]] ; then
                     local dpath="\s+$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+(nfs|none)\s+";
                 else
-                    local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+-fstype=nfs.*";
+                    local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\ /g' <<< "${shares[$i]}"))\s+-fstype=nfs.*";
                 fi
-                out=$($SED -i -re /${dpath}/d ${MOUNTS_STORAGE} 2>&1)
+                out=$($SED -i -re /"${dpath}"/d ${MOUNTS_STORAGE} 2>&1)
                 [[ ! -z "${out}" ]] && log "${out}";
                 retfunc="writeJSONResponseOut result=>0"
             else
