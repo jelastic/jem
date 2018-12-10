@@ -249,14 +249,14 @@ function validateExports() {
 
         keeplist=$(mktemp)
         fulllist=$(mktemp)
-        ls $1.backup-??-??-????.??:??:??.* -1t | head -n $_BACKUP_COUNT > "$keeplist" 2>/dev/null
+        ls $1.backup-??-??-????.??:??:??.* -1t 2>/dev/null | head -n $_BACKUP_COUNT > "$keeplist" 2>/dev/null
         ls $1.backup-??-??-????.??:??:??.* -1t > "$fulllist" 2>/dev/null
         comm -13 --nocheck-order $keeplist $fulllist 2>/dev/null | while read f ; do
             echo "removing backup file $f " >> $ACTIONS_LOG
             rm -f "$f"
         done
-        rm -f $keeplist
-        rm -f $fulllist
+        rm -f $keeplist 2>/dev/null
+        rm -f $fulllist 2>/dev/null
 
         for (( i = 0; i < ${#invalidExports[@]}; i++)) ; do
             lineToComment="/$(sed -re 's/\//\\\//g' <<< $(sed -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/(\\\\040|\\s)/g' <<< "${invalidExports[$i]}"))/ s/^#*/#/"
