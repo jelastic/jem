@@ -534,12 +534,16 @@ function dofwset() {
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
     echo "*filter" > "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
     for ruleraw in ${RULES[@]} ; do
-        rulevars=$(awk -F, '{print "proto="$1";ptype="$2";dport="$3";srchost="$4";dsthost="$5";chain="$6";raction="$7";tcptype="$8";"}' <<< $ruleraw )
+        rulevars=$(awk -F, '{print "proto="$1";ptype="$2";dport="$3";srchost="$4";dsthost="$5";chain="$6";raction="$7";tcptype="$8";cmd="$9";"}' <<< $ruleraw )
         eval $rulevars
         chain="${chain^^}"
         proto="${proto,,}"
+        cmd="${cmd,^^}"
+        if [ "x$cmd" != "x" ] ; then
+            cmd="-A"
+        fi
 
-        rulecmd="-A $chain"
+        rulecmd="$cmd $chain"
         if [ "x$proto" != "x" ] ; then
             rulecmd="$rulecmd -p $proto"
         fi
