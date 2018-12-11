@@ -541,6 +541,8 @@ function dofwset() {
         cmd="${cmd,^^}"
         if [ "x$cmd" != "x" ] ; then
             cmd="-A"
+        else
+            cmd="-$cmd"
         fi
 
         rulecmd="$cmd $chain"
