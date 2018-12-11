@@ -456,9 +456,11 @@ function doEnable() {
         $SED -i -re '/^$/d' ${META_FILE}
     fi
 
-    local issue_file="/vz/root/${CTID}/etc/issue";
-    local release_files="/vz/root/${CTID}/etc/*-release";
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+    prefix=""
+    [[ $CTID -ge 0 ]] && prefix="/vz/root/$CTID"
+    local issue_file="$prefix/etc/issue"
+    local release_files="$prefix/etc/*-release"
+    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null)
     OS=$(detectOS "$issue_string")
     OS_ver=$(getOSVersion "$issue_string")
     OS_ver=${OS_ver%%.*}
