@@ -457,7 +457,7 @@ function doEnable() {
     fi
 
     prefix=""
-    [[ $CTID -ge 0 ]] && prefix="/vz/root/$CTID"
+    [[ $CTID -gt 0 ]] && prefix="/vz/root/$CTID"
     local issue_file="$prefix/etc/issue"
     local release_files="$prefix/etc/*-release"
     issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null)
