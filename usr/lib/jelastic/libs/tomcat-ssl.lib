@@ -29,7 +29,6 @@ function enableSSL(){
         local msg;
         msg=$(doAction keystore install 2>&1);
         local result=$?;
-        [ -z "$msg" ] || echo "$msg" | $SED -re 's|.*result.*message\":||' -e 's|\}||' >>$ACTIONS_LOG;
         [ "$result" -ne 0 ] && return $result;
         stopServiceSilent "$SERVICE" ;
         $SED -i '/<!--/d' $SERVER_XML_CONFIG;
@@ -38,7 +37,9 @@ function enableSSL(){
 }
 
 function disableSSL(){
-        local msg=$(doAction keystore remove);
+        local msg=$(doAction keystore remove 2>&1);
+        local result=$?;
+        [ "$result" -ne 0 ] && return $result;
         stopServiceSilent "$SERVICE" ;
         $SED  -i '1i  <!--' $SERVER_XML_CONFIG;
         $SED  -i '$a  -->' $SERVER_XML_CONFIG;
