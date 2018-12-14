@@ -44,7 +44,44 @@ function doInstall(){
                       { writeJSONResponseErr "result=>4116" "message=>SSL installation is not implemented"; return 0; }
                fi                                          
         fi
-        $(enableSSL) && writeJSONResponseOut "result=>0" "message=>SSL installed succesfully" || { writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"; return 1; };
+        $(enableSSL) ; sslresult=$?;
+
+   case $sslresult in
+	209 ) 
+		writeJSONResponseErr "result=>4009" "message=>Could not detect valid domain for uploaded certificate"
+	;;
+	210 ) 
+		writeJSONResponseErr "result=>4010" "message=>No certificates installed"
+	;;
+	211 ) 
+		writeJSONResponseErr "result=>4011" "message=>Uploaded file isn't a certificate!"
+	;;
+	213 ) 
+		writeJSONResponseErr "result=>4012" "message=>Could not receive certificate!"
+	;;
+	214 )
+		writeJSONResponseErr "result=>4013" "message=>Could not receive CA certificate"
+	;;
+	215 )
+		writeJSONResponseErr "result=>4014" "message=>Certificate does not match key!"
+	;;
+	215 )
+		writeJSONResponseErr "result=>4015" "message=>Uploaded file isn't a private key!"
+	;;
+	216 ) 
+		writeJSONResponseErr "result=>4016" "message=>Could not receive private key!"
+	;; 
+	0)
+		writeJSONResponseOut "result=>0" "message=>SSL installed succesfully"
+	;;
+
+	220|221)
+	;;
+
+	*) writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"
+	;; 
+esac
+return $sslresult 
 }
 
 
