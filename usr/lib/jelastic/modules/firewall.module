@@ -256,6 +256,11 @@ function doStart() {
 
     $IPTABLES -F;
     $IPTABLES -t nat -F;
+
+    if [ -f /proc/net/if_inet6 ] ; then
+        $IP6TABLES -F;
+        $IP6TABLES -t nat -F;
+    fi
     _setDefaultPolicy;
 
     $IPTABLES -A INPUT -i lo -j ACCEPT
