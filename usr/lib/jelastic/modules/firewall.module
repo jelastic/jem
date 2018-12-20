@@ -474,7 +474,7 @@ function doEnable() {
     # VZ containers has no modprobe support
     if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
         [ -d "/usr/share/netfilter-persistent/plugins.d/" ] && {
-            sed -i -re '/\/sbin/\modprobe/s/^/#/g' "/usr/share/netfilter-persistent/plugins.d/*" >>$ACTIONS_LOG 2>&1
+            sed -i -re '/\/sbin\/modprobe/s/^/#/g' /usr/share/netfilter-persistent/plugins.d/* >>$ACTIONS_LOG 2>&1
             systemctl enable netfilter-persistent >>$ACTIONS_LOG 2>&1
         }
     else
