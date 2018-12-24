@@ -56,13 +56,13 @@ function doInstall(){
 	211 ) 
 		writeJSONResponseErr "result=>4011" "message=>Uploaded file isn't a certificate!"
 	;;
-	213 ) 
+	212 ) 
 		writeJSONResponseErr "result=>4012" "message=>Could not receive certificate!"
 	;;
-	214 )
+	213 )
 		writeJSONResponseErr "result=>4013" "message=>Could not receive CA certificate"
 	;;
-	215 )
+	214 )
 		writeJSONResponseErr "result=>4014" "message=>Certificate does not match key!"
 	;;
 	215 )
