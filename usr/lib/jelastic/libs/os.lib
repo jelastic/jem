@@ -291,7 +291,7 @@ function getOSVersion() {
             fi
 
             if [ -z "$OS_version" ] ; then
-                OS_version=$($GREP -m 1 -h "Debian" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z\/ ]*\s([0-9.]*).*/\1/;p;n')
+                OS_version=$($GREP -m 1 -hP "Ubuntu|Debian" <<< "$issue_string" 2>/dev/null | $SED -nre 's/[a-zA-Z\/ ]*\s([0-9.]*).*/\1/;p;n')
             fi
 
             if [ -z "$OS_version" ] ; then
