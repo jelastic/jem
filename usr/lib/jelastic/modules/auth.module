@@ -91,8 +91,8 @@ function onModLoadCallback() {
     done;
     [[ ! -z "${CTID}" ]] && {
         vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; };
-        NFS_CONFIG_DIR="/vz/root/${CTID}${NFS_CONFIG_DIR}"
-        NFS_CONFIG_FILE="/vz/root/${CTID}${NFS_CONFIG_FILE}"
+        NFS_CONFIG_DIR="/vz/root/${CTID}/etc/"
+        NFS_CONFIG_FILE="${NFS_CONFIG_DIR}exports"
         EXPORTS_FILE="/vz/root/${CTID}${CONTAINER_EXPORTS_FILE}"
     }
 }
@@ -244,16 +244,16 @@ function validateExports() {
         for (( i = 0; i < ${#dd[@]}; i++)) ; do
             isValidShare ${dd[$i]} $1 "/vz/root/${CTID}" || invalidExports=("${invalidExports[@]}" "${dd[$i]}")
         done
-        local backup="$1.backup-$(date +%d-%m-%Y.%k:%M:%S.%N)"
+        local backup="$1.backup-$(date +%d-%m-%Y.%H:%M:%S.%N)"
         cp -f "$1" "$backup" > /dev/null 2>&1
 
         keeplist=$(mktemp)
         fulllist=$(mktemp)
-        ls $1.backup-??-??-????.??:??:??.* -1t 2>/dev/null | head -n $_BACKUP_COUNT > "$keeplist" 2>/dev/null
-        ls $1.backup-??-??-????.??:??:??.* -1t > "$fulllist" 2>/dev/null
+        find $NFS_CONFIG_DIR -name exports.backup-??-??-????.??:??:??.* -printf '%T@ %p\n' 2>/dev/null | sort -k 1nr | sed 's/^[^ ]* //' | head -n $_BACKUP_COUNT > $keeplist 2>/dev/null
+        find $NFS_CONFIG_DIR -name exports.backup-??-??-????.??:??:??.* -printf '%T@ %p\n' 2>/dev/null | sort -k 1nr | sed 's/^[^ ]* //' > $fulllist 2>/dev/null
         comm -13 --nocheck-order $keeplist $fulllist 2>/dev/null | while read f ; do
             echo "removing backup file $f " >> $ACTIONS_LOG
-            rm -f "$f"
+            rm $f 2>/dev/null
         done
         rm -f $keeplist 2>/dev/null
         rm -f $fulllist 2>/dev/null
