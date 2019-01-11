@@ -259,7 +259,7 @@ function doStart() {
 
     if [ -f /proc/net/if_inet6 ] ; then
         $IP6TABLES -F;
-        $IP6TABLES -t nat -F;
+        $IP6TABLES -t nat -F 2>/dev/null;
     fi
     _setDefaultPolicy;
 
