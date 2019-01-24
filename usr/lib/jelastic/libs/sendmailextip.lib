@@ -33,6 +33,9 @@ function SendmailExtIp() {
     }
 
     if [ -f /usr/sbin/sendmail.sendmail ]; then
+        [ $UID -eq 0 ] && {
+            chmod g+s /usr/sbin/sendmail.sendmail 2>/dev/null
+        }
         myip=$($IP route get 1 | $AWK '{print $NF;exit}')
         if isLANIP $myip &&  [ ${SENDMAIL_ENABLED} -eq 0 ] ; then
             SM_ENABLED=0;
