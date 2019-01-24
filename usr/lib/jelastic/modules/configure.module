@@ -141,9 +141,6 @@ function doOption(){
         return 80;
     }
     if [ "x$MANAGE_OPTION" == "xSENDMAIL" ]; then
-        [ $UID -eq 0 ] && {
-            [ -f /usr/sbin/sendmail.sendmail ] && chmod g+s /usr/sbin/sendmail.sendmail 2>/dev/null
-        }
         inherit sendmailextip ; SendmailExtIp ;
     fi
     writeJSONResponseOut "result=>0" "message=>Option ${MANAGE_OPTION} configured successfully"
