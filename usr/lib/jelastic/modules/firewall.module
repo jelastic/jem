@@ -259,7 +259,7 @@ function doStart() {
 
     if [ -f /proc/net/if_inet6 ] ; then
         $IP6TABLES -F;
-        $IP6TABLES -t nat -F;
+        $IP6TABLES -t nat -F 2>/dev/null;
     fi
     _setDefaultPolicy;
 
@@ -308,12 +308,12 @@ function doStart() {
         echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_4RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
 
-    [ -f "${JELASTIC_6RULES_FILE}" ] && { $IP6TABLES_RESTORE -n < "${JELASTIC_6RULES_FILE}" 2>>$ACTIONS_LOG ;
-        echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_6RULES_FILE}" >> $JEM_CALLS_LOG ;
-    }
-
     [ -f "${CUSTOM_6RULES_FILE}" ] && { $IP6TABLES_RESTORE -n < "${CUSTOM_6RULES_FILE}" 2>>$ACTIONS_LOG ;
         echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_6RULES_FILE}" >> $JEM_CALLS_LOG ;
+    }
+
+    [ -f "${JELASTIC_6RULES_FILE}" ] && { $IP6TABLES_RESTORE -n < "${JELASTIC_6RULES_FILE}" 2>>$ACTIONS_LOG ;
+        echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_6RULES_FILE}" >> $JEM_CALLS_LOG ;
     }
 
     [ -f "${JELASTIC_4NATRULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${JELASTIC_4NATRULES_FILE}" 2>>$ACTIONS_LOG ;

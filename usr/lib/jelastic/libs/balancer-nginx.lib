@@ -45,6 +45,9 @@ EXTRA_CONF="${UPSTREAMS_LOCATION_PATH}/extra-conf"
 STICKY_CONF="${UPSTREAMS_LOCATION_PATH}/sticky-conf"
 DISCLIMER_LINE="#This config is auto-generated. DO NOT modify the weight property. If changing the rest of settings, please, remember that you are doing this at your own risk."
 
+export $(grep UPSTREAM_KEEPALIVE /.jelenv 2>/dev/null | tr -d '"') >/dev/null
+[ -z "${UPSTREAM_KEEPALIVE##*[!0-9]*}" ] && UPSTREAM_KEEPALIVE=100
+UPSTREAM_KEEPALIVE=${UPSTREAM_KEEPALIVE:-100}
 [ ! -f "$UPSTREAM_COMMON_CONFIG" ] && touch "$UPSTREAM_COMMON_CONFIG"
 
 ############ SERVICE FUNCTIONS ###########
@@ -184,7 +187,7 @@ function generateUpstreams(){
       echo "${upstreams[@]} ### UPSTREAMPROTO for $1 ###"
     else
       [ ! -z "$WEIGHT_CHANGED_FLAG" ] && { [ "$WEIGHT_CHANGED_FLAG" -eq 1 ] && [ -f "$EXTRA_CONF" ] && extraConfContent=$( <${EXTRA_CONF} ); }
-      echo "upstream $1 {${backups[@]}  ${upstreams[@]} $extraConfContent sticky path=/; } ### UPSTREAMPROTO for $1 ###"
+      echo "upstream $1 { ${backups[@]}  ${upstreams[@]} $extraConfContent sticky path=/; keepalive $UPSTREAM_KEEPALIVE; } ### UPSTREAMPROTO for $1 ###"
     fi
   else
     toActionLog "- ${GROUP_CONFIG} not exists" ;
@@ -262,6 +265,7 @@ function updateMappingsSection(){
   	LINE=( $( $GREP -n MAPPROTO $NGINX_CONFIG | tail -n 1 | $AWK -F: '{print $1}') )
     $SED -i "$LINE a $MAPPING_LINE" $NGINX_CONFIG
   fi
+  $SED -i  "/DEFUPPROTO/!b;n;n;s/100/$UPSTREAM_KEEPALIVE/" $NGINX_CONFIG
 }
 
 function updateDefaultUpstreamSection(){
