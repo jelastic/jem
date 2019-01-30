@@ -360,7 +360,13 @@ function describeList() {
 }
 
 function doList() {
+    echo "IPTABLES rules ($@)"
+    echo "--------------------"
     $IPTABLES -L -t $@
+    echo
+    echo "IP6TABLES rules ($@)"
+    echo "--------------------"
+    $IP6TABLES -L -t $@
 }
 
 function doFWStart() {
