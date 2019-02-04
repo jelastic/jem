@@ -316,6 +316,7 @@ function processnfs() {
 }
 
 function processlocal() {
+    CONTAINER_MOUNTS_STORAGE="/etc/fstab"
     log "source: $sourceMount destination: ${_DESTINATION} ctid: ${_CTID}"
     local mntEntry="${sourceMount}\t${_DESTINATION}\tnone\trw,bind\t0\t0"
 
@@ -366,7 +367,7 @@ function processlocal() {
     echo -e $mntEntry >> "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}"
     echo $mntEntry
     if [[ $running -eq 0 ]] ; then
-        vzexecRun "mount ${_DESTINATION}"
+        vzexecRun "mount \"$($SED -re 's/("\*|\$|\?|\|\^|`|'\'')/\\\1/g' <<< "${_DESTINATION}")\""
     else
         $VZCTL umount $CTID > /dev/null 2>&1
     fi
