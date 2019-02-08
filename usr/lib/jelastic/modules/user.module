@@ -155,7 +155,7 @@ function __processNotVDS(){
 }
 
 function preAddCallback(){
-	log "$@";
+    log "$@";
 
     options=`getopt -o n,d,u,e -l uid:,new,eid -- "$@"`;
     while [ $# -gt 0 ]
@@ -189,19 +189,29 @@ function preAddCallback(){
             die -q
         }
         if [[ -f ${prefix}/etc/jelastic/metainf.conf ]]; then
-            __processNotVDS ${_CTID}
-            _UID=700
-            _GUID=700
+            # JE-45748: evalueate compute type from metainf, empty value if there is no compute type in file
+            eval "CT_$(grep "COMPUTE_TYPE=" ${prefix}/etc/jelastic/metainf.conf 2>/dev/null || echo "COMPUTE_TYPE=")"
+            if [ ! -z $CT_COMPUTE_TYPE -a "x$CT_COMPUTE_TYPE" != "xvds" ] ; then
+                # JE-45748 : container with metainf.conf and not empty compute type
+                __processNotVDS ${_CTID}
+                _UID=700
+                _GUID=700
+            else
+                # JE-45748 : container with metainf.conf and empty compute type
+                __processVDS ${_CTID}
+                _UID=0
+                _GUID=0
+            fi
         else
+            # JE-45748 : container without metainf.conf
             __processVDS ${_CTID}
             _UID=0
             _GUID=0
-
         fi
     fi
 
-	isFunction "getAppUserInfo" && { log "Call getAppUserInfo"; "getAppUserInfo" "${_USER_NAME}"; } || {  writeJSONResponseErr "result=>4048" "message=>Can not get user info!"; die -q; };
-	[ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
+    isFunction "getAppUserInfo" && { log "Call getAppUserInfo"; "getAppUserInfo" "${_USER_NAME}"; } || {  writeJSONResponseErr "result=>4048" "message=>Can not get user info!"; die -q; };
+    [ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
 }
 
 function doAdd() {
