@@ -691,6 +691,23 @@ function doRemove() {
     return $?
 }
 
+function doList() {
+    local _first=0
+    if [ ! -e "${EXPORTS_FILE}" ] ; then
+        echo '{"result":"4099", "message":"'${EXPORTS_FILE}' not found!"}'
+    fi
+
+    echo '{"result":"0", "shares":['
+    while read l ; do
+        [[ $_first -eq 0 ]] && { $_first=1 } || echo ","
+        echo -n "{"
+        sed -re 's/^"(.*)"\s+.*fsid=([^,\)]+).*/"name":"\1","fsid":"\2"/' <<< $l | \
+        sed -re'/root"$/{s/.*"root"/\0,"fuse":"false"/;q}' -e 's/.*/\0,"fuse":"true"/'
+        echo -n "}"
+    done < "${EXPORTS_FILE}"
+    echo "]}"
+}
+
 function doClean() {
     _clean${NFS_BACKEND}${ATYPE};
     return $?
