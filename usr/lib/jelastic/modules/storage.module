@@ -211,6 +211,16 @@ function checkMount() {
     return $(vzexecGetLastErrCode)
 }
 
+function processnfs4() {
+    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nolock,soft,timeo=120,retrans=20,_netdev"
+    processnfs $*
+}
+
+function processnfs3() {
+    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,udp,soft,timeo=120,retrans=20,_netdev"
+    processnfs $*
+}
+
 function processnfs() {
     local sourceIP=${1:?"Source address required"}
     local sourceMount=${2:?"Source share name required"}
@@ -488,7 +498,7 @@ function doMount() {
 
     # parse connection string
     _SOURCE="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< "$_SOURCE")"
-    eval "$(echo "${_SOURCE}" | $SED -rne "s/(([Rr][Oo]|[Rr][Ww]):?([Ll][Oo][Cc][Aa][Ll]|[Nn][Ff][Ss]|[Ww][Ee][Bb][Dd][Aa][Vv]):?(\/){0,2})?([^:]+):?(.*)/atype=\2\nmtype='\3'\nsourceIP='\5'\nsourceMount='\6';/g;p" | $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
+    eval "$(echo "${_SOURCE}" | $SED -rne "s/(([Rr][Oo]|[Rr][Ww]):?([Ll][Oo][Cc][Aa][Ll]|[Nn][Ff][Ss]3?4?|[Ww][Ee][Bb][Dd][Aa][Vv]):?(\/){0,2})?([^:]+):?(.*)/atype=\2\nmtype='\3'\nsourceIP='\5'\nsourceMount='\6';/g;p" | $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
     mtype=${mtype,,}
     atype=${atype,,}
     atype=$($SED -re 's/;//g' <<< $atype)
