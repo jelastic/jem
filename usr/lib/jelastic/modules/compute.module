@@ -138,10 +138,10 @@ function doDeploy(){
         fi
     }
 
+    applyHook ${context} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
+
     local vcs_project_properties="/var/lib/jelastic/vcs/${context}.properties";
     [ -f "$vcs_project_properties" ] && { set -f; rm -f "$vcs_project_properties"; set +f; }
-
-    applyHook ${context} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
     
     deploy_function="deploy"
  
