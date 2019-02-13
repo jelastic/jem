@@ -496,6 +496,8 @@ function _addNativeip() {
                 vzexecRun "grep \" / ext\" /proc/mounts | awk '{print "'$1'"}' | xargs blkid | head -n 1 | sed -re 's/.* UUID=\"([a-z0-9-]+)\".*/\1/' "
                 _UUID=$(vzexecGetLastStdOut)
             fi
+        else
+            _createPath=0
         fi
         _UUID=root
     fi
@@ -553,6 +555,7 @@ function _addNativeip() {
                     vzexecRun "showmount -e  2>/dev/null | grep -qP \"$IPLIST\""
                     retries=$((retries-1))
                 else
+                    [[ $_isFUSE -eq 1 ]] && _isFUSE="true" || _isFUSE="false"
                     writeJSONResponseOut "result=>0" "message=>Client configuration has been changed" "version=>$_version" "fuse=$_isFUSE" "UUID=$_UUID"
                     return $(vzexecGetLastErrCode)
                 fi
