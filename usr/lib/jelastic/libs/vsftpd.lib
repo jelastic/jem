@@ -40,8 +40,8 @@ function setvsFtpCert(){
     [ -f /usr/lib/systemd/system/vsftpd.service ] && rm -f /usr/lib/systemd/system/vsftpd.service >/dev/null 2>&1;
     [ -f /usr/lib/systemd/system/vsftpd.target ] && rm -f /usr/lib/systemd/system/vsftpd.target >/dev/null 2>&1;
     [ -f /usr/lib/systemd/system/vsftpd@.service ] && rm -f /usr/lib/systemd/system/vsftpd@.service >/dev/null 2>&1;
-    systemctl daemon-reload > /dev/null ;
-    cp -f /etc/vsftpd/vsftpd.conf.tpl /etc/vsftpd/vsftpd.conf;
+    systemctl daemon-reload &>/dev/null ;
+    [ -f /etc/vsftpd/vsftpd.conf.tpl ] && cp -f /etc/vsftpd/vsftpd.conf.tpl /etc/vsftpd/vsftpd.conf || true;
 
 umask 77 ; echo "$COUNTRY
 $STATE
