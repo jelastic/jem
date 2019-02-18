@@ -556,7 +556,7 @@ function _addNativeip() {
                     retries=$((retries-1))
                 else
                     [[ $_isFUSE -eq 1 ]] && _isFUSE="true" || _isFUSE="false"
-                    writeJSONResponseOut "result=>0" "message=>Client configuration has been changed" "version=>$_version" "fuse=>$_isFUSE" "UUID=>$_UUID"
+                    writeJSONResponseOut "result=>0" "message=>Client configuration has been changed" "version=>NFS$_version" "fuse=>$_isFUSE" "UUID=>$_UUID"
                     return $(vzexecGetLastErrCode)
                 fi
             done
