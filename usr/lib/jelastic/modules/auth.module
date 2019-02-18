@@ -703,7 +703,7 @@ function doList() {
 
     echo '{"result":"0", "shares":['
     while read l ; do
-        [[ $_first -eq 0 ]] && $_first=1  || echo ","
+        [[ $_first -eq 0 ]] && _first=1  || echo ","
         echo -n "{"
         sed -re 's/^"(.*)"\s+.*fsid=([^,\)]+).*/"name":"\1","fsid":"\2"/' <<< $l | \
         sed -re'/root"$/{s/.*"root"/\0,"fuse":"false"/;q}' -e 's/.*/\0,"fuse":"true"/'
