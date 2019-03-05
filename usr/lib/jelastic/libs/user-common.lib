@@ -39,7 +39,7 @@ function fixRights(){
     chmod 555 /usr/bin/jem 2>>"$JEM_CALLS_LOG";
     chown root:root /usr/bin/jem 2>>"$JEM_CALLS_LOG";
     chmod 755 /var/lib/jelastic/libs 2>>"$JEM_CALLS_LOG";
-    chmod 644 /var/lib/jelastic/libs/* 2>>"$JEM_CALLS_LOG";    
+    chmod 644 /var/lib/jelastic/libs/* 2>>"$JEM_CALLS_LOG";
     [ -f /var/lib/jelastic/libs/gitssh.sh ] && { chmod a+x /var/lib/jelastic/libs/gitssh.sh 2>>"$JEM_CALLS_LOG"; }
 }
 
@@ -47,17 +47,17 @@ function fixRights(){
 #       return uid, guid, home_dir of user defined in DATA_OWNER in envinfo.lib (DATA_OWNER=user:group)
 # result:
 #       _UID  user id
-#       _GUID  group id 
+#       _GUID  group id
 #		_homedir  homedir
 function bashRestricts(){
         bashrcvar="export PS1='\[\033[01;32m\]\u@\h\[\033[01;34m\] \w \$\[\033[00m\] '
 shopt -s histappend
 readonly PROMPT_COMMAND=\"history -a\"
 readonly HISTFILE
-readonly HISTFILESIZE 
-readonly HISTSIZE 
-readonly HISTCMD 
-readonly HISTCONTROL 
+readonly HISTFILESIZE
+readonly HISTSIZE
+readonly HISTCMD
+readonly HISTCONTROL
 readonly HISTIGNORE
 [[ -f ~/.profile ]] && . ~/.profile
 [[ -f ~/.bashrc ]] && . ~/.bashrc"
@@ -95,11 +95,10 @@ readonly HISTIGNORE
 }
 
 function getAppUserInfo(){
-	# return 0;
-        [ ! -z "${DATA_OWNER}" ] && {
-		local _appuser=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
-		local _appgroup=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
-		_UID=$(id -u $_appuser);
+    [ ! -z "${DATA_OWNER}" ] && {
+        local _appuser=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
+        local _appgroup=$($AWK -F : '{print $1}' <<< ${DATA_OWNER});
+        _UID=$(id -u $_appuser);
         _GUID=$(id -g $_appgroup);
         case ${COMPUTE_TYPE} in
             memcached )
@@ -111,7 +110,7 @@ function getAppUserInfo(){
                 mkdir -p "/opt/maven/";
                 _homedir="/opt/maven/";
                 chown ${_UID}:${_GUID} ${_homedir} 2>>"$JEM_CALLS_LOG";
-	    ;;
+            ;;
             glassfish)
                 [ -d /var/lib/jelastic/glalssfish ] && {
                     chmod -R 700 /var/lib/jelastic/glalssfish 2>&1 >/dev/null;
@@ -125,14 +124,14 @@ function getAppUserInfo(){
         if [ "x${COMPUTE_TYPE}" != "xgate" ] ;then
             bashRestricts;
         fi
-		#check if not empty
-	}
-	# || retern error
+        #check if not empty
+    }
+    return 0
 }
 
 # postAddReform
 # 		make all you need after add user
-# 		 Check key - if not exists enerete new key 
+# 		 Check key - if not exists enerete new key
 # 		 add pub to authorized_keys, return private (put it to _SSH_PRIVATE_KEY)
 # return:
 #		return code is 0 if success 1 othervise
@@ -186,7 +185,7 @@ function postAddReform(){
             chmod -f 700 "${_User_AuthorizedKeysDir}" 2>>"$JEM_CALLS_LOG";
     fi
 
-    retval="$?" 
+    retval="$?"
 
     [ "x${_DISABLE_PASS_AUTH}" == "xtrue" ] && doAction user access --action disable --type pwd &>>JEM_CALLS_LOG;
 
