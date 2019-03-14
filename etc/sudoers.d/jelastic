@@ -36,7 +36,7 @@ Cmnd_Alias CARTRIDGE_SERVICE = /sbin/service cartridge stop, /sbin/service cartr
 
 Cmnd_Alias CUSTOM_IMPR = /usr/bin/passwd jelastic-ftp, /usr/bin/jem firewall fwstart, /usr/bin/jem balancer rebuildconfig, /usr/bin/jem firewall list *, /usr/bin/chmod * /var/log*, /usr/bin/chmod * /var/run*, /usr/bin/rm -f /var/run*, /usr/bin/touch /var/run*, /usr/bin/chmod * /usr/lib/jelastic*, /usr/bin/chmod * /usr/bin/jem, /usr/bin/mkdir * /var/cache/downloads, /usr/bin/setfacl * /var/cache/downloads, /usr/bin/chown * /var/lib/jelastic/env, /usr/bin/chmod * /etc/environment, /usr/bin/chmod * /var/lib/jelastic/hooks/*, /usr/bin/pear *
 
-Cmnd_Alias JEM = /bin/jem service start, /bin/jem service stop, /bin/jem service restart, /bin/jem compute deploy *
+Cmnd_Alias JEM = /bin/jem service start, /bin/jem service stop, /bin/jem service restart, /bin/jem compute deploy *, /bin/jem service reload
 
 Cmnd_Alias NSCD_SERVICE = /usr/bin/systemctl * nscd, /usr/sbin/nscd *, /usr/bin/systemctl * nscd.socket, /usr/sbin/nscd *
 
