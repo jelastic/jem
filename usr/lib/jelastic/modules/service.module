@@ -88,6 +88,11 @@ function doStart(){
     startService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; writeJSONResponseOut "result=>$?" "message=>Service been started with code $?";
 }
 
+function doReload(){
+    [ ! -z "$1" ] && SERVICE=$1;
+    reloadService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; writeJSONResponseOut "result=>$?" "message=>Service been reloaded with code $?";
+}
+
 function doEnable(){
     [ ! -z "$1" ] && SERVICE=$1;
     include sendmailextip ; isFunction "SendmailExtIp" && SendmailExtIp ;
