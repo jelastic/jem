@@ -377,7 +377,7 @@ function doAction() {
     actionResult="124";
     local ppid=$!
         [ -z "$ppid" ] || {
-            local ppids=$(pstree -p $ppid | tr -d '\n' | sed -re 's/[a-z]*\(([0-9]*)\)\-*/\1 /g' -e 's/[\|+\`\-]//g' -e 's/\s{2,}/ /g')
+            local ppids=$(pstree -p $ppid | tr -d '\n' | sed -re 's/[^0-9]/\ /g' -e 's/\s{2,}/ /g' )
             [ -z "$ppids" ] || {
                 echo "Killing after timeout $ppids" >> ${JEM_CALLS_LOG} 2>&1
                 kill -9 $ppids >>${JEM_CALLS_LOG} 2>&1
