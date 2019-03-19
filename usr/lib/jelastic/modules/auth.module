@@ -328,10 +328,7 @@ function _nfsReexport() {
 }
 
 function doRestart() {
-    if ! _nfsReexport ; then
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not reload configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)"
-        return 1
-    fi
+    ! _nfsReexport && return 1
     writeJSONResponseOut "result=>0" "message=>Success"
     return 0
 }
