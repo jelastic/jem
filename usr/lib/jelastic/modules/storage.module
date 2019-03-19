@@ -159,15 +159,15 @@ function preparePath() {
         tpath=$($SED -re 's/\$/\\$/g' -e 's/(`)/\\\1/g' <<< "${tpath}")
     fi
 
-    local cmd="[[ ! -d '$($SED -re "s/'/\\\'\'/g" <<< "${tpath}")' ]] && mkdir -p \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\" 2>&1 && chmod 0777 \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\"";
+    local cmd="[[ ! -d '$($SED -re "s/'/\\\'\'/g" <<< "${tpath}")' ]] && mkdir -p \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\" 2>/dev/null && chmod 0777 \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\"";
     if [[ -z "${hn}" ]] ; then
         log "${cmd}"
         vzexecRun "${cmd}"
-        return 0;
+        return $(vzexecGetLastErrCode)
     fi
     log "${cmd}"
     /bin/bash -c "$cmd"
-    return 0;
+    return $?;
 }
 
 function remountPath() {
@@ -272,7 +272,10 @@ function processnfs() {
         fi
     fi
 
-    preparePath "${_DESTINATION}" "${_CTID}"
+    if ! preparePath "${_DESTINATION}" "${_CTID}" ; then
+        echo "Can not create path ${_DESTINATION}"
+        return 1
+    fi
 
     if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
         log "registering ${sourceIP}:${sourceMount} in ${_CTID}"
@@ -358,8 +361,14 @@ function processlocal() {
         log "cannot get fstab entries"
     fi
 
-    preparePath "${_DESTINATION}" 1
-    preparePath "${sourceMount}" 1
+    if ! preparePath "${_DESTINATION}" 1 ; then
+        echo "Can not create path ${_DESTINATION}"
+        return 1
+    fi
+    if ! preparePath "${sourceMount}" 1 ; then
+        echo "Can not create path ${sourceMount}"
+        return 1
+    fi
 
     hnSrcPath=${sourceMount}
     hnDstPath=${_DESTINATION}
