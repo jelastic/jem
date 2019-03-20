@@ -26,8 +26,8 @@ echo ":[EXEC]      [PID: $$] $@" >> ${JEM_CALLS_LOG} 2>&1;
 
 sudo chmod 666 ${JEM_CALLS_LOG};
 sudo chmod 555 /usr/bin/jem;
-sudo find /usr/lib/jelastic -type d -print0 | xargs -0 sudo chmod 0755;
-sudo find /usr/lib/jelastic -type f -print0 | xargs -0 sudo chmod 0644;
+find /usr/lib/jelastic -type d -print0 | xargs -0 sudo chmod 0755;
+find /usr/lib/jelastic -type f -print0 | xargs -0 sudo chmod 0644;
 
 "unalias" -a;
 unset -f rm;
