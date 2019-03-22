@@ -530,6 +530,7 @@ function _addNativeip() {
             _done=1
         else
             log "${i} already in list"
+            _done=1
         fi
     done
 
