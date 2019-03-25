@@ -82,9 +82,10 @@ function loadConfig() {
 
 function loadINISection() {
     local inifile=${1} section=${2} ini
+    grep -q -E "^\[$section]" $inifile || return
     ini="$(<$inifile)";
-    ini="${ini//[/\\[}";
-    ini="${ini//]/\\]}";
+    ini="${ini//[/\[}";
+    ini="${ini//]/\]}";
     OIFS=${IFS};
     IFS=$'\n' && ini=( ${ini} );
     ini=( ${ini[*]//;*/} );
@@ -102,7 +103,7 @@ function loadINISection() {
     ini[${#ini[*]} + 1]='}';
     eval "$(echo "${ini[*]}")";
     IFS=${OIFS};
-    config.section.${section}
+    config.section.${section} 2>/dev/null
 }
 
 function appendConfig() {
