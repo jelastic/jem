@@ -617,12 +617,12 @@ function addNginxSticky(){
   if [ -f ${STICKY_CONF} -a -n "$(cat ${STICKY_CONF})" ]; then
         STICKY_STRING=$(cat ${STICKY_CONF} |sed -e 's|/|\\/|g' -e 's/"/\\"/g' );
         [ -z "$(grep "name=" ${STICKY_CONF})" ] && STICKY_STRING="name=${STICKY_NAME} ${STICKY_STRING}";
-        $SED -i "/### UPSTREAMPROTO for common ###/{s/}\s*###/sticky ${STICKY_STRING}; } ###/}" $NGINX_CONFIG;
+        $SED -i -re "/### UPSTREAMPROTO for common ###/{s/(keepalive.*)?}\s*###/sticky ${STICKY_STRING}; \1} ###/}" $NGINX_CONFIG;
         $SED -i  "/### DEFUPPROTO for common ###/{s/###/sticky ${STICKY_STRING}; ###/}"  $NGINX_CONFIG;
   else
 
         [ "$STICKY_NAME" ] && ADD_NAME="name=${STICKY_NAME}" ;
-        $SED -i "/### UPSTREAMPROTO for common ###/{s/}\s*###/sticky ${ADD_NAME} path=\/; } ###/}" $NGINX_CONFIG;
+        $SED -i -re "/### UPSTREAMPROTO for common ###/{s/(keepalive.*)}\s*###/sticky ${ADD_NAME} path=\/; \1} ###/}" $NGINX_CONFIG;
         $SED -i  "/### DEFUPPROTO for common ###/{s/###/sticky ${ADD_NAME} path=\/; ###/}"  $NGINX_CONFIG;
         writeJSONResponseOut "result=>0" "message=>Ok";
   fi
