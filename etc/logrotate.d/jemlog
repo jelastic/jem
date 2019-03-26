@@ -3,6 +3,6 @@
     size 100M
     compress
     weekly
-    rotate 4
+    rotate 10
     notifempty
 }
