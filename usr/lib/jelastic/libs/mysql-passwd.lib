@@ -140,7 +140,7 @@ function setPassword() {
 
                 if [[ $isDefPassLifetime -gt 0 ]] ; then
                     for muser in ${mysqlusers[*]}; do
-                        $MYSQL -u "${user}" -p"${password}" $db --execute="ALTER USER $muser PASSWORD EXPIRE INTERVAL ${defPassLifetime} DAY;"
+                        $MYSQL -u "${user}" -p"${password}" $db --execute="ALTER USER $muser PASSWORD EXPIRE INTERVAL ${defPassLifetime} DAY;" >>$LOG_FILE 2>>$LOG_FILE
                     done
                 fi
 
