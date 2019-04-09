@@ -140,6 +140,7 @@ function getLastRemoteCommit(){
     fi
 
     if [ "x${LOGIN}" == "xgit" ]; then
+        URL=$($SED -e 's/git:\/\///g' -e 's/ssh:\/\///g' <<< "${URL}");    
         last_remote=$(git ls-remote git@$URL $BRANCH 2>&1);
         result=$?;
     else
