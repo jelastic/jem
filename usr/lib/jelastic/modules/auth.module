@@ -559,7 +559,11 @@ function _addNativeip() {
                 fi
             done
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: timeout has elapsed" >> ${JEM_CALLS_LOG};
-            return $(vzexecGetLastErrCode)
+            lasterr=$(vzexecGetLastErrCode)
+            if [[ "$lasterr" -ne 0 ]] then
+                writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
+            fi
+            return $lasterr
         else
             writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
         fi
