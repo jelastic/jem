@@ -267,7 +267,11 @@ function doDeleteProject(){
         cd ${WEBROOT}; ROOT_DIRS=$(ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$");
         rm -rf ${ROOT_DIRS} && _deployLog "Removing deprecated ROOT context directories ${ROOT_DIRS}";
         mkdir -p ${WEBROOT}/${PROJECT_NAME}; updateOwnership ${WEBROOT}/${PROJECT_NAME} > /dev/null 2>&1;
-        }
+	[ -L ${WEBROOT}/../ROOT ] && {
+		rm -f ${WEBROOT}/../ROOT;
+		ln -s ${WEBROOT}/${PROJECT_NAME} ${WEBROOT}/../ROOT;
+	}
+  }
   [ -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.key" ] && rm -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.key" ;
   [ -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties" ] && rm -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties"  && writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfully deleted" || {
     writeJSONResponseErr "result=>4002" "message=>Error delete project!"; die -q;
