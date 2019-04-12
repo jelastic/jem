@@ -263,10 +263,6 @@ function doStart() {
     fi
     _setDefaultPolicy;
 
-    $IPTABLES -A INPUT -i lo -j ACCEPT
-    $IPTABLES -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
-    $IPTABLES -A INPUT -p icmp -j ACCEPT
-
     #exports
     NFSIPS=()
     [ -e '/etc/exports' ] && NFSIPS=($($SED -re 's/.+(\s|\t)+(([0-9]+\.){3}[0-9]+(\/[0-9]{0,2})?).*/\2/g' -e '/#/d' '/etc/exports' | sort | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'))
@@ -329,6 +325,11 @@ function doStart() {
         $IP6TABLES -I INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
         $IP6TABLES -I INPUT -i lo -j ACCEPT
     fi
+
+    $IPTABLES -I INPUT -p icmp -j ACCEPT
+    $IPTABLES -I INPUT -i lo -j ACCEPT
+    $IPTABLES -I INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+
 
     checkRule "INPUT" "-j REJECT --reject-with icmp-host-prohibited" || $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited
 
