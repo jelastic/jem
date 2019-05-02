@@ -245,3 +245,53 @@ function netContainIp(){
     return 0
 }
 
+function dump_active_ips() {
+    local tmp=( $(vzlist -Ho private) )
+
+    for tmp in ${tmp[*]}
+    do
+        . $tmp/ve.conf &>/dev/null || continue
+        echo "$IP_ADDRESS"
+    done
+}
+
+# expand_ipv6() - expand ipv6 representation to its full 39-character notation
+# @stdin - stream with ipv4 and ipv6 addresses
+function expand_ipv6() {
+    [ x"$VERSION_ID" != x6 ] || {
+        grep -v ':'
+        return
+    }
+
+    awk '
+        /:/{
+            # Expand :: empty group
+            n = 8 - split($1, ip, ":") + 1
+            if (1 < n) {
+                tmp = ""
+                for(; n >= 1; n--) {tmp="0000:"tmp}
+                sub(/::/, ":"tmp, $1)
+            }
+
+            # Expand hextets
+            split($1, ip, ":")
+            $1 = ""
+            for(i = 1; i <= 8; i++) {
+                tmp = ""
+                for(n = 4 - length(ip[i]); n; n--) {
+                    tmp = "0"tmp
+                }
+            $1 = $1":"tmp""ip[i]
+            }
+            $1 = substr($1, 2)
+        }
+        { print }'
+}
+
+function dump_active_ipv4_ips(){
+    dump_active_ips | \
+        sed -r 's/[[:blank:]]+/\n/g' | \
+        sed -nr '/^[[:blank:]]*$/!{/^0[.]0[.]0[.]0$/!{s/[/][^/]+$//; p}}' | \
+        expand_ipv6 | \
+        sort -u
+}
