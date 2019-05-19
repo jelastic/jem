@@ -96,6 +96,7 @@ function getPackageName() {
         ensureFileCanBeDownloaded $package_url;
         $WGET --no-check-certificate --content-disposition --directory-prefix="$DOWNLOADS" $package_url >> $ACTIONS_LOG 2>&1 || { writeJSONResponseErr "result=>4078" "message=>Error loading file from URL"; die -q; }
         package_name="$(ls ${DOWNLOADS})";
+        [ "${package_name}" != "$(ls ${DOWNLOADS} | awk -F? '{print $1}')" ] && { mv ${DOWNLOADS}/${package_name} ${DOWNLOADS}/$(ls ${DOWNLOADS} | awk -F? '{print $1}'); package_name="$(ls ${DOWNLOADS})"; }
         package_path=${DOWNLOADS};
         [ ! -s "${package_path}/${package_name}" ] && {
             set -f

@@ -52,6 +52,11 @@ function unpack(){
        $TAR --overwrite -xpf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
     fi
+    if [[ ${package_url} =~ .tgz$ ]] || [[ ${package_name} =~ .tgz$ ]]
+    then
+        $TAR --overwrite -xzf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+        return $?;
+    fi
     if [[ ${package_url} =~ .tar.gz$ ]] || [[ ${package_name} =~ .tar.gz$ ]]
     then
        $TAR --overwrite -xpzf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
