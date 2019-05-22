@@ -46,26 +46,24 @@ function unpack(){
         $UNZIP -o "${package_path}/${package_name}" -d "$APPWEBROOT" 2>>$ACTIONS_LOG 1>/dev/null;
         rcode=$?;
         [ "$rcode" -eq 1 ] && return 0 || return $rcode
-    fi
-    if [[ ${package_url} =~ .tar$ ]] || [[ ${package_name} =~ .tar$ ]]
+    elif [[ ${package_url} =~ .tar$ ]] || [[ ${package_name} =~ .tar$ ]]
     then
        $TAR --overwrite -xpf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
-    fi
-    if [[ ${package_url} =~ .tgz$ ]] || [[ ${package_name} =~ .tgz$ ]]
+    elif [[ ${package_url} =~ .tgz$ ]] || [[ ${package_name} =~ .tgz$ ]]
     then
         $TAR --overwrite -xzf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
         return $?;
-    fi
-    if [[ ${package_url} =~ .tar.gz$ ]] || [[ ${package_name} =~ .tar.gz$ ]]
+    elif [[ ${package_url} =~ .tar.gz$ ]] || [[ ${package_name} =~ .tar.gz$ ]]
     then
        $TAR --overwrite -xpzf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
-    fi
-    if [[ ${package_url} =~ .tar.bz2$ ]] || [[ ${package_name} =~ .tar.bz2$ ]]
+    elif [[ ${package_url} =~ .tar.bz2$ ]] || [[ ${package_name} =~ .tar.bz2$ ]]
     then
        $TAR --overwrite -xpjf  "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
+    else
+       $TAR --overwrite -xf -a "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
     fi
 }
 
