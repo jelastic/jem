@@ -147,7 +147,7 @@ function doDeploy(){
  
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && { isFunction "_deploy" && deploy_function="_deploy"; }
 
-    ${deploy_function} "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" || {
+    ${deploy_function} "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" 2>&1 || {
         result=$?;
         [ $result -eq 156 ] && result=4078;
         [ $result -eq 56  ] && result=4071;
