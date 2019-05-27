@@ -64,6 +64,7 @@ function unpack(){
        return $?;
     else
        $TAR --overwrite -xf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+       return $?;
     fi
 }
 
