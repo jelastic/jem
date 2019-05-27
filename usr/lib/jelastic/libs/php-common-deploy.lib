@@ -63,7 +63,8 @@ function unpack(){
        $TAR --overwrite -xpjf  "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
     else
-       $TAR --overwrite -xf -a "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+       $TAR --overwrite -xf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+       return $?;
     fi
 }
 
