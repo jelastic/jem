@@ -39,7 +39,7 @@ function doInstall(){
         then
                if [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] 
                   then 
-                      source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && $( _enableSSL ) && { writeJSONResponseOut "result=>0" "message=>SSL installed succesfully"; return 0; } || { writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"; return 1; };
+                      source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && $( _enableSSL ) && { writeJSONResponseOut "result=>0" "message=>SSL installed successfully"; return 0; } || { writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"; return 1; };
                   else 
                       { writeJSONResponseErr "result=>4116" "message=>SSL installation is not implemented"; return 0; }
                fi                                          
@@ -72,7 +72,7 @@ function doInstall(){
 		writeJSONResponseErr "result=>4016" "message=>Could not receive private key!"
 	;; 
 	0)
-		writeJSONResponseOut "result=>0" "message=>SSL installed succesfully"
+		writeJSONResponseOut "result=>0" "message=>SSL installed successfully"
 	;;
 
 	220|221)
@@ -92,13 +92,13 @@ function doRemove(){
         then
                if [ -f "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" ] 
                   then 
-                      source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && $( _disableSSL ) && { writeJSONResponseOut "result=>0" "message=>SSL removed succesfully"; return 0; } || { writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"; return 1; };
+                      source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && $( _disableSSL ) && { writeJSONResponseOut "result=>0" "message=>SSL removed successfully"; return 0; } || { writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"; return 1; };
                   else 
                       { writeJSONResponseErr "result=>4116" "message=>SSL remove is not implemented!"; return 0; }
                fi                                          
         fi
 
-      $(disableSSL) && writeJSONResponseOut "result=>0" "message=>SSL removed succesfully" || { writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"; return 1; };
+      $(disableSSL) && writeJSONResponseOut "result=>0" "message=>SSL removed successfully" || { writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"; return 1; };
 }
 
 

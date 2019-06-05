@@ -250,7 +250,7 @@ function doCreateProject(){
   writeProjectConfig && {
     [ ${COMPUTE_TYPE} == "apache-ruby" -o ${COMPUTE_TYPE} == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && {
     PROJECT_NAME=${bundle_type}; reloadServiceSilent "$SERVICE";
-  } && [ ! -z $CONTEXT ] &&  [ ! -z $ENVIRONMENT ] && writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfully created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "environment=>${ENVIRONMENT}" "context=>${CONTEXT}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}" "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" || writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfully created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}"  "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" "atomic_deploy=>${ATOMIC_DEPLOY}"  "nodegroup=>${NODE_GROUP}"  "repohash=>${REPO_HASH}"; }  || { writeJSONResponseErr "result=>4001" "message=>Error while creating project config!"; return 1; };
+  } && [ ! -z $CONTEXT ] &&  [ ! -z $ENVIRONMENT ] && writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was successfully created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "environment=>${ENVIRONMENT}" "context=>${CONTEXT}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}" "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" || writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was successfully created" "project_name=>${PROJECT_NAME}" "vcs_type=>${VCS_TYPE}" "url=>${URL}" "login=>${LOGIN}" "branch=>${BRANCH}" "autoupdate=>${AUTOUPDATE}" "interval=>${UPDATE_INTERVAL}"  "autoresolveconflict=>${GIT_AUTORESOLVE_CONFLICT}" "atomic_deploy=>${ATOMIC_DEPLOY}"  "nodegroup=>${NODE_GROUP}"  "repohash=>${REPO_HASH}"; }  || { writeJSONResponseErr "result=>4001" "message=>Error while creating project config!"; return 1; };
 
 }
 
@@ -273,7 +273,7 @@ function doDeleteProject(){
 	}
   }
   [ -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.key" ] && rm -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.key" ;
-  [ -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties" ] && rm -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties"  && writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was succesfully deleted" || {
+  [ -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties" ] && rm -f "${VCS_CONFIG_DIR}/${PROJECT_NAME}.properties"  && writeJSONResponseOut "result=>0" "message=>Project $PROJECT_NAME was successfully deleted" || {
     writeJSONResponseErr "result=>4002" "message=>Error delete project!"; die -q;
   }
 
@@ -508,7 +508,7 @@ function doEditProject(){
                 hash=`echo $AUTHORIZATION_KEY_VAL | md5sum | $AWK '{print $1}'`;
                 VAL=$VAL" hash=>$hash";
         fi
-        writeJSONResponseOut "result=>0" "message=>Project edited succesfully" ${VAL} ;
+        writeJSONResponseOut "result=>0" "message=>Project edited successfully" ${VAL} ;
 
   else
         writeJSONResponseErr "result=>4017" "message=>Project edit failed";
