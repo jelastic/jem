@@ -316,7 +316,6 @@ function sourceOverride(){
 }
 
 function doAction() {
-    [ "$UID" == '0' ] && chmod 666 /etc/jelastic/timeouts.conf;
     local action="${1##--}" modfile="" subaction="${2##--}" ;
     [[ -z ${action} ]] && die "Usage: doAction <action> <args>";
     shift; shift;
