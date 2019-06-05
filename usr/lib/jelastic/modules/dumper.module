@@ -34,7 +34,7 @@ function doRestore(){
     [ $err -eq  72 -o $err -eq 232 ] && { writeJSONResponseErr "result=>4101" "message=>Could not create database" ; die -q; } ;
     [ $err -eq  73 -o $err -eq 233 ] && { writeJSONResponseErr "result=>4073" "message=>Could not restore dump" ; die -q; } ;
     [ $err -eq  74 -o $err -eq 234 ] && { writeJSONResponseErr "result=>4074" "message=>Could not download dump file"; die -q; } ;
-    [ $err -eq  0 ] &&  { writeJSONResponseOut "result=>0" "message=>Dump restored succesfully" ; return 0; } ;
+    [ $err -eq  0 ] &&  { writeJSONResponseOut "result=>0" "message=>Dump restored successfully" ; return 0; } ;
     [ $err -gt  0 ] && { writeJSONResponseErr "result=>4100" "message=>Unknown error"; die -q; } ;
 }
 

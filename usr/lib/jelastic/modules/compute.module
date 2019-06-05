@@ -217,9 +217,9 @@ function doRenameContext(){
         shift;
     done;
     if [ "x$newContext" == "x$oldContext" ]; then
-        writeJSONResponseOut "result=>0" "message=>Context renamed succesfully";
+        writeJSONResponseOut "result=>0" "message=>Context renamed successfully";
     else
-        renameContext "$newContext" "$oldContext"  && renameHooks "$newContext" "$oldContext" && writeJSONResponseOut "result=>0" "message=>Context renamed succesfully" || writeJSONResponseErr "result=>4062" "message=>Context rename failed";
+        renameContext "$newContext" "$oldContext"  && renameHooks "$newContext" "$oldContext" && writeJSONResponseOut "result=>0" "message=>Context renamed successfully" || writeJSONResponseErr "result=>4062" "message=>Context rename failed";
     fi
 }
 

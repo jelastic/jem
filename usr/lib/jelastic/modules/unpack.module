@@ -126,7 +126,7 @@ function doArchive() {
 
     [[ "x${SERVICE}" != "x" ]] && startService ${SERVICE} >> $ACTIONS_LOG 2>&1;
     # writeJSONResponseErr "result=>4052" "message=>Context does not exist";
-    writeJSONResponseOut "result=>0" "message=>Unpacked succesfully";
+    writeJSONResponseOut "result=>0" "message=>Unpacked successfully";
     return 0;
 }
 

@@ -53,7 +53,7 @@ function doSet(){
             _setPassword > /dev/null 2>&1; local res=$?;
             export J_OPENSHIFT_APP_ADM_USER=${J_OPENSHIFT_APP_ADM_USER}; 
             #saveEnvironmentVariables;
-            [ $res -eq 0 ] && writeJSONResponseOut "result=>0" "message=>Password set succesfully" "username=>$J_OPENSHIFT_APP_ADM_USER" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
+            [ $res -eq 0 ] && writeJSONResponseOut "result=>0" "message=>Password set successfully" "username=>$J_OPENSHIFT_APP_ADM_USER" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
             #
             #  Parsing of argument is implemented inside module to avoid extra work for enduser in hook
             #
@@ -62,9 +62,9 @@ function doSet(){
 
 	if echo $@ | $GREP -qP "\-u"
 	then
-		setPassword $@ && writeJSONResponseOut "result=>0" "message=>Password set succesfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
+		setPassword $@ && writeJSONResponseOut "result=>0" "message=>Password set successfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
 	else
-		setPassword -u "$default_user" $@ && writeJSONResponseOut "result=>0" "message=>Password set succesfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
+		setPassword -u "$default_user" $@ && writeJSONResponseOut "result=>0" "message=>Password set successfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
 	fi
 }
 
@@ -111,7 +111,7 @@ function doSetos(){
                         fi
                 fi
 
- 		echo "$user:$password" | $CHPASSWD > /dev/null 2>&1 && writeJSONResponseOut "result=>0" "message=>Password set succesfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
+ 		echo "$user:$password" | $CHPASSWD > /dev/null 2>&1 && writeJSONResponseOut "result=>0" "message=>Password set successfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
 
 }
 
