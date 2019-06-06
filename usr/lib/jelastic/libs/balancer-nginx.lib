@@ -139,7 +139,7 @@ function makeSureNodesReceivedIpsFromDhcpd(){
     current_result=$(getAmountOfDhcpdLeases);
     [ $current_result == $accepted_result ] && { break; } || {
       sleep 3s;
-      [ $check == 15 ] && { toActionLog "- Cound not make sure that DHCP works corectly now"; };
+      [ $check == 15 ] && { toActionLog "- Could not make sure that DHCP works correctly now"; };
     }
   done
 }
