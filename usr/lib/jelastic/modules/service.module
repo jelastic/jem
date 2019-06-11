@@ -22,6 +22,7 @@ inherit extendperm;
 VERSION="1";
 DEFAULT_ACTION="Usage";
 DESCRIPTION="Manage OS services";
+RAKE_DEPLOY_USER="jelastic";
 
 function doUsage() {
     showUsageMessage;
@@ -47,7 +48,11 @@ function doRestart(){
             mv -f "${WEBROOT}/ROOT/rake_deploy" "${WEBROOT}/ROOT/rake_deploy.old" 1>>"$RAKE_DEPLOY_LOG" 2>&1;
             for command in  ${rake_commands}
             do
-               source /usr/lib/rvm/environments/base && cd "${WEBROOT}/ROOT/" && HOME=/ RAILS_ENV=${bundle_type} ${bundle} exec rake "$command" >> "$RAKE_DEPLOY_LOG" 2>&1;
+                if [[ "$UID" == '0' ]]; then
+                    runuser -l "$RAKE_DEPLOY_USER" -c  "source /usr/lib/rvm/environments/base && cd "${WEBROOT}/ROOT/" && HOME=/ RAILS_ENV=${bundle_type} ${bundle} exec rake "$command" >> "$RAKE_DEPLOY_LOG" 2>&1;"
+                else
+                    source /usr/lib/rvm/environments/base && cd "${WEBROOT}/ROOT/" && HOME=/ RAILS_ENV=${bundle_type} ${bundle} exec rake "$command" >> "$RAKE_DEPLOY_LOG" 2>&1;
+                fi
             done
         fi
         shopt -s dotglob;
