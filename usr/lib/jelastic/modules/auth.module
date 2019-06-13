@@ -490,13 +490,11 @@ function _addNativeip() {
             if vzexecRun "grep -q \" $destinationPath fuse\" /proc/mounts" ; then
                 _createPath=0
                 _isFUSE=1
-                vzexecRun "grep \" / ext\" /proc/mounts | awk '{print "'$1'"}' | xargs blkid | head -n 1 | sed -re 's/.* UUID=\"([a-z0-9-]+)\".*/\1/' "
-                _UUID=$(vzexecGetLastStdOut)
+                _UUID=$(cat /proc/sys/kernel/random/uuid)
             fi
         else
             _createPath=0
         fi
-        _UUID=root
     fi
 
 
@@ -524,7 +522,7 @@ function _addNativeip() {
             [[ "x${accessMode}" == "xro" ]] && DEFAULTEXPORTOPT=$($SED -re 's/,rw,/,ro,/g' <<< $DEFAULTEXPORTOPT)
             _opts="$DEFAULTEXPORTOPT"
             if [[ $_version -eq 4 ]] ; then
-                [[ ! -z "$_UUID" ]] && _opts="$DEFAULTEXPORTOPT,fsid=$_UUID" || break
+                [[ ! -z "$_UUID" ]] && _opts="$DEFAULTEXPORTOPT,fsid=$_UUID"
             fi
             echo -e "\"${destinationPath}\"\t${i}($_opts)" >> "${EXPORTS_FILE}"
             _done=1
