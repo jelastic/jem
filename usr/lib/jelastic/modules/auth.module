@@ -491,6 +491,10 @@ function _addNativeip() {
                 _createPath=0
                 _isFUSE=1
                 _UUID=$(cat /proc/sys/kernel/random/uuid)
+            elif vzexecRun "fuse_avail=\$(grep \"fuse\" /proc/mounts | awk '{print \$2}'); [ -n \"\$fuse_avail\" ] &&  grep -q \$fuse_avail <<< \"$destinationPath\"" ; then
+                vzexecRun "[ ! -e \"${destinationPath}\" ]" && _createPath=1 || _createPath=0
+                _isFUSE=1
+                _UUID=$(cat /proc/sys/kernel/random/uuid)
             fi
         else
             _createPath=0
@@ -513,8 +517,14 @@ function _addNativeip() {
 
         [[ ! -d "/vz/root/${CTID}${destinationPath}" ]] && [ ! -L "/vz/root/${CTID}${destinationPath}" ] && {
             if [[ $_createPath -eq 1 ]] ; then
-                mkdir -p "/vz/root/${CTID}${destinationPath}"
-                chmod 0777 "/vz/root/${CTID}${destinationPath}"
+                if [[ $_isFUSE -eq 1 ]]; then 
+                    if isContainerRunning ${CTID} ; then
+                        vzexecRun "mkdir -p ${destinationPath}; chmod 0777 ${destinationPath}"
+                    fi
+                else
+                    mkdir -p "/vz/root/${CTID}${destinationPath}"
+                    chmod 0777 "/vz/root/${CTID}${destinationPath}"
+                fi
             fi
         }
         if [[ -z $(indexOf "${aCurrentIPs[*]}" "$i") ]] ; then

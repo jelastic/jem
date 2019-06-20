@@ -417,7 +417,13 @@ function LookupShare() {
 function isValidShare()
 {
     [ ! -f "$2" ] && return 1
-    isShareExistsOnDisk $3$1 || return 1
+    if [[ $_isFUSE -eq 1 ]]; then
+        if isContainerRunning ${CTID};  then
+            vzctl exec2 ${CTID} "[ -d \"$1\" ]" || return 1;
+        fi
+    else
+        isShareExistsOnDisk $3$1 || return 1;
+    fi
     local opts=$(LookupShare "$1" "$2")
     [[ -z "$opts" ]] && return 1
     return 0
