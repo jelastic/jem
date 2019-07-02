@@ -455,8 +455,8 @@ function dosetupUtils() {
         installCmd="apt update ; $(installPackageCmd $OS install autofs nfs-common)"
         checkCmd=$(checkPackageCmd $OS autofs nfs-common)
     elif [ "x$OS" == "xcentos" -a "$OS_ver" -eq "7" ] ; then
-        installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-1j.x86_64.rpm nfs-utils http://spacewalk.jelastic.com/pub/autofs-debuginfo-5.1.5-1j.x86_64.rpm)
-        checkCmd=$(checkPackageCmd $OS http://spacewalk.jelastic.com/pub/autofs-5.1.5-1j.x86_64.rpm http://spacewalk.jelastic.com/pub/autofs-debuginfo-5.1.5-1j.x86_64.rpm nfs-utils)
+        installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-1j.x86_64.rpm nfs-utils)
+        checkCmd=$(checkPackageCmd $OS autofs nfs-utils)
     else
         installCmd=$(installPackageCmd $OS install autofs nfs-utils)
         checkCmd=$(checkPackageCmd $OS autofs nfs-utils)
