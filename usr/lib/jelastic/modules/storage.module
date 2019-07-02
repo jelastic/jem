@@ -214,7 +214,7 @@ function checkMount() {
 }
 
 function processnfs4() {
-    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nolock,soft,timeo=3,retrans=3,_netdev"
+    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nolock,soft,timeo=120,retrans=20,_netdev"
     processnfs $*
 }
 
@@ -454,9 +454,6 @@ function dosetupUtils() {
     if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
         installCmd="apt update ; $(installPackageCmd $OS install autofs nfs-common)"
         checkCmd=$(checkPackageCmd $OS autofs nfs-common)
-    elif [ "x$OS" == "xcentos" -a "$OS_ver" -eq "7" ] ; then
-        installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-1j.x86_64.rpm nfs-utils)
-        checkCmd=$(checkPackageCmd $OS autofs nfs-utils)
     else
         installCmd=$(installPackageCmd $OS install autofs nfs-utils)
         checkCmd=$(checkPackageCmd $OS autofs nfs-utils)
