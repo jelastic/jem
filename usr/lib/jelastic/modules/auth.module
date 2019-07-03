@@ -145,15 +145,15 @@ function dosetupUtils() {
 
     #JE-25896
     if [ "x$OS" == "xalpine" ] ; then
-        echo "Alpine linux is not supported"
+        writeJSONResponseErr "result=>4112" "message=>NFS: Alpine linux is not supported"
         return $FALSE
     fi
     if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "5" ] ; then
-        echo "Centos 5 is not supported"
+        writeJSONResponseErr "result=>4112" "message=>NFS: Centos 5 is not supported"
         return $FALSE
     fi
     if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "6" ] ; then
-        echo "Debian 6 is not supported"
+        writeJSONResponseErr "result=>4112" "message=>NFS: Debian 6 is not supported"
         return $FALSE
     fi
 
