@@ -95,7 +95,7 @@ function loadINISection() {
     ini=( ${ini[*]/#\\[/\}$'\n'config.section.} );
     ini=( ${ini[*]/%\\]/ \(} );
     ini=( ${ini[*]/=/=\( } );
-    ini=( ${ini[*]/\ =/=} )
+    ini=( ${ini[*]/\ =/=} );
     ini=( ${ini[*]/%/ \)} );
     ini=( ${ini[*]/%\\ \)/ \\} );
     ini=( ${ini[*]/%\( \)/\(\) \{} );
