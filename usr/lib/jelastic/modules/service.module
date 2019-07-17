@@ -42,7 +42,11 @@ function doRestart(){
         inherit ruby-common;
         bundleInstall;
         if [ -f "${WEBROOT}/ROOT/rake_deploy" ]
-        then 
+        then
+            touch ${RAKE_DEPLOY_LOG}
+            if [[ "$UID" == '0' ]]; then
+                chown ${DATA_OWNER} ${RAKE_DEPLOY_LOG}
+            fi  
             bundle_type=$(cat /var/lib/jelastic/env) ; 
             rake_commands=$(cat ${WEBROOT}/ROOT/rake_deploy) ;
             mv -f "${WEBROOT}/ROOT/rake_deploy" "${WEBROOT}/ROOT/rake_deploy.old" 1>>"$RAKE_DEPLOY_LOG" 2>&1;
