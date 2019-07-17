@@ -29,6 +29,7 @@ VERSION="1";
 DEFAULT_ACTION="usage";
 APPLY_PL='/var/lib/jelastic/overrides/apply.pl'
 ROUTEFIXER='/root/scripts/routefixer/routefixer.sh'
+RUN_CHECKER='/var/lib/jelastic/overrides/run_checker.lib'
 
 function dousage() {
     showUsageMessage;
@@ -108,4 +109,11 @@ function doSet(){
     echo no;
     fi
     
+}
+
+function doChekServiceRun(){
+    [ ! -f $RUN_CHECKER ] || {
+        . $RUN_CHECKER
+        check_run;
+    }
 }
