@@ -214,7 +214,7 @@ function checkMount() {
 }
 
 function processnfs4() {
-    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nolock,soft,timeo=120,retrans=20,_netdev"
+    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nolock,soft,timeo=30,retrans=2,_netdev"
     processnfs $*
 }
 
