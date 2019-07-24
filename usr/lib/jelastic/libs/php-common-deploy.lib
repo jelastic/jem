@@ -62,6 +62,14 @@ function unpack(){
     then
        $TAR --overwrite -xpjf  "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
+    elif [[ ${package_url} =~ .bz2$ ]] || [[ ${package_name} =~ .bz2$ ]]
+    then
+       cp ${package_path}/${package_name} ${APPWEBROOT}/${package_name}; $BZIP2 -d ${APPWEBROOT}/${package_name} >> $ACTIONS_LOG 2>&1;
+       return $?;
+    elif [[ ${package_url} =~ .gz$ ]] || [[ ${package_name} =~ .gz$ ]]
+    then
+       cp ${package_path}/${package_name} ${APPWEBROOT}/${package_name}; $GUNZIP ${APPWEBROOT}/${package_name} >> $ACTIONS_LOG 2>&1;
+       return $?;
     else
        $TAR --overwrite -xf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
        return $?;
