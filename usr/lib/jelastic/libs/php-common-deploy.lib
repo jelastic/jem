@@ -21,6 +21,9 @@ PHPCOMMONDEPLOYLIB_VERSION="0.1";
 
 inherit default exceptor;
 $PROGRAM 'grep';
+$PROGRAM 'bzip2';
+$PROGRAM 'gunzip';
+$PROGRAM 'xz';
 
 VERBOSE=0;
 
@@ -48,31 +51,50 @@ function unpack(){
         [ "$rcode" -eq 1 ] && return 0 || return $rcode
     elif [[ ${package_url} =~ .tar$ ]] || [[ ${package_name} =~ .tar$ ]]
     then
-       $TAR --overwrite -xpf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
-       return $?;
+        $TAR --overwrite -xpf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+        return $?;
     elif [[ ${package_url} =~ .tgz$ ]] || [[ ${package_name} =~ .tgz$ ]]
     then
         $TAR --overwrite -xzf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
         return $?;
     elif [[ ${package_url} =~ .tar.gz$ ]] || [[ ${package_name} =~ .tar.gz$ ]]
     then
-       $TAR --overwrite -xpzf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
-       return $?;
+        $TAR --overwrite -xpzf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+        return $?;
     elif [[ ${package_url} =~ .tar.bz2$ ]] || [[ ${package_name} =~ .tar.bz2$ ]]
     then
-       $TAR --overwrite -xpjf  "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
-       return $?;
+        $TAR --overwrite -xpjf  "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+        return $?;
+    elif [[ ${package_url} =~ .tar.xz$ ]] || [[ ${package_name} =~ .tar.xz$ ]]
+    then
+        $TAR --overwrite -xJf  "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+        return $?;
+    elif [[ ${package_url} =~ (.tar.lzma$|.tlz$) ]] || [[ ${package_name} =~ (.tar.lzma$|.tlz$) ]]
+    then
+        $TAR --overwrite --lzma -xf  "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+        return $?;
+    elif [[ ${package_url} =~ .tar.Z$ ]] || [[ ${package_name} =~ .tar.Z$ ]]
+    then
+        $TAR --overwrite -xzf  "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
+        return $?;
     elif [[ ${package_url} =~ .bz2$ ]] || [[ ${package_name} =~ .bz2$ ]]
     then
-       cp ${package_path}/${package_name} ${APPWEBROOT}/${package_name}; $BZIP2 -d ${APPWEBROOT}/${package_name} >> $ACTIONS_LOG 2>&1;
-       return $?;
+        cp ${package_path}/${package_name} ${APPWEBROOT}/${package_name}; $BZIP2 -d ${APPWEBROOT}/${package_name} >> $ACTIONS_LOG 2>&1;
+        return $?;
     elif [[ ${package_url} =~ .gz$ ]] || [[ ${package_name} =~ .gz$ ]]
     then
-       cp ${package_path}/${package_name} ${APPWEBROOT}/${package_name}; $GUNZIP ${APPWEBROOT}/${package_name} >> $ACTIONS_LOG 2>&1;
-       return $?;
+        cp ${package_path}/${package_name} ${APPWEBROOT}/${package_name}; $GUNZIP ${APPWEBROOT}/${package_name} >> $ACTIONS_LOG 2>&1;
+        return $?;
+    elif [[ ${package_url} =~ (.xz$|.lzma$) ]] || [[ ${package_name} =~ (.xz$|.lzma$) ]]
+    then
+        cp ${package_path}/${package_name} ${APPWEBROOT}/${package_name}; $XZ -d ${APPWEBROOT}/${package_name} >> $ACTIONS_LOG 2>&1;
+        return $?;
+    elif [[ ${package_url} =~ .Z$ ]] || [[ ${package_name} =~ .Z$ ]]
+    then
+        cp ${package_path}/${package_name} ${APPWEBROOT}/${package_name}; $UNCOMPRESS ${APPWEBROOT}/${package_name} >> $ACTIONS_LOG 2>&1;
+        return $?;
     else
-       $TAR --overwrite -xf "${package_path}/${package_name}" -C "$APPWEBROOT" >> $ACTIONS_LOG 2>&1;
-       return $?;
+        clearCache; writeJSONResponseErr "result=>4174" "message=>Archive format is not supported" && deployLog "Archive format is not supported"; die -q;
     fi
 }
 
