@@ -94,7 +94,7 @@ function unpack(){
         cp ${package_path}/${package_name} ${APPWEBROOT}/${package_name}; $UNCOMPRESS ${APPWEBROOT}/${package_name} >> $ACTIONS_LOG 2>&1;
         return $?;
     else
-        clearCache; writeJSONResponseErr "result=>4174" "message=>Archive format is not supported" && deployLog "Archive format is not supported"; die -q;
+        clearCache; writeJSONResponseErr "result=>4175" "message=>Archive format is not supported" && deployLog "Archive format is not supported"; die -q;
     fi
 }
 
