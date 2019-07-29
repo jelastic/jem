@@ -145,9 +145,9 @@ function doDeploy(){
     
     deploy_function="deploy"
  
-    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && { isFunction "_deploy" && deploy_function="_deploy"; }
+    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && { isFunction "_deploy" && deploy_function="_deploy"; CARTRIDGE_STDERR_REDIRECT="2>&1"; }
 
-    ${deploy_function} "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" 2>&1 || {
+    ${deploy_function} "$package_url" "$context" "$ext" >> "$ACTIONS_LOG" "$CARTRIDGE_STDERR_REDIRECT" || {
         result=$?;
         [ $result -eq 156 ] && result=4078;
         [ $result -eq 56  ] && result=4071;
