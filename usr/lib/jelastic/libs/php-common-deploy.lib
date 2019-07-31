@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
 [ -n "${PHPCOMMONDEPLOYLIB_VERSION:-}" ] && return 0;
 PHPCOMMONDEPLOYLIB_VERSION="0.1";
 
@@ -67,7 +65,7 @@ function unpack(){
         TAR_UNPACK_OPTIONS="-xJf"
     elif [[ ${package_url} =~ (.tar.lzma$|.tlz$) ]] || [[ ${package_name} =~ (.tar.lzma$|.tlz$) ]]
     then
-        TAR_UNPACK_OPTIONS="--lzma -xf"
+        TAR_UNPACK_OPTIONS="--xz -xf"
     elif [[ ${package_url} =~ (.tar.Z$|.taz$) ]] || [[ ${package_name} =~ (.tar.Z$|.taz$) ]]
     then
         TAR_UNPACK_OPTIONS="-xzf"
