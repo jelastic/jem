@@ -71,16 +71,18 @@ function doInstall(){
 	216 ) 
 		writeJSONResponseErr "result=>4016" "message=>Could not receive private key!"
 	;; 
-	0)
+	147 )
+		writeJSONResponseErr "result=>4147" "message=>Certificates not uploaded";
+	;; 
+	0 )
 		writeJSONResponseOut "result=>0" "message=>SSL installed successfully"
 	;;
-
-	220|221)
+	220|221 )
 	;;
 
 	*) writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"
 	;; 
-esac
+    esac
 return $sslresult 
 }
 
