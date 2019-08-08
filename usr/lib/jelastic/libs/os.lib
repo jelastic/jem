@@ -274,9 +274,9 @@ function getHostIP() {
 function getOSVersion() {
     : ${1:?"Missing param: issue_string"}
     local issue_string=$1
-    local OS_version=$($GREP -h VERSION_ID <<< "$issue_string" 2>/dev/null | $SED -nre 's/.*=\"?([0-9.]*).*/\1/;p;n');
+    local OS_version=$($GREP -h VERSION_ID <<< "$issue_string" 2>/dev/null | $SED -nre 's/.*=\"?([0-9.]*).*/\1/;p;n' | head -n 1)
     if [ -z "$OS_version" ] ; then
-        OS_version=$($GREP -h DISTRIB_RELEASE <<< "$issue_string" 2>/dev/null | $SED -nre 's/.*=\s?\"?([0-9.]*).*/\1/;p;n');
+        OS_version=$($GREP -h DISTRIB_RELEASE <<< "$issue_string" 2>/dev/null | $SED -nre 's/.*=\s?\"?([0-9.]*).*/\1/;p;n' | head -n 1)
         if [ -z "$OS_version" ] ; then
             if $GREP -hqi "jessie" <<< "$issue_string" 2>/dev/null ; then
                 OS_version="8"
