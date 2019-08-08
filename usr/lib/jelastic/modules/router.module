@@ -272,7 +272,7 @@ function doUnbind() {
             fi
 
             if [[ $res -eq 0 ]] ; then
-                /etc/init.d/iptables save | $GRAB_OUTPUT;
+                service iptables save | $GRAB_OUTPUT;
                 writeJSONResponseOut "result=>0" "message=>Port binding has been removed"; return 0 ;
             else
                 writeJSONResponseOut "result=>4093" "message=>Port binding has not been removed"; return 1 ;
@@ -289,7 +289,7 @@ function doUnbind() {
             done
 
 
-            /etc/init.d/iptables save | $GRAB_OUTPUT;
+            service iptables save | $GRAB_OUTPUT;
             writeJSONResponseOut "result=>0" "message=>Port bindings for ${__IP} has been removed (${msg} )"; return 0 ;
     fi
 }
