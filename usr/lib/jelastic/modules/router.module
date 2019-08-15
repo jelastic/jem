@@ -50,7 +50,7 @@ function getPortByIP() {
     local _IP=${1}
     local _port=${2}
 
-    echo $($IPTABLES -w -L PREROUTING -t nat -n | $SED -nre "/:${_IP}:${_port}/{/$__PROTO/{s/.*dpt:([0-9]+).*/\1/;p}}")
+    echo $($IPTABLES -w -L PREROUTING -t nat -n | $SED -nre "/:${_IP}:${_port}$/{/$__PROTO/{s/.*dpt:([0-9]+).*/\1/;p}}")
 }
 
 function getDestinationPort() {
@@ -260,27 +260,25 @@ function doUnbind() {
     if [[ ! -z ${__PORT+x} ]] ; then
         #single port
         #TODO: This comparation is buggy. Need to refactor it in future
-        if ! $GREP -qP ${__PORT} <<< ${_ports[*]} ; then
-            if [[ -z ${_ports[0]} ]] ; then
-                writeJSONResponseErr "result=>4091" "message=>there is no bindings for ${__IP}:${__PORT}"; exit 1;
-            fi
-
-            if [[ $NAT_ACTION == "dnat" ]] ; then
-                $EXEC "$IPTABLES -w -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j DNAT --to-destination $__IP:$__PORT" 2>/dev/null
-                res=$?
-            else
-                $EXEC "$IPTABLES -w -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j REDIRECT --to-port $__PORT" 2>/dev/null
-                res=$?
-            fi
-
-            if [[ $res -eq 0 ]] ; then
-                service iptables save | $GRAB_OUTPUT;
-                writeJSONResponseOut "result=>0" "message=>Port binding has been removed"; return 0 ;
-            else
-                writeJSONResponseOut "result=>4093" "message=>Port binding has not been removed"; return 1 ;
-            fi
-
+        if [[ -z ${_ports[0]} ]] ; then
+            writeJSONResponseErr "result=>4091" "message=>there is no bindings for ${__IP}:${__PORT}"; exit 1;
         fi
+
+        if [[ $NAT_ACTION == "dnat" ]] ; then
+            $EXEC "$IPTABLES -w -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j DNAT --to-destination $__IP:$__PORT" 2>/dev/null
+            res=$?
+        else
+            $EXEC "$IPTABLES -w -t nat -D PREROUTING -p $__PROTO --dport ${_ports} -j REDIRECT --to-port $__PORT" 2>/dev/null
+            res=$?
+        fi
+
+        if [[ $res -eq 0 ]] ; then
+            service iptables save | $GRAB_OUTPUT;
+            writeJSONResponseOut "result=>0" "message=>Port binding has been removed"; return 0 ;
+        else
+            writeJSONResponseOut "result=>4093" "message=>Port binding has not been removed"; return 1 ;
+        fi
+
     else
             # multiple ports
             msg=""
