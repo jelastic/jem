@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
 inherit default os envinfo output;
 inherit extendperm;
 
@@ -50,12 +48,14 @@ function doRestart(){
             bundle_type=$(cat /var/lib/jelastic/env) ; 
             rake_commands=$(cat ${WEBROOT}/ROOT/rake_deploy) ;
             mv -f "${WEBROOT}/ROOT/rake_deploy" "${WEBROOT}/ROOT/rake_deploy.old" 1>>"$RAKE_DEPLOY_LOG" 2>&1;
-            for command in  ${rake_commands}
+            [ -e /etc/environment ] && ./etc/environment
+            RAKE_HOME_DIR=$(echo ~jelastic)
+            for command in ${rake_commands}
             do
                 if [[ "$UID" == '0' ]]; then
-                    runuser -l "$RAKE_DEPLOY_USER" -c  "source /usr/lib/rvm/environments/base && cd "${WEBROOT}/ROOT/" && HOME=/ RAILS_ENV=${bundle_type} ${bundle} exec rake "$command" >> "$RAKE_DEPLOY_LOG" 2>&1;"
+                    runuser -l "$RAKE_DEPLOY_USER" -c "source /usr/lib/rvm/environments/base && cd "${WEBROOT}/ROOT/" && HOME=${RAKE_HOME_DIR} RAILS_ENV=${bundle_type} ${bundle} exec rake "$command" >> "$RAKE_DEPLOY_LOG" 2>&1;"
                 else
-                    source /usr/lib/rvm/environments/base && cd "${WEBROOT}/ROOT/" && HOME=/ RAILS_ENV=${bundle_type} ${bundle} exec rake "$command" >> "$RAKE_DEPLOY_LOG" 2>&1;
+                    source /usr/lib/rvm/environments/base && cd "${WEBROOT}/ROOT/" && RAILS_ENV=${bundle_type} ${bundle} exec rake "$command" >> "$RAKE_DEPLOY_LOG" 2>&1;
                 fi
             done
         fi
@@ -155,4 +155,3 @@ function describeRestartParameters() {
 function describeRestartOptions() {
     echo "<service name>: service to act with";
 }
-
