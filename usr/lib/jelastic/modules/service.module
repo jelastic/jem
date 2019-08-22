@@ -48,7 +48,7 @@ function doRestart(){
             bundle_type=$(cat /var/lib/jelastic/env) ; 
             rake_commands=$(cat ${WEBROOT}/ROOT/rake_deploy) ;
             mv -f "${WEBROOT}/ROOT/rake_deploy" "${WEBROOT}/ROOT/rake_deploy.old" 1>>"$RAKE_DEPLOY_LOG" 2>&1;
-            [ -e /etc/environment ] && ./etc/environment
+            [ -e /etc/environment ] && . /etc/environment
             RAKE_HOME_DIR=$(echo ~jelastic)
             for command in ${rake_commands}
             do
