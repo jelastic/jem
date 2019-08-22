@@ -129,11 +129,24 @@ function onModLoadCallback() {
         esac;
     done;
     [ -n "$CTID" ] && { vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; }
+
+    VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
+    VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+
     for arg do UNKNOWN_ARG+=("$arg") ; done
     [[ ! -z "${CTID}" ]] && {
-        MOUNTS_STORAGE="/vz/root/${CTID}${CONTAINER_MOUNTS_STORAGE}"
+        MOUNTS_STORAGE="${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}"
     }
     log "${UNKNOWN_ARG[*]}"
+}
+
+function _reloadAutoFS() {
+    local _cmd="systemctl reload autofs || service autofs reload"
+    vzexecRun "$_cmd" && return 0
+
+    _cmd="pgrep automount >/dev/null && kill -s SIGHUP $(pidof -s automount)"
+    vzexecRun "$_cmd"
+    return $?
 }
 
 function _isVirtuozzoInstalled() {
@@ -157,7 +170,7 @@ function preparePath() {
     local tpath=${1:?"Path required"}
     local hn=${2}
     if [[ ! -z "${hn}" ]] ; then
-        tpath="/vz/root/${_CTID}${tpath}"
+        tpath="${VZ_CTID_ROOT}${tpath}"
         tpath=$($SED -re 's/\$/\\$/g' -e 's/(`)/\\\1/g' <<< "${tpath}")
     fi
 
@@ -183,8 +196,8 @@ function remountPath() {
 }
 
 function migrateConfig() {
-    $SED -nre '/nfs(3|4)?/p' "/vz/root/${CTID}/etc/fstab" | awk "{print \$2\" ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} \"\$1}" >> "${MOUNTS_STORAGE}"
-    $SED -i -re '/nfs(3|4)?/d' "/vz/root/${CTID}/etc/fstab"
+    $SED -nre '/nfs(3|4)?/p' "$VZ_CTID_ROOT/etc/fstab" | awk "{print \$2\" ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} \"\$1}" >> "${MOUNTS_STORAGE}"
+    $SED -i -re '/nfs(3|4)?/d' "$VZ_CTID_ROOT/etc/fstab"
 }
 
 function checkMount() {
@@ -236,8 +249,8 @@ function processnfs() {
         $VZCTL mount $CTID > /dev/null 2>&1
     fi
 
-    local issue_file="/vz/root/${CTID}/etc/issue";
-    local release_files="/vz/root/${CTID}/etc/*-release";
+    local issue_file="$VZ_CTID_ROOT/etc/issue";
+    local release_files="$VZ_CTID_ROOT/etc/*-release";
     issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
     OS=$(detectOS "$issue_string")
     OS_ver=$(getOSVersion "$issue_string")
@@ -245,12 +258,12 @@ function processnfs() {
 
     if [[ "x$OS" == "xalpine" ]] ; then
         log "OS is ALPINE"
-        if [[ ! -e "/vz/root/${_CTID}${MOUNTPROG_APK}" ]] ; then
+        if [[ ! -e "${VZ_CTID_ROOT}${MOUNTPROG_APK}" ]] ; then
             dosetupUtils ${_CTID} || return 2
         fi
 
         [[ ! -z "${CTID}" ]] && {
-            MOUNTS_STORAGE="/vz/root/${CTID}/etc/fstab"
+            MOUNTS_STORAGE="$VZ_CTID_ROOT/etc/fstab"
         }
 
         _DEFAULT_NFS_MOUNT_OPTS="$($SED -re 's/-fstype=nfs,//g' <<< $_DEFAULT_NFS_MOUNT_OPTS)"
@@ -258,7 +271,7 @@ function processnfs() {
         cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE};"
 
     else
-        if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" "/vz/root/${CTID}/etc/auto.master" 2>&1; then
+        if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" "$VZ_CTID_ROOT/etc/auto.master" 2>&1; then
             dosetupUtils ${_CTID} || return 2
         fi
 
@@ -319,8 +332,7 @@ function processnfs() {
     fi
 
     if [[ $running -eq 0 ]] ; then
-        mntcmd="systemctl restart autofs || service autofs restart"
-        vzexecRun "${mntcmd}"
+        _reloadAutoFS
     else
         log "unmounting"
         $VZCTL umount $CTID > /dev/null 2>&1
@@ -348,7 +360,7 @@ function processlocal() {
     }
 
     OIFS=${IFS};IFS=$'\n'
-    local aCurrentMounts=($($SED -nre "/none/{/bind/{s/\s*(\S+).*/\1/;p}}" "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}"))
+    local aCurrentMounts=($($SED -nre "/none/{/bind/{s/\s*(\S+).*/\1/;p}}" "${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}"))
     IFS=${OIFS}
 
     log "${aCurrentMounts[@]}"
@@ -376,8 +388,8 @@ function processlocal() {
     hnDstPath=${_DESTINATION}
 
     if [[ "$_CTID" -gt 0 ]] ; then
-        hnDstPath="/vz/root/${_CTID}${hnDstPath}"
-        hnSrcPath="/vz/root/${_CTID}${hnSrcPath}"
+        hnDstPath="${VZ_CTID_ROOT}${hnDstPath}"
+        hnSrcPath="${VZ_CTID_ROOT}${hnSrcPath}"
     fi
 
     if [[ "$_MOVEDATA" -gt 0 ]] ; then
@@ -385,7 +397,7 @@ function processlocal() {
         rm -fr "${hnDstPath}/*" >> $ACTIONS_LOG 2>&1
     fi
 
-    echo -e $mntEntry >> "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}"
+    echo -e $mntEntry >> "${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}"
     echo $mntEntry
     if [[ $running -eq 0 ]] ; then
         vzexecRun "mount \"$($SED -re 's/("\*|\$|\?|\|\^|`|'\'')/\\\1/g' <<< "${_DESTINATION}")\""
@@ -401,8 +413,8 @@ function processlocal() {
 }
 
 function doRemount() {
-    local issue_file="/vz/root/${CTID}/etc/issue";
-    local release_files="/vz/root/${CTID}/etc/*-release";
+    local issue_file="${VZ_CTID_ROOT}/etc/issue";
+    local release_files="${VZ_CTID_ROOT}/etc/*-release";
     issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
     OS=$(detectOS "$issue_string")
     OS_ver=$(getOSVersion "$issue_string")
@@ -412,7 +424,7 @@ function doRemount() {
         log "OS is ALPINE"
         local shares=(${_DESTINATION})
         [[ -z ${_DESTINATION} ]] && {
-            [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="/vz/root/${CTID}/etc/fstab"
+            [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="${VZ_CTID_ROOT}/etc/fstab"
             shares=($($SED -nre "/\snfs(3|4)?\s/{s/\s*(\S+)\s*(\S+).*/\2/;p}" "$MOUNTS_STORAGE" ))
         }
         for share in ${shares[*]} ; do
@@ -420,14 +432,13 @@ function doRemount() {
         done
         return 0
     fi
-    mntcmd="systemctl restart autofs"
-    vzexecRun "${mntcmd}"
+    _reloadAutoFS
     return 0;
 }
 
 function dosetupUtils() {
-    local issue_file="/vz/root/${CTID}/etc/issue";
-    local release_files="/vz/root/${CTID}/etc/*-release";
+    local issue_file="${VZ_CTID_ROOT}/etc/issue";
+    local release_files="${VZ_CTID_ROOT}/etc/*-release";
 
     issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
     OS=$(detectOS "$issue_string")
@@ -481,10 +492,10 @@ function dosetupUtils() {
         return 1
     fi
 
-    [ -e "/vz/root/${CTID}/etc/autofs.conf" ] && $SED -i "s/^timeout = .*/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "/vz/root/${CTID}/etc/autofs.conf"
+    [ -e "${VZ_CTID_ROOT}/etc/autofs.conf" ] && $SED -i "s/^timeout = .*/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "${VZ_CTID_ROOT}/etc/autofs.conf"
 
     if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "7" ] ; then
-        [ -e "/vz/root/${CTID}/etc/init.d/autofs" ] && $SED -i -re 's/PROG=automount/PROG=automount\n_SYSTEMCTL_SKIP_REDIRECT="true"/' "/vz/root/${CTID}/etc/init.d/autofs"
+        [ -e "${VZ_CTID_ROOT}/etc/init.d/autofs" ] && $SED -i -re 's/PROG=automount/PROG=automount\n_SYSTEMCTL_SKIP_REDIRECT="true"/' "${VZ_CTID_ROOT}/etc/init.d/autofs"
     fi
 
     if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xsuse" ] ; then
@@ -494,11 +505,12 @@ function dosetupUtils() {
     fi
 
     if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "7" ] ; then
-        $SED -i -re '/automount/d' "/vz/root/${CTID}/etc/nsswitch.conf"
-        echo -e "\nautomount:  files" >> "/vz/root/${CTID}/etc/nsswitch.conf"
+        $SED -i -re '/automount/d' "${VZ_CTID_ROOT}/etc/nsswitch.conf"
+        echo -e "\nautomount:  files" >> "${VZ_CTID_ROOT}/etc/nsswitch.conf"
     fi
-    echo '/- /etc/autofs.jelastic' >> "/vz/root/${CTID}/etc/auto.master"
+    echo '/- /etc/autofs.jelastic' >> "${VZ_CTID_ROOT}/etc/auto.master"
     vzexecRun "systemctl enable autofs"
+    vzexecRun "systemctl start autofs"
     return 0
 }
 
@@ -522,8 +534,8 @@ function doMount() {
     local mtype sourceIP sourceMount
     isContainerRunning ${CTID} ; running=$?
     [[ $running -ne 0 ]] && $VZCTL mount $CTID > /dev/null 2>&1
-    [ -e "/vz/root/${CTID}/etc/autofs.conf" ] && $SED -i "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "/vz/root/${CTID}/etc/autofs.conf"
-    [ -f "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" ] || { touch "/vz/root/${_CTID}${CONTAINER_MOUNTS_STORAGE}" 2>/dev/null ; dosetupUtils ${_CTID}; }
+    [ -e "${VZ_CTID_ROOT}/etc/autofs.conf" ] && $SED -i "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "${VZ_CTID_ROOT}/etc/autofs.conf"
+    [ -f "${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}" ] || { touch "${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}" 2>/dev/null ; dosetupUtils ${_CTID}; }
 
     # parse connection string
     _SOURCE="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< "$_SOURCE")"
@@ -564,8 +576,8 @@ function doUmount() {
     isContainerRunning ${CTID} ; running=$?
     [[ $running -ne 0 ]] && $VZCTL mount $CTID > /dev/null 2>&1
 
-    local issue_file="/vz/root/${CTID}/etc/issue";
-    local release_files="/vz/root/${CTID}/etc/*-release";
+    local issue_file="${VZ_CTID_ROOT}/etc/issue";
+    local release_files="${VZ_CTID_ROOT}/etc/*-release";
     issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
     OS=$(detectOS "$issue_string")
     OS_ver=$(getOSVersion "$issue_string")
@@ -583,7 +595,7 @@ function doUmount() {
 
     if [[ "x$OS" == "xalpine" ]] ; then
         log "OS is ALPINE"
-        [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="/vz/root/${CTID}/etc/fstab"
+        [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="${VZ_CTID_ROOT}/etc/fstab"
     fi
 
     OIFS=$IFS; IFS=$'\n'
@@ -629,8 +641,7 @@ function doUmount() {
     if [[ $running -ne 0 ]] ; then
         $VZCTL umount $CTID > /dev/null 2>&1
     else
-        mntcmd="systemctl restart autofs"
-        vzexecRun "${mntcmd}"
+        _reloadAutoFS
     fi
     $retfunc "message=>$msg";
     return 0;
