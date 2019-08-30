@@ -417,10 +417,8 @@ function LookupShare() {
 function isValidShare()
 {
     [ ! -f "$2" ] && return 1
-    if [[ $_isFUSE -eq 1 ]]; then
-        if isContainerRunning ${CTID};  then
-            vzctl exec2 ${CTID} "[ -d \"$1\" ]" || return 1;
-        fi
+    if isContainerRunning ${CTID};  then
+        vzctl exec2 ${CTID} "[ -d \"$1\" ]" || return 1;
     else
         isShareExistsOnDisk $3$1 || return 1;
     fi
