@@ -188,7 +188,7 @@ function doUndeploy(){
     done;
     lUndeploy="undeploy" #added for backwards compatibility with Openshift cartridge templates
     isFunction "_undeploy" && lUndeploy="_undeploy" #must be removed after the cartridge support is finished
-    "$lUndeploy" "$context" && removeHooks "$context" &&  writeJSONResponseOut "result=>0" "message=>Application removed sussesfully" || writeJSONResponseErr "result=>4061" "message=>Undeploy failed" ;
+    "$lUndeploy" "$context" && removeHooks "$context" &&  writeJSONResponseOut "result=>0" "message=>Application removed successfully" || writeJSONResponseErr "result=>4061" "message=>Undeploy failed" ;
 }
 
 function doRenameContext(){
@@ -298,7 +298,7 @@ function doInternalCall(){
 }
 
 function doCleanUp(){
-        $glassfish_tools -m cleanup >> "$JEM_CALLS_LOG" && writeJSONResponseOut "result=>0" "message=>Сleanup sussesfully" || writeJSONResponseErr "result=>4070" "message=>Сleanup failed" ;
+        $glassfish_tools -m cleanup >> "$JEM_CALLS_LOG" && writeJSONResponseOut "result=>0" "message=>Сleanup successfull" || writeJSONResponseErr "result=>4070" "message=>Сleanup failed" ;
 }
 
 function describeAddToCluster() {
