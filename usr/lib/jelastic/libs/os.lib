@@ -328,6 +328,7 @@ function installPackageCmd() {
     : ${1:?"Missing param: OS"};
     local OS=$1; shift
     local pmaction=$1; shift
+    local _apk_wait_timeout=${APK_WAIT_TIMEOUT:="10"}
     for arg do PKGS="$arg $PKGS"; done
     case $OS in
         suse)
@@ -340,7 +341,7 @@ function installPackageCmd() {
                 PM="yum -y"
             ;;
         alpine)
-            PM="apk"
+            PM="apk --wait $_apk_wait_timeout"
             case $pmaction in
                 install)
                         pmaction="add -f"
@@ -356,6 +357,7 @@ function installPackageCmd() {
 function checkPackageCmd() {
     : ${1:?"Missing param: OS"};
     local OS=$1; shift
+    local _apk_wait_timeout=${APK_WAIT_TIMEOUT:="10"}
     local res=""
 
     case $OS in
@@ -366,7 +368,7 @@ function checkPackageCmd() {
             ltpl='rpm -q %s >/dev/null 2>&1 || echo "%s" ;'
             ;;
         alpine)
-            ltpl='p="%s";if apk | grep -q list ; then [ -n "$(apk list -I $p)" ] || echo $p ; else [ -z "$(apk version -q $p)" ] && echo %s; fi ;'
+            ltpl='p="%s";if apk | grep -q list ; then [ -n "$(apk --wait '$_apk_wait_timeout' list -I $p)" ] || echo $p ; else [ -z "$(apk --wait '$_apk_wait_timeout' version -q $p)" ] && echo %s; fi ;'
             ;;
     esac
     for arg do
