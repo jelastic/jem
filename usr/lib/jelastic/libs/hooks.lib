@@ -57,7 +57,7 @@ function applyHook(){
         echo -e "[INFO] $(date) Applying ${hookDisplayName} hook for ${target} \n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         ${SUDO_COMMAND} chmod +x "$HOOKS_DIR/${hook}_${target}.sh";
         if [ "$UID" == '0' ]; then
-	    chown ${DATA_OWNER} ${HOOKS_LOG} ${resultFile} ;
+            chown ${DATA_OWNER} ${HOOKS_LOG} ${resultFile} ;
             runuser -l jelastic -c "timeout ${actiontimeout} $HOOKS_DIR/${hook}_${target}.sh 2>&1; echo \$?>${resultFile}" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         else
             (timeout ${actiontimeout} $HOOKS_DIR/${hook}_${target}.sh 2>&1; echo $?>${resultFile}) | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
@@ -92,9 +92,14 @@ function removeHooks(){
     getHooksLogName;
     target="$1"
     adjustRubyTarget;
-    rm -f "$HOOKS_DIR/*_${target}.sh" && echo -e "[INFO] $(date) All hooks are removed for ${target}" >> ${HOOKS_LOG} || return 0;
+    [ -z "${hooks_to_delete}" ] && hooks_to_delete=$(ls ${HOOKS_DIR}|grep "_${target}.sh")
+    if [ -n "${hooks_to_delete}" ]; then
+        rm -f "$HOOKS_DIR/*_${target}.sh" && echo -e "[INFO] $(date) All hooks are removed for ${target}" >> ${HOOKS_LOG};
+    else
+        return 0;
+    fi
 }
 
 function adjustRubyTarget(){
-    [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && { [ -f /etc/environment ] && ${SUDO_COMMAND} chmod 666 /etc/environment; target="${bundle_type}"; [ -z "${target}" ] && target=${context}; [ -d ${HOOKS_DIR} ] && hooks_to_rename=$(ls ${HOOKS_DIR}); }
+    [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && { [ -f /etc/environment ] && ${SUDO_COMMAND} chmod 666 /etc/environment; target="${bundle_type}"; [ -z "${target}" ] && target=${context}; [ -d ${HOOKS_DIR} ] && hooks_to_rename=hooks_to_delete=$(ls ${HOOKS_DIR}); }
 }
