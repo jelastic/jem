@@ -288,7 +288,7 @@ function expand_ipv6() {
         { print }'
 }
 
-function dump_active_ipv4_ips(){
+function dump_active_ips_expanded(){
     dump_active_ips | \
         sed -r 's/[[:blank:]]+/\n/g' | \
         sed -nr '/^[[:blank:]]*$/!{/^0[.]0[.]0[.]0$/!{s/[/][^/]+$//; p}}' | \
