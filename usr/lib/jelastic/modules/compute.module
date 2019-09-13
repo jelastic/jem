@@ -298,7 +298,7 @@ function doInternalCall(){
 }
 
 function doCleanUp(){
-        $glassfish_tools -m cleanup >> "$JEM_CALLS_LOG" && writeJSONResponseOut "result=>0" "message=>Сleanup successfull" || writeJSONResponseErr "result=>4070" "message=>Сleanup failed" ;
+        $glassfish_tools -m cleanup >> "$JEM_CALLS_LOG" && writeJSONResponseOut "result=>0" "message=>Cleanup successful" || writeJSONResponseErr "result=>4070" "message=>Сleanup failed" ;
 }
 
 function describeAddToCluster() {
