@@ -50,6 +50,7 @@ declare -r _JELASTIC_SHELL="/opt/jsh/jsh"
 VERBOSE=1;
 function onModLoadCallback() {
 	[[ "$UID" != '0' ]] && {  writeJSONResponseErr "result=>4034" "message=>You must be root!"; die -q; }
+    return 0
 }
 
 function doUsage() {
