@@ -346,32 +346,38 @@ function doAction() {
 
         source "$MANAGE_DEFAULT_ACTIONS" 2>/dev/null || die "Couldn't source ${MANAGE_DEFAULT_ACTIONS}";
         source "${modfile}" 2>/dev/null || die "Couldn't source ${modfile}";
+        res=0
 
-        isFunction "onModLoadCallback" && "onModLoadCallback" "$@";
+        if isFunction "onModLoadCallback" ; then
+            "onModLoadCallback" "$@";
+            res=$?
+        fi
 
-        [[ -z ${subaction} ]] && {
-            checkDo "do${DEFAULT_ACTION:-usage}" "$@";
-        } || {
-            isFunction "do${subaction}" || subaction=$(sed 's/\([a-zA-Z0-9]\)\([a-zA-Z0-9]*\)/\u\1\2/g' <<< ${subaction});
-            isFunction "do${subaction}" || subaction=$(declare -F | grep -iom 1 "${subaction}");
-            [[ -z ${subaction} ]] && die -q "Action ${subaction} unknown";
-            # [[ "$@" == "help" ]] && { "showActionHelp" "$subaction"; return 0; }
-            [[ "$@" == "help" ]] && { isFunction "showActionHelp" && "showActionHelp" "$subaction"; return 0; }
-            sourceOverride;
-            isFunction "pre${subaction}Callback" && "pre${subaction}Callback" "$@";
-            checkDo "do${subaction}" "$@";
-            result=$?;
-            if [[ $result -eq 0 ]] ; then
-                if isFunction "post${subaction}Callback" ; then
-                    "post${subaction}Callback" "$@" ;
-                    result=$?;
+        if [[ $res -eq 0 ]] ; then
+            [[ -z ${subaction} ]] && {
+                checkDo "do${DEFAULT_ACTION:-usage}" "$@";
+            } || {
+                isFunction "do${subaction}" || subaction=$(sed 's/\([a-zA-Z0-9]\)\([a-zA-Z0-9]*\)/\u\1\2/g' <<< ${subaction});
+                isFunction "do${subaction}" || subaction=$(declare -F | grep -iom 1 "${subaction}");
+                [[ -z ${subaction} ]] && die -q "Action ${subaction} unknown";
+                # [[ "$@" == "help" ]] && { "showActionHelp" "$subaction"; return 0; }
+                [[ "$@" == "help" ]] && { isFunction "showActionHelp" && "showActionHelp" "$subaction"; return 0; }
+                sourceOverride;
+                isFunction "pre${subaction}Callback" && "pre${subaction}Callback" "$@";
+                checkDo "do${subaction}" "$@";
+                result=$?;
+                if [[ $result -eq 0 ]] ; then
+                    if isFunction "post${subaction}Callback" ; then
+                        "post${subaction}Callback" "$@" ;
+                        result=$?;
+                    fi
                 fi
-            fi
-            [ -w "$resultFile" -a -n "$result" ] && {
-                echo $result >$resultFile
+                [ -w "$resultFile" -a -n "$result" ] && {
+                    echo $result >$resultFile
+                }
+                exit $result
             }
-            exit $result
-        }
+        fi
     );
     [[ $? -eq 124 ]] && {
     actionResult="124";
