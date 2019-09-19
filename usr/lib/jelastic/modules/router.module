@@ -122,6 +122,7 @@ function onModLoadCallback() {
         esac;
     done
     [ -z "$__PROTO" ] && __PROTO=tcp ;
+    return 0;
 }
 
 function describeForward() {
