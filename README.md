@@ -1,4 +1,4 @@
-![JEM](http://oi63.tinypic.com/huoc5d.jpg)
+![JEM](https://download.jelastic.com/index.php/apps/files_sharing/publicpreview?file=%2F%2FJEM%20Core.jpg&x=1906&a=true&t=d696e3e65cdf33969472e5679d9a3d09&scalingup=0)
 
 # **JEM**
 **JEM** is an open source platform component, intended for injection of smart logic into containers. It gives extra abilities and extra automation for applications, designed to be run inside Linux containers.
