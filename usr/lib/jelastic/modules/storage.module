@@ -54,6 +54,7 @@ MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-utils.tar.gz"
 _UI_RESULT=0
 USERID=0
 GROUPID=0
+VERBOSE=1
 DEFAULT_AUTOFS_TIMEOUT=300
 JELASTIC_AUTOFS_TIMEOUT=3
 
@@ -138,6 +139,7 @@ function onModLoadCallback() {
         MOUNTS_STORAGE="${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}"
     }
     log "${UNKNOWN_ARG[*]}"
+    return 0
 }
 
 function _reloadAutoFS() {
