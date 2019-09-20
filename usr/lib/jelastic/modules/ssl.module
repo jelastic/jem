@@ -71,6 +71,9 @@ function doInstall(){
 	216 ) 
 		writeJSONResponseErr "result=>4016" "message=>Could not receive private key!"
 	;; 
+	217 )
+		writeJSONResponseErr "result=>4180" "message=>Uploaded key is encrypted!"
+	;;
 	147 )
 		writeJSONResponseErr "result=>4147" "message=>Certificates not uploaded";
 	;; 
