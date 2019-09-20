@@ -106,7 +106,13 @@ function onModLoadCallback() {
         NFS_CONFIG_DIR="/vz/root/${CTID}/etc/"
         NFS_CONFIG_FILE="${NFS_CONFIG_DIR}exports"
         EXPORTS_FILE="/vz/root/${CTID}${CONTAINER_EXPORTS_FILE}"
+
+        if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
+            res=$(vzexecGetLastStdOut)
+            [ ! -n "$res" ] && eval "$res"
+        fi
     }
+    return 0
 }
 
 
@@ -554,6 +560,19 @@ function _addNativeip() {
                 writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
                 return 1
             fi
+
+            if [ -z "$JELASTIC_CHECK_MOUNT" ]; then
+                if ! vzexecRun "rpcinfo -p | grep -q mountd" ; then
+                    log "mountd procedures not found on RPC server. Checking exported share will be disabled"
+                    return 0
+                fi
+            else
+                if [ $JELASTIC_CHECK_MOUNT -eq 0 ] ; then
+                    log "local server checking disabled for CTID $CTID"
+                    return 0
+                fi
+            fi
+
             retries=5
             vzexecRun "showmount -e  2>/dev/null | grep -qP \"$IPLIST\""
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: checking exports" >> ${JEM_CALLS_LOG};
