@@ -228,7 +228,7 @@ function onModLoadCallback() {
                 ;;
         esac;
     done;
-
+    return 0
 }
 
 function describeStart() {

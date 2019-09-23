@@ -56,7 +56,7 @@ function onModLoadCallback(){
     while true ; do
         case "${1}" in
             -c|--configs)
-                EXPORT_CONFIGS="yes"; 
+                EXPORT_CONFIGS="yes";
                 shift
                 ;;
             -d|--data)
@@ -81,7 +81,8 @@ function onModLoadCallback(){
                 ;;
         esac;
     done;
-    echo -e "[simplehttp]\nPORT=${EX_PORT}" > ${SIMPLEHTTP_CONF} ;
+    echo -e "[simplehttp]\nPORT=${EX_PORT}" > ${SIMPLEHTTP_CONF}
+    return 0
 }
 
 function describeRunParameters(){
@@ -101,7 +102,7 @@ function doRun() {
     ARCH_FILE="${DESTINATION}/${ARCH_FILE_NAME}";
     if [ "x$EXPORT_CONFIGS" == "xyes" ] ; then
 	INCLUDE_LIST="";
-	if [ "x$COMPUTE_TYPE" == "xcartridge" ] ; then 
+	if [ "x$COMPUTE_TYPE" == "xcartridge" ] ; then
 		INCLUDE_LIST=`find /opt/repo/ -name "*.xml" -o -name "*.cfg" -o -name "*.yaml" -o -name "*.yml" -o -name "*.conf" 2>/dev/null`
 	else
 		[ -f "$INCLUDE_LIST_FILE" ] && {
@@ -135,20 +136,20 @@ function doRun() {
         else
             INCLUDE_LIST="${INCLUDE_LIST}"$'\n'"${_homedir}";
         fi
-	
+
     fi
-    [ -z "$INCLUDE_LIST" ] && { 
-	echo "Empty export list" >> $ACTIONS_LOG; 
+    [ -z "$INCLUDE_LIST" ] && {
+	echo "Empty export list" >> $ACTIONS_LOG;
 	writeJSONResponseErr "result=>4040" "message=>Export failed" ;
-	return 1; 
+	return 1;
     }
 
     INCLUDE_LIST="`echo "$INCLUDE_LIST"|sort|uniq`";
     PID=$$;
-    EXPORT_LIST_FILE=`mktemp /tmp/export3.${PID}XXXX 2>/dev/null`; 
-    exresult=$?; 
+    EXPORT_LIST_FILE=`mktemp /tmp/export3.${PID}XXXX 2>/dev/null`;
+    exresult=$?;
 
-    EXCLUDE_LIST_FILE=`mktemp /tmp/exclude3.${PID}XXXX 2>/dev/null`; 
+    EXCLUDE_LIST_FILE=`mktemp /tmp/exclude3.${PID}XXXX 2>/dev/null`;
     excluderesult=$?;
 
     INCLUDE_LIST1="$INCLUDE_LIST";
@@ -163,7 +164,7 @@ function doRun() {
     echo "$INCLUDE_LIST1" >> "$EXPORT_LIST_FILE";
     echo "$EXCLUDE_LIST" >> "$EXCLUDE_LIST_FILE";
     [ -z "${_homedir}" ] || echo "${_homedir}/.ssh/*" >> "$EXCLUDE_LIST_FILE";
-    
+
     [ ! -d "$DESTINATION" ] && { mkdir -p "$DESTINATION";  }
     TAR_OPTS=" --warning=none -P --ignore-failed-read"
 
@@ -176,7 +177,7 @@ function doRun() {
 
     [ -f "$EXCLUDE_LIST_FILE" ] && rm -f "$EXCLUDE_LIST_FILE";
     [ -f "$EXPORT_LIST_FILE" ] && rm -f "$EXPORT_LIST_FILE";
-    if [ $arcresult -eq 0 ] ; then 
+    if [ $arcresult -eq 0 ] ; then
 	if [ `$TAR -P -tf "$ARCH_FILE" | wc -l` -eq 0 ] ; then
 	    echo "Empty archive created" >> $ACTIONS_LOG ;
 	    writeJSONResponseErr "result=>4040" "message=>Export failed" ;
