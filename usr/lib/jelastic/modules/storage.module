@@ -131,8 +131,14 @@ function onModLoadCallback() {
     done;
     [ -n "$CTID" ] && { vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; }
 
-    VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
-    VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+    [ -n "$CTID" ] && {
+        VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
+        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+        if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
+            res=$(vzexecGetLastStdOut)
+            [ -n "$res" ] && eval "$res"
+        fi
+    }
 
     for arg do UNKNOWN_ARG+=("$arg") ; done
     [[ ! -z "${CTID}" ]] && {
@@ -205,6 +211,19 @@ function migrateConfig() {
 function checkMount() {
     #skip check if CTID is empty
     [[ -z "${CTID}" ]] && return 0
+
+    if [ -z "$JELASTIC_CHECK_MOUNT" ]; then
+        if ! vzexecRun "rpcinfo -p $1 | grep -q mountd" ; then
+            log "mountd procedures not found on RPC server. Checking remote share will be disabled"
+            return 0
+        fi
+    else
+        if [ $JELASTIC_CHECK_MOUNT -eq 0 ] ; then
+            log "remote server checking disabled for CTID $CTID"
+            return 0
+        fi
+    fi
+
     localCIPs="$($SED -re 's/\./\\\./g' -e 's/\s+/\|/g' <<< $(getTargetIPs $CTID))"
     retries=5
     vzexecRun "showmount -e $1 2>/dev/null | grep \"$2\" | grep -qP \"$localCIPs\""
