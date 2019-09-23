@@ -580,13 +580,13 @@ function _addNativeip() {
             esac
 
             retries=5
-            vzexecRun "showmount -e  2>/dev/null | grep -qP \"$IPLIST\""
+            vzexecRun "showmount -e 127.0.0.1 2>/dev/null | grep -qP \"$IPLIST\""
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: checking exports" >> ${JEM_CALLS_LOG};
             while [[ $retries -gt 0 ]] ; do
                 if [[ "$(vzexecGetLastErrCode)" -gt 0 ]]; then
                     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: $(vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG};
                     sleep 4
-                    vzexecRun "showmount -e  2>/dev/null | grep -qP \"$IPLIST\""
+                    vzexecRun "showmount -e 127.0.0.1 2>/dev/null | grep -qP \"$IPLIST\""
                     retries=$((retries-1))
                 else
                     [[ $_isFUSE -eq 1 ]] && _isFUSE="true" || _isFUSE="false"
