@@ -65,6 +65,7 @@ function onModLoadCallback() {
     done;
     for arg do UNKNOWN_ARG+=("$arg") ; done
     log "${UNKNOWN_ARG[*]}"
+    return 0
 }
 
 function doSetTechEmail(){

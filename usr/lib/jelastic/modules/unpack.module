@@ -57,6 +57,7 @@ function onModLoadCallback(){
     done;
     [ -z "$ARCHIVE_URL" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
     [ -z "$DESTINATION" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
+    return 0
 }
 
 

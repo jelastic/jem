@@ -67,7 +67,7 @@ function onModLoadCallback(){
         esac;
     done;
     # echo "USER: ${FS_USER}|PATH: ${FS_PATH}|SOURCE: ${FS_SOURCE}|DEST: ${FS_DESTINATION}|OVER: ${FS_OVERWRITE}";
-
+    return 0
 }
 
 # checkRights
