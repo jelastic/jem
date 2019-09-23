@@ -351,6 +351,7 @@ function doAction() {
         if isFunction "onModLoadCallback" ; then
             "onModLoadCallback" "$@";
             res=$?
+            echo "{\"result\":4181, \"message\": \"Internal error. Contact support.\"}"
         fi
 
         if [[ $res -eq 0 ]] ; then
