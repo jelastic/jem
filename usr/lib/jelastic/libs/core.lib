@@ -351,7 +351,6 @@ function doAction() {
         if isFunction "onModLoadCallback" ; then
             "onModLoadCallback" "$@";
             res=$?
-            echo "{\"result\":4181, \"message\": \"Internal error. Contact support.\"}"
         fi
 
         if [[ $res -eq 0 ]] ; then
@@ -378,6 +377,8 @@ function doAction() {
                 }
                 exit $result
             }
+        else
+            echo "{\"result\":4181, \"message\": \"Internal error. Contact support.\"}"
         fi
     );
     [[ $? -eq 124 ]] && {
