@@ -136,7 +136,7 @@ function onModLoadCallback() {
         VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
         if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
             res=$(vzexecGetLastStdOut)
-            [ ! -n "$res" ] && eval "$res"
+            [ -n "$res" ] && eval "$res"
         fi
     }
 
@@ -213,7 +213,6 @@ function checkMount() {
     #skip check if CTID is empty
     [[ -z "${CTID}" ]] && return 0
 
-    # JELASTIC_CHECK_MOUNT -
     if [ -z "$JELASTIC_CHECK_MOUNT" ]; then
         if ! vzexecRun "rpcinfo -p $1 | grep -q mountd" ; then
             log "mountd procedures not found on RPC server. Checking remote share will be disabled"
