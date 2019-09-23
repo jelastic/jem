@@ -562,16 +562,22 @@ function _addNativeip() {
             fi
 
             if [ -z "$JELASTIC_CHECK_MOUNT" ]; then
-                if ! vzexecRun "rpcinfo -p | grep -q mountd" ; then
-                    log "mountd procedures not found on RPC server. Checking exported share will be disabled"
-                    return 0
+                if ! vzexecRun "rpcinfo -p $1 | grep -q mountd" ; then
+                    log "mountd procedures not found on RPC server. Checking remote share will be disabled"
+                    JELASTIC_CHECK_MOUNT=0
                 fi
-            else
-                if [ $JELASTIC_CHECK_MOUNT -eq 0 ] ; then
-                    log "local server checking disabled for CTID $CTID"
-                    return 0
-                fi
+                JELASTIC_CHECK_MOUNT=1
             fi
+
+            case "$JELASTIC_CHECK_MOUNT" in
+                false|0)
+                    log "remote server checking disabled for CTID $CTID"
+                    return 0
+                    ;;
+                true|1)
+                    log "remote server checking enabled for CTID $CTID"
+                    ;;
+            esac
 
             retries=5
             vzexecRun "showmount -e  2>/dev/null | grep -qP \"$IPLIST\""
