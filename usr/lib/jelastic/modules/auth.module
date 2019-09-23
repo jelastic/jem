@@ -554,6 +554,25 @@ function _addNativeip() {
                 writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
                 return 1
             fi
+
+            if [ -z "$JELASTIC_CHECK_MOUNT" ]; then
+                if ! vzexecRun "rpcinfo -p $1 | grep -q mountd" ; then
+                    log "mountd procedures not found on RPC server. Checking remote share will be disabled"
+                    JELASTIC_CHECK_MOUNT=0
+                fi
+                JELASTIC_CHECK_MOUNT=1
+            fi
+
+            case "$JELASTIC_CHECK_MOUNT" in
+                false|0)
+                    log "remote server checking disabled for CTID $CTID"
+                    return 0
+                    ;;
+                true|1)
+                    log "remote server checking enabled for CTID $CTID"
+                    ;;
+            esac
+
             retries=5
             vzexecRun "showmount -e  2>/dev/null | grep -qP \"$IPLIST\""
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: checking exports" >> ${JEM_CALLS_LOG};
