@@ -388,7 +388,7 @@ function doAction() {
             local ppids=$(pstree -p $ppid | tr -d '\n' | sed -re 's/[^0-9]/\ /g' -e 's/\s{2,}/ /g' )
             [ -z "$ppids" ] || {
                 echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
-                echo ":[KILLING ]   [PID: $ppid] Parrent PID is: $ppid. Killing after timeout $ppids" >> ${JEM_CALLS_LOG} 2>&1
+                echo ":[KILLING]   [PID: $ppid] Parrent PID is: $ppid. Killing after timeout $ppids" >> ${JEM_CALLS_LOG} 2>&1
                 kill -9 $ppids >>${JEM_CALLS_LOG} 2>&1
             }
         }
