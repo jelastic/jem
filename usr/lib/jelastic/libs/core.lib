@@ -284,14 +284,14 @@ function startJemThreadQueueManager(){
 
     [ -f $jempidfile ] && {
         echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
-        echo ":[WAITING]   [PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
+        echo ":[WAITING]   [PID: $(cat $jempidfile 2>/dev/null)] Current PID: $$. Action: $action Subaction: $subaction" >> ${JEM_CALLS_LOG} 2>&1;
 
         while [[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]]; do
             sleep $sleep_period;
         done
 
         echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
-        echo ":[PROCESSING][PID: $(cat $jempidfile 2>/dev/null)]" >> ${JEM_CALLS_LOG} 2>&1;
+        echo ":[PROCESSING][PID: $(cat $jempidfile 2>/dev/null)] Current PID: $$. Action: $action Subaction: $subaction" >> ${JEM_CALLS_LOG} 2>&1;
     }
     ${SUDO_COMMAND} touch $jempidfile;
     ${SUDO_COMMAND} chmod 666 $jempidfile;
@@ -387,7 +387,7 @@ function doAction() {
         [ -z "$ppid" ] || {
             local ppids=$(pstree -p $ppid | tr -d '\n' | sed -re 's/[^0-9]/\ /g' -e 's/\s{2,}/ /g' )
             [ -z "$ppids" ] || {
-                echo "Killing after timeout $ppids" >> ${JEM_CALLS_LOG} 2>&1
+                echo "Parrent PID is: $ppid. Killing after timeout $ppids" >> ${JEM_CALLS_LOG} 2>&1
                 kill -9 $ppids >>${JEM_CALLS_LOG} 2>&1
             }
         }
