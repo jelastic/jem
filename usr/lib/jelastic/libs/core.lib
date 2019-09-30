@@ -211,7 +211,9 @@ function startJemThreadQueueManager(){
 #    local jempidfile="/var/run/jem.pid";
     jempidfile="/var/run/jem.pid";
     local sleep_period="1s"
-    ensureDiskSpaceIsOK;
+
+    ensureDiskSpaceIsOK || exit
+
     local subaction=$1;
     if [ "x$action" == "xvcs" -a "x$subaction" == "xautoupdate" ] ; then
         [[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]] && {
