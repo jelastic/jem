@@ -16,6 +16,7 @@
 
 [ -n "${EXCEPTORLIB_VERSION:-}" ] && return 0;
 EXCEPTORLIB_VERSION="0.1";
+DF_TIMEOUT_SEC=120
 
 inherit fsutils;
 include output;
@@ -29,16 +30,28 @@ $PROGRAM 'unzip';
 $PROGRAM 'sed';
 
 function ensureDiskSpaceIsOK() {
-    local disk_space_usage_critical_state=97;
-    local disk_inode_usage_critical_state=97;
-    local fstype="$(getFSType '/')";
-    local disk_space_usage_percentage=$(df -l -h 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1);
-    local disk_inode_usage_percentage=$(df -l -i 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1);
-    [ ${disk_space_usage_percentage} -lt ${disk_space_usage_critical_state} ] || { writeJSONResponseErr "result=>4075" "message=>No free diskspace"; die -q; }
+    resfile=$(mktemp 2>/dev/null)
+    [ -z "$resfile" ] && return 1
+    timeout -s 9 $DF_TIMEOUT_SEC cat <(
+        local disk_space_usage_critical_state=97
+        local disk_inode_usage_critical_state=97
+        local fstype="$(getFSType '/')"
+        local disk_space_usage_percentage=$(df -l -h 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1)
+        local disk_inode_usage_percentage=$(df -l -i 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1)
+        [ ${disk_space_usage_percentage} -lt ${disk_space_usage_critical_state} ] || { writeJSONResponseErr "result=>4075" "message=>No free diskspace"; echo 1 > $resfile; exit; }
 
-    [[ "${fstype}" == "reiserfs" ]] && return 0;
-    [ ${disk_inode_usage_percentage} -lt ${disk_inode_usage_critical_state} ] || { writeJSONResponseErr "result=>4076" "message=>No free inodes"; die -q; }
-    return 0;
+        [[ "${fstype}" == "reiserfs" ]] && { echo 0 > $resfile; exit; }
+        [ ${disk_inode_usage_percentage} -lt ${disk_inode_usage_critical_state} ] || { writeJSONResponseErr "result=>4076" "message=>No free inodes"; echo 1 > $resfile; exit; }
+        echo 0 > $resfile
+    )
+    res=$?
+    [[ $res -eq 137 ]] && {
+        echo "{\"result\":4132, \"message\": \"Execution timed out\"}"
+        die -q
+    }
+    fres=$(cat $resfile)
+    [ -n "$fres" ] && return $fres
+    return 1
 }
 
 function ensureFileCanBeUncompressed(){
