@@ -317,6 +317,25 @@ function sourceOverride(){
     }
 }
 
+function _getTimeout() {
+    while :; do
+        case $1 in
+            --timeout)
+                [ "$2" ] && { value=$2 ; shift ; }
+                ;;
+            --timeout=?*)
+                value=${1#*=}
+                ;;
+            *)
+                [ -z "$1" ] && break
+        esac
+        shift
+    done
+    [ -z "$value" ] && return 1
+    echo $value
+    return 0
+}
+
 function doAction() {
     local action="${1##--}" modfile="" subaction="${2##--}" ;
     [[ -z ${action} ]] && die "Usage: doAction <action> <args>";
@@ -332,13 +351,19 @@ function doAction() {
 
     #default timeout for all actions is 1hr
     actiontimeout=3600
-    _moduleaction="${action}${subaction}"
-    #read the timeouts from config file
-    eval "$($SED -re '/^#/d;/^(\s*)$/d;s/(.*)/declare -x \L\1/g' '/etc/jelastic/timeouts.conf')"
-    eval "actiontimeout_cfg=\$${_moduleaction}"
-    if [ ! -z "${actiontimeout_cfg}" ] ; then
-       actiontimeout="${actiontimeout_cfg}"
+    timeoutParam=$(_getTimeout $*)
+    if [ $? -ne 0 ] ; then
+        _moduleaction="${action}${subaction}"
+        #read the timeouts from config file
+        eval "$($SED -re '/^#/d;/^(\s*)$/d;s/(.*)/declare -x \L\1/g' '/etc/jelastic/timeouts.conf')"
+        eval "actiontimeout_cfg=\$${_moduleaction}"
+        if [ ! -z "${actiontimeout_cfg}" ] ; then
+            actiontimeout="${actiontimeout_cfg}"
+        fi
+    else
+        actiontimeout=$timeoutParam
     fi
+
     modfile=$(_manageFindModule "${action}");
     resultFile=$(mktemp)
     ACTION_STATE_FILE=$(mktemp)
