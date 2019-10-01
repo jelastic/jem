@@ -34,6 +34,7 @@ $PROGRAM "tar"
 declare -i _CTID=""
 declare -i CTID=""
 declare -i _MOVEDATA=0
+declare CLUSTER="false"
 declare _SOURCE=""
 declare _DESTINATION=""
 declare _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,udp,soft,timeo=120,retrans=20,_netdev"
@@ -56,7 +57,6 @@ USERID=0
 GROUPID=0
 VERBOSE=1
 DEFAULT_AUTOFS_TIMEOUT=300
-JELASTIC_AUTOFS_TIMEOUT=3
 
 EXEC="/bin/bash -c "
 
@@ -68,7 +68,7 @@ function onModLoadCallback() {
     log "Preload callback";
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -o c:,s:,d:,u:,g:,l:,m: -l ctid:,source:,destination:,ip:,uid:,gid:,movedata:,saveconfig::,force:: -- "$@" 2>/dev/null`;
+    local temp=`getopt -o c:,s:,d:,u:,g:,l:,m: -l ctid:,source:,destination:,ip:,uid:,gid:,movedata:,saveconfig::,force::,cluster: -- "$@" 2>/dev/null`;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
@@ -91,6 +91,14 @@ function onModLoadCallback() {
                 CTID=$1
                 EXEC="$VZCTL exec2 ${_CTID}"
                 vzexecSetCTID ${_CTID}
+                shift;
+                ;;
+            --cluster)
+                shift;
+                CLUSTER=$1
+                if [ "x$CLUSTER" != "xtrue" ]; then
+                    JELASTIC_AUTOFS_TIMEOUT="300"
+                fi
                 shift;
                 ;;
             -s | --source)
