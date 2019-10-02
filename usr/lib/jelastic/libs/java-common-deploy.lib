@@ -31,7 +31,7 @@ function verifyUnpackedContent(){
     local pull_inverval_for_content=2s;
     local pull_inverval_for_directory=2s;
     local content_size_step1 content_size_step2;
-    local attempt_amount=450;
+    local attempt_amount=390
     local attempt_num=0;
 
     while [ true ]
