@@ -262,7 +262,6 @@ function doAdd() {
 }
 
 function doAccess(){
-        options=`getopt -o t:,a: -l type:,action: -- "$@"`;
         while [ $# -gt 0 ]
         do
                 case $1 in
