@@ -295,3 +295,37 @@ function dump_active_ips_expanded(){
         expand_ipv6 | \
         sort -u
 }
+
+function inSubnet {
+    local ip ip_a mask netmask sub sub_ip rval start end
+    local readonly BITMASK=0xFFFFFFFF
+
+    IFS=/ read sub mask <<< "$1"
+    IFS=. read -a sub_ip <<< "$sub"
+    IFS=. read -a ip_a <<< "$2"
+
+    if [ "x$mask" == "x" ] ; then
+        [[ "x$sub" == "x$2" ]] && echo "1" || echo "0"
+        return 0
+    fi
+
+    netmask=$(($BITMASK<<$((32-$mask)) & $BITMASK))
+
+    start=0
+    for o in "${sub_ip[@]}" ; do
+        start=$(($start<<8 | $o))
+    done
+
+    start=$(($start & $netmask))
+    end=$(($start | ~$netmask & $BITMASK))
+
+    ip=0
+    for o in "${ip_a[@]}" ;     do
+        ip=$(($ip<<8 | $o))
+    done
+
+    (( $ip >= $start )) && (( $ip <= $end )) && rval=1 || rval=0
+
+    echo "${rval}"
+}
+
