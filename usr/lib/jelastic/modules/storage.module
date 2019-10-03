@@ -240,27 +240,34 @@ function checkMount() {
             ;;
     esac
 
-    localCIPs="$($SED -re 's/\./\\\./g' -e 's/\s+/\|/g' <<< $(getTargetIPs $CTID))"
     retries=5
-    vzexecRun "showmount -e $1 2>/dev/null | grep \"$2\" | grep -qP \"$localCIPs\""
+    cmdShowmount='showmount -e '$1' 2>/dev/null | grep "'$2'"'
+
+    localCIPs=($(getTargetIPs $CTID))
 
     while [[ $retries -gt 0 ]] ; do
-        if [[ "$(vzexecGetLastErrCode)" -gt 0 ]]; then
-            sleep 4
-            vzexecRun "showmount -e $1 2>/dev/null | grep \"$2\" | grep -qP \"$localCIPs\""
-            retries=$((retries-1))
-        else
-            return $(vzexecGetLastErrCode)
-        fi
+        #get IPs from remote storage
+        vzexecRun $cmdShowmount
+        sharedIPs=($(awk '{split($0,a,",") ; if (a[1] != $0) { a[1] = "" ; for (k in a) { if (a[k] != "") { print a[k] } } } else {print $2}}' <<< $(vzexecGetLastStdOut)))
+
+        #is local IP in remote network range
+        for lIP in $localCIPs ; do
+            for sIP in $sharedIPs ; do
+                [[ "x$sIP" == "x*" || "x$sIP" == "x(everyone)" ]] && return 0
+                (( $(inSubnet $sIP $lIP) )) && return 0
+            done
+        done
+
+        sleep 4
+        retries=$((retries-1))
     done
 
     if [[ "$(vzexecGetLastErrCode)" -gt 0 ]]; then
-        vzexecRun "showmount -e $1 | grep \"$2\" | grep -qP \"$localCIPs\""
-         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: StdErr: $(vzexecGetLastStdErr) StdOut": $(vzexecGetLastStdErr) >> ${JEM_CALLS_LOG};
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: StdErr: $(vzexecGetLastStdErr) StdOut": $(vzexecGetLastStdOut) >> ${JEM_CALLS_LOG};
     fi
 
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: timeout has elapsed" >> ${JEM_CALLS_LOG};
-    return $(vzexecGetLastErrCode)
+    return 1
 }
 
 function processnfs4() {
