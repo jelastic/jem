@@ -364,6 +364,15 @@ function doAction() {
         actiontimeout=$timeoutParam
     fi
 
+    r=1
+    for arg do
+        shift
+        [[ "$arg" = "--timeout" ]] && { r=0; continue; }
+        [[ "$arg" == --timeout=* ]] && continue
+        [[ "$r" -eq 0 ]] && { r=1 ; continue ; }
+        set -- "$@" "$arg"
+    done
+
     modfile=$(_manageFindModule "${action}");
     resultFile=$(mktemp)
     ACTION_STATE_FILE=$(mktemp)
