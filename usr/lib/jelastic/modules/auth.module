@@ -45,6 +45,7 @@ MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-server.tar.gz"
 METAINFOFILE="/etc/jelastic/metainf.conf"
 
 $PROGRAM "tar"
+VZ_TYPE=0
 
 function doUsage() {
     showUsageMessage
@@ -106,6 +107,13 @@ function onModLoadCallback() {
         NFS_CONFIG_DIR="/vz/root/${CTID}/etc/"
         NFS_CONFIG_FILE="${NFS_CONFIG_DIR}exports"
         EXPORTS_FILE="/vz/root/${CTID}${CONTAINER_EXPORTS_FILE}"
+
+        if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
+            res=$(vzexecGetLastStdOut)
+            [ ! -n "$res" ] && eval "$res"
+        fi
+
+        VZ_TYPE=$(cat /etc/*release /etc/issue | grep -i "virtuozzo\|parallels" | awk '{ for (i=1; i<NF; i++ ) {if ($i ~ "release" ) print $(i+1) }}' | awk -F'.' '{print $1}' | head -n 1)
     }
 }
 
@@ -470,7 +478,7 @@ function _addNativeip() {
     local _isFUSE=0
     local _UUID=""
     local _done=0
-    local _version=3
+    local _version=$_NFS_VERSION
 
 
     isContainerRunning ${CTID} ; running=$?
@@ -504,6 +512,7 @@ function _addNativeip() {
         fi
     fi
 
+    [ "$VZ_TYPE" -eq 6 ] && _version=3
 
     if [ -e "${EXPORTS_FILE}" ] ; then
         dPath="\"$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< $destinationPath)\"\s+"
