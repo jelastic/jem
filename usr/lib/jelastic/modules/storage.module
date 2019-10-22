@@ -507,14 +507,14 @@ function dosetupUtils() {
     fi
 
     if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
-        vzexecRun "apt update; curl -sLO http://spacewalk.jelastic.com/pub/autofs_5.1.5-1_amd64.deb"
+        vzexecRun "apt update; curl -sLO http://spacewalk.jelastic.com/pub/autofs_5.1.5-1_amd64-test.deb"
         if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "8" ]; then
             vzexecRun "$(installPackageCmd $OS install autofs)"
-            vzexecRun "DEBIAN_FRONTEND=noninteractive dpkg -i ./autofs_5.1.5-1_amd64.deb"
+            vzexecRun "DEBIAN_FRONTEND=noninteractive dpkg -i ./autofs_5.1.5-1_amd64-test.deb"
         else
-            vzexecRun "$(installPackageCmd $OS install ./autofs_5.1.5-1_amd64.deb)"
+            vzexecRun "$(installPackageCmd $OS install ./autofs_5.1.5-1_amd64-test.deb)"
         fi
-        vzexecRun "rm -f autofs_5.1.5-1_amd64.deb"
+        vzexecRun "rm -f autofs_5.1.5-1_amd64-test.deb"
         installCmd="$(installPackageCmd $OS install nfs-common)"
         checkCmd=$(checkPackageCmd $OS autofs nfs-common)
     elif [ "x$OS" == "xcentos" ] ; then
