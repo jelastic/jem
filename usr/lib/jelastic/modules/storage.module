@@ -247,7 +247,7 @@ function checkMount() {
     while [[ $retries -gt 0 ]] ; do
         #get IPs from remote storage
         vzexecRun $cmdShowmount
-        sharedIPs=($(awk '{split($2,a,",") ; if (a[1] != $0) { for (k in a) { if (a[k] != "") { print a[k] } } } else {print $2}}' <<< $(vzexecGetLastStdOut)))
+        sharedIPs=($(awk '{split($2,a,",") ; if (a[1] != $0) { for (k in a) { if (a[k] != "") { print a[k] } } } else {print $2}}' <<< "$(vzexecGetLastStdOut)"))
 
         #is local IP in remote network range
         for lIP in ${localCIPs[@]} ; do
