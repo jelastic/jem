@@ -101,5 +101,5 @@ function removeHooks(){
 }
 
 function adjustRubyTarget(){
-    [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && { [ -f /etc/environment ] && ${SUDO_COMMAND} chmod 666 /etc/environment; target="${bundle_type}"; [ -z "${target}" ] && target=${context}; [ -d ${HOOKS_DIR} ] && hooks_to_rename=hooks_to_delete=$(ls ${HOOKS_DIR}); }
+    [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" == "nginx-ruby" ] || [ "x${COMPUTE_TYPE}" == "xcartridge" -a "x${Engine_Type}" == "xruby" ] && { [ -f /etc/environment ] && ${SUDO_COMMAND} chmod 666 /etc/environment; target="${bundle_type}"; [ -z "${target}" ] && target=${context}; [ -d ${HOOKS_DIR} ]  && hooks_to_delete=$(ls ${HOOKS_DIR}) && hooks_to_rename=${hooks_to_delete}; }
 }
