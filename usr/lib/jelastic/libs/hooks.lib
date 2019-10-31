@@ -64,11 +64,11 @@ function applyHook(){
         fi
         result=$(cat ${resultFile}); rm -f ${resultFile};
         if [ "${result}" == "0" ]; then
-            echo -e "[INFO] ${hookDisplayName} hook applied successfully\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
+            echo -e "[INFO] $(date) ${hookDisplayName} hook applied successfully\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         elif [ "${result}" == "124" ]; then
-            echo -e "[ERROR] ${hookDisplayName} hook execution timed out. Exit code ${result}\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG}; die -q;
+            echo -e "[ERROR] $(date) ${hookDisplayName} hook execution timed out. Exit code ${result}\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG}; die -q;
         else
-            echo -e "[ERROR] ${hookDisplayName} hook execution failed. Exit code ${result}\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
+            echo -e "[ERROR] $(date) ${hookDisplayName} hook execution failed. Exit code ${result}\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         fi
         return ${result}
     else
