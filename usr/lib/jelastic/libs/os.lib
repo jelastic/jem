@@ -84,7 +84,7 @@ function convertUnits() {
 
 function enableService() {
     local name=${1} level=${2:-3} doStart=${3:-${__TRUE}};
-    [[ ${doStart} == ${__TRUE} ]] && startService ${name} && \
+    [[ ${doStart} == ${__TRUE} ]] && startService ${name};
     ${CHKCONFIG} --level ${level} ${name} on;
     return ${?};
 }
