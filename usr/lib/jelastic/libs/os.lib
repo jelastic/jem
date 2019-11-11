@@ -84,7 +84,7 @@ function convertUnits() {
 
 function enableService() {
     local name=${1} level=${2:-3} doStart=${3:-${__TRUE}};
-    [[ ${doStart} == ${__TRUE} ]] && startService ${name};
+    [[ ${doStart} == ${__TRUE} ]] && startService ${name} && \
     ${CHKCONFIG} --level ${level} ${name} on;
     return ${?};
 }
@@ -94,32 +94,36 @@ function enableService() {
 function startService() {
     local name=${1};
     ${SUDO_COMMAND} ${SERVICE_CMD} ${name} start;
+    result=$?;
     sleep 1;
-    return ${?};
+    return ${result};
 }
 
 # $1 - service name
 function startServiceSilent() {
     local name=${1};
     ${SUDO_COMMAND} ${SERVICE_CMD} ${name} start > /dev/null 2>&1;
+    result=$?;
     sleep 1;
-    return ${?};
+    return ${result};
 }
 
 
 function stopService() {
     local name=${1};
     ${SUDO_COMMAND} ${SERVICE_CMD} ${name} stop;
+    result=$?;
     sleep 1;
-    return ${?};
+    return ${result};
 };
 
 # $1 - service name
 function stopServiceSilent() {
     local name=${1};
     ${SUDO_COMMAND} ${SERVICE_CMD} ${name} stop > /dev/null 2>&1;
+    result=$?;
     sleep 1;
-    return ${?};
+    return ${result};
 }
 
 function reloadService() {
