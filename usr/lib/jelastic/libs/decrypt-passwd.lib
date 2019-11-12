@@ -31,7 +31,7 @@ function getPassword(){
         local keyString='';
         case ${decType,,} in
                 'rsa' )
-                        [ -f "$rsaKey" ] && keyString=$( cat $rsaKey );
+                        [ -f "$rsaKey" ] && keyString=$( cat $rsaKey )  || {  writeJSONResponseErr "result=>4087" "message=>Could not decrypt password!!"; die -q; }
                         ;;
                 'static' )
                         keyString='TFVhBKDOSBspeSXesw8fElCcOzbJzYed';

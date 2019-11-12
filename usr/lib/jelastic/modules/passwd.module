@@ -93,7 +93,7 @@ function doSetos(){
 		  esac
 		  shift
 		done
-
+		[ -f /etc/vsftpd/vsftpd.conf.tpl ] && cp -f /etc/vsftpd/vsftpd.conf.tpl /etc/vsftpd/vsftpd.conf || true;
                 [ -z "$password" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
                 if [ "$user" == "jelastic-ftp" -a -d "/etc/vsftpd/" ]; then
                         include vsftpd;
