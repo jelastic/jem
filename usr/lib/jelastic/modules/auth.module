@@ -104,9 +104,10 @@ function onModLoadCallback() {
     done;
     [[ ! -z "${CTID}" ]] && {
         vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; };
-        NFS_CONFIG_DIR="/vz/root/${CTID}/etc/"
+        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+        NFS_CONFIG_DIR="$VZ_CTID_ROOT/etc/"
         NFS_CONFIG_FILE="${NFS_CONFIG_DIR}exports"
-        EXPORTS_FILE="/vz/root/${CTID}${CONTAINER_EXPORTS_FILE}"
+        EXPORTS_FILE="${VZ_CTID_ROOT}${CONTAINER_EXPORTS_FILE}"
 
         if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
             res=$(vzexecGetLastStdOut)
@@ -120,11 +121,11 @@ function onModLoadCallback() {
 
 
 function dosetupUtils() {
-    local issue_file="/vz/root/${CTID}/etc/issue";
-    local release_files="/vz/root/${CTID}/etc/*-release";
+    local issue_file="$VZ_CTID_ROOT/etc/issue";
+    local release_files="$VZ_CTID_ROOT/etc/*-release";
 
     isContainerRunning ${CTID} && {
-        local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
+        local computetype="$( [ -e "${VZ_CTID_ROOT}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "${VZ_CTID_ROOT}${METAINFOFILE}")"
         if [[ "xstorage" == "x$computetype" ]] ; then
             vzexecRun "systemctl enable nfs-server"
             return $TRUE
@@ -167,7 +168,7 @@ function dosetupUtils() {
         return $FALSE
     fi
 
-    $TAR hzxf "${MOUNTPACKAGE}" -C "/vz/root/${CTID}/"
+    $TAR hzxf "${MOUNTPACKAGE}" -C "$VZ_CTID_ROOT/"
 
     # install systemD unit
     [[ -d "/vz/root/${CTID}/lib/systemd/system" ]] && echo "$SystemDUnit" > "/vz/root/${CTID}/lib/systemd/system/unfsd.service"
@@ -221,35 +222,53 @@ function _adjustFirewall() {
     fwstatus=$(vzexecGetLastErrCode)
     if [[ "$fwstatus" -gt 0 ]] ; then
         #firewall is not running in container (or old jem inside)
-        [ -e "/vz/root/${CTID}/etc/exports" ] && NFSIPS=($($SED -re 's/.+(\s|\t)+(([0-9]+\.){3}[0-9]+(\/[0-9]{0,2})?).*/\2/g' -e '/#/d' "/vz/root/${CTID}/etc/exports" | sort | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'))
+        set -f
+        [ -e "$VZ_CTID_ROOT/etc/exports" ] && NFSIPS=($($SED -re 's/.+(\s|\t)+((\*)|([0-9]+\.){3}[0-9]+(\/[0-9]{0,2})?).*/\2/g' -e '/#/d' "$VZ_CTID_ROOT/etc/exports" | sort | uniq | $SED -e '/^$/d' -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'))
 
         vzexecRun "which iptables"
         IPT="$(vzexecGetLastStdOut)"
         if [ ! -z "$IPT" ] ; then
+            local __allnetwork=0
 
             if [[ "${#NFSIPS[@]}" -gt 0 ]] ; then
                 for nfsip in ${NFSIPS[@]} ; do
-                    #remove rule if already exists
-                    vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
-                    vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
-                    #add new rule for selected IP
-                    vzexecRun "$IPT -I INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
-                    vzexecRun "$IPT -I INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                    if [ "$nfsip" == "*" ] ; then
+                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j ACCEPT"
+                        vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -j ACCEPT"
+                        vzexecRun "$IPT -I INPUT -p tcp -m multiport --dports 111,2049 -j ACCEPT"
+                        vzexecRun "$IPT -I INPUT -p udp -m multiport --dports 111,2049 -j ACCEPT"
+
+                        #all network exported
+                        __allnetwork=1
+                        break
+                    else
+                        #remove rule if already exists
+                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                        vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                        #add new rule for selected IP
+                        vzexecRun "$IPT -I INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                        vzexecRun "$IPT -I INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                    fi
                 done
             fi
             vzexecRun "$IPT -D INPUT -i lo -j ACCEPT"
             vzexecRun "$IPT -I INPUT -i lo -j ACCEPT"
 
-            vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -j DROP"
-            vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
-            #DROP ALL OTHER SOURCES
-            vzexecRun "$IPT -A INPUT -p udp -m multiport --dports 111,2049 -j DROP"
-            vzexecRun "$IPT -A INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
+            if [[ "$__allnetwork" -eq 0 ]] ; then
+                vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -j DROP"
+                vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
+
+                #DROP ALL OTHER SOURCES
+                vzexecRun "$IPT -A INPUT -p udp -m multiport --dports 111,2049 -j DROP"
+                vzexecRun "$IPT -A INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
+            fi
+
             vzexecRun "service iptables save"
             #JE-26417
             vzexecRun "[ -x /etc/init.d/iptables-persistent ] && /etc/init.d/iptables-persistent save"
             vzexecRun "[ -x /etc/init.d/netfilter-persistent ] && /etc/init.d/netfilter-persistent save"
         fi
+        set +f
     else
         #firewall is enabled, so call reconfiguration method
         vzexecRun "jem firewall FWReconfigure"
