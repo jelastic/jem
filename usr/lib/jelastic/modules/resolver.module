@@ -21,6 +21,8 @@ VERSION="1.0"
 DEFAULT_ACTION="Usage";
 
 SLB_ZONES_CONFIG_PATH='/etc/pdns-recursor/internal.zones';
+REGION_RESOLVERS_CONF="/etc/jelastic/region_resolvers.conf"
+[ -f $REGION_RESOLVERS_CONF ] && . $REGION_RESOLVERS_CONF
 
 #ZONE_TYPE parameter specifies type of zone to Add
 #Valid values: internal, external, both
@@ -28,6 +30,7 @@ ZONE_TYPE='both';
 
 $PROGRAM 'grep'
 $PROGRAM 'curl'
+$PROGRAM 'sed'
 
 function checkParams() {
     local params=($*)
@@ -82,7 +85,11 @@ function reload_zones(){
 
 
 function doAddZone() {
-    local INTERNALIP="$(internalip)"
+    if [ -z "${region_resolvers_internal_ips}" ]; then
+        local INTERNALIPS="$(internalip)"
+    else
+        local INTERNALIPS="${region_resolvers_internal_ips}"
+    fi
     local requiredParqams=("ZONE_NAME" "INTERNALIP")
     local msg=$(checkParams ${requiredParqams[@]})
     [[ ! -z "${msg}" ]] && { writeJSONResponseErr "result=>4099" "message=>Missing param $msg" ; return 99; }
@@ -91,28 +98,28 @@ function doAddZone() {
         return 99;
     }
     #is Zone exists in main config?
-    if $GREP -wE "^${ZONE_NAME}([[:blank:]]|=)" "$SLB_ZONES_CONFIG_PATH" ; then
+    if $GREP -wE "^${ZONE_NAME}[[:blank:]]*=[[:blank:]]*${INTERNALIPS}" "$SLB_ZONES_CONFIG_PATH" ; then
         writeJSONResponseErr "result=>4099" "message=>Zone ${ZONE_NAME} already exists in $SLB_NAMED_MAIN_CONFIG" ;
         return 99;
     fi
-    echo "${ZONE_NAME} = ${INTERNALIP}" >> $SLB_ZONES_CONFIG_PATH
+    $SED -i "/^${ZONE_NAME}[[:blank:]]*=/d" $SLB_ZONES_CONFIG_PATH
+    echo "${ZONE_NAME} = ${INTERNALIPS}" >> $SLB_ZONES_CONFIG_PATH
     reload_zones;
     return $?;
 }
 
 function doFixZones() {
     $PROGRAM 'mysql'
-    _QUERY='select name from hivext_jelastic.dns_internal where rdtype="SOA";'
+    _QUERY='select DISTINCT(name) from hivext_jelastic.dns_internal where rdtype="SOA";'
     OLD_IFS=$IFS; IFS=$'\n';
     ZONES=($(${MYSQL} -uroot -BNse "${_QUERY}")) || return $?
     IFS=$OLD_IFS
+    > $SLB_ZONES_CONFIG_PATH
     for zone in ${ZONES[*]} ; do
         ZONE_NAME=$zone
-        if ! $GREP -qwE "^${ZONE_NAME}([[:blank:]]|=)" "$SLB_ZONES_CONFIG_PATH" ; then
-            echo "Adding zone ${ZONE_NAME}"
-            out=$(doAddZone)
-            log $out
-        fi
+        echo "Adding zone ${ZONE_NAME}"
+        out=$(doAddZone)
+        log $out
     done
     reload_zones;
     return $?
