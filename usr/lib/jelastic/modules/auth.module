@@ -678,7 +678,7 @@ function _removeNativeip() {
            for i in "${IPLIST[@]}" ; do
                 isValidIP $i || continue
                 log "removing ${i} from ${EXPORTS_FILE}"
-                $SED -i -re "/\"?$DESTINATION\"?\s+${i//./\\.}/{/${i//./\\.}/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
+                $SED -i -re "/\"?$DESTINATION\"?\s+${i//./\\.}/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
                 vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $i -j ACCEPT"
                 vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $i -j ACCEPT"
             done
@@ -693,7 +693,7 @@ function _removeNativeip() {
         for i in "${IPLIST[@]}" ; do
             isValidIP $i || continue
             log "removing ${i} from ${EXPORTS_FILE}"
-            $SED -i -re "/\"?$DESTINATION\"?\s+/{/${i//./\\.}/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
+            $SED -i -re "/\"?$DESTINATION\"?\s+/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
         done
     fi
 
