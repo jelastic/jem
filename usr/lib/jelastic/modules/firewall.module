@@ -535,10 +535,18 @@ function doFWEnable() {
     if [[ $CTID -eq 0 ]] ; then
         local resultMsg
         resultMsg=$(doEnable); result=$?
-    else
-        resultMsg=$(vzctl exec2 $CTID "jem firewall Enable"); result=$?
+        [[ "${result}" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been enabled" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}"
+        return $result
     fi
-    [[ "${result}" ]] && writeJSONResponseOut "result=>${result}" "message=>Firewall has been enabled" || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}"
+
+    resultMsg=$(vzctl exec2 $CTID "jem firewall Enable"); result=$?
+    [[ "${result}" ]] || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}"
+
+    FWSetMsg=$(dofwset $@)
+    eval $($SED -re 's/.*"result":"([0-9]+)".*"message":"([^"]+)".*/fwset_result="\1";fwset_msg="\2"/g' <<< $FWSetMsg)
+    [[ "$fwset_result" -gt 0 ]] && writeJSONResponseErr "result=>$fwset_result" "message=>$fwset_msg"
+    writeJSONResponseOut "result=>0" "message=>Firewall has been enabled"
+    return 0
 }
 
 function describeDisable() {
