@@ -148,7 +148,8 @@ function dosetupUtils() {
         addPackages="libtirpc"
         [[ "$OS_ver" -eq "7" ]] && addPackages="$addPackages nfs-utils"
     elif [ "x$OS" == "xdebian" -o "x$OS" == "xubuntu" ] ; then
-        addPackages="libtirpc1"
+        addPackages="libtirpc1 nfs-common"
+        [[ "$OS_ver" -eq "10" ]] && addPackages="libtirpc-common nfs-common"
     fi
 
     installCmd=$(installPackageCmd $OS install rpcbind $addPackages)
