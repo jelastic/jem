@@ -413,7 +413,7 @@ function doAutoUpdate(){
 }
 
 function doEnableScheduler(){
-  [ -f $ROOT_CRONFILE ] && $GREP -q "\^$AUTOUPDATE_CRON_STRING"  $ROOT_CRONFILE || echo "$AUTOUPDATE_CRON_STRING" >> $ROOT_CRONFILE;
+  [ -f $ROOT_CRONFILE ] && $GREP -q "\^$AUTOUPDATE_CRON_STRING"  $ROOT_CRONFILE || { echo "$AUTOUPDATE_CRON_STRING" >> $ROOT_CRONFILE; chmod 0644 $ROOT_CRONFILE; }
 }
 
 function doDisableScheduler(){
