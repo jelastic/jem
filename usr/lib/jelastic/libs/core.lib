@@ -18,6 +18,7 @@
 CORELIB_VERSION="0.1";
 
 declare -x OVERRIDE_DIR="/var/lib/jelastic/overrides/"
+declare -x CUSTOMIZATIONS_DIR="/var/lib/jelastic/customizations/"
 
 DEBUG=${DEBUG:=0};
 PROGRAM='searchProg';
@@ -308,11 +309,16 @@ function stopJemThreadQueueManager(){
     }
 }
 function sourceOverride(){
-    [ -d "$OVERRIDE_DIR" ] && [  $(ls -1 ${OVERRIDE_DIR}/*.lib 2>/dev/null | wc -l ) -gt 0 ] && {
-    # [  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -eq 0 ] && return 0;
-        for override_lib in $(ls ${OVERRIDE_DIR}/*.lib)
+    [ -d "$OVERRIDE_DIR" ] && [  $(ls -1 $OVERRIDE_DIR/*.lib 2>/dev/null | wc -l ) -gt 0 ] && {
+        for override_lib in $(ls $OVERRIDE_DIR/*.lib)
         do
-            source $override_lib;
+            source $override_lib
+        done
+    }
+    [ -d "$CUSTOMIZATIONS_DIR" ] && [  $(ls -1 $CUSTOMIZATIONS_DIR/*.lib 2>/dev/null | wc -l ) -gt 0 ] && {
+        for override_lib in $(ls $CUSTOMIZATIONS_DIR/*.lib)
+        do
+            source $override_lib
         done
     }
 }
