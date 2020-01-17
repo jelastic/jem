@@ -151,6 +151,22 @@ function checkRule() {
     $IPTABLES -C $chainName $rule 1>/dev/null 2>&1
 }
 
+function processRule4File() {
+    [ -f "$1" ] || return 1
+    echo "CUSTOM RULES FILE $1 CONTENT"  >> $JEM_CALLS_LOG
+    cat "$1" >> $JEM_CALLS_LOG
+    $IPTABLES_RESTORE -n < "$1" 2>>$ACTIONS_LOG
+    return $?
+}
+
+function processRule6File() {
+    [ -f "$1" ] || return 1
+    echo "CUSTOM RULES FILE $1 CONTENT "  >> $JEM_CALLS_LOG
+    cat "$1" >> $JEM_CALLS_LOG
+    $IP6TABLES_RESTORE -n < "$1" 2>>$ACTIONS_LOG
+    return $?
+}
+
 function doUsage() {
     showUsageMessage
 }
@@ -315,29 +331,20 @@ function doStart() {
         [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" >>$JEM_CALLS_LOG 2>&1;
     }
 
-    [ -f "${CUSTOM_RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${CUSTOM_RULES_FILE}" 2>>$ACTIONS_LOG ;
-        echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_RULES_FILE}" >> $JEM_CALLS_LOG ;
-    }
+    _rule4Files=($CUSTOM_RULES_FILE $JELASTIC_4RULES_FILE $JELASTIC_4NATRULES_FILE)
+    _rule6Files=($CUSTOM_6RULES_FILE $JELASTIC_6RULES_FILE $JELASTIC_6NATRULES_FILE)
 
-    [ -f "${JELASTIC_4RULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${JELASTIC_4RULES_FILE}" 2>>$ACTIONS_LOG ;
-        echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_4RULES_FILE}" >> $JEM_CALLS_LOG ;
-    }
-
-    [ -f "${CUSTOM_6RULES_FILE}" ] && { $IP6TABLES_RESTORE -n < "${CUSTOM_6RULES_FILE}" 2>>$ACTIONS_LOG ;
-        echo "CUSTOM RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${CUSTOM_6RULES_FILE}" >> $JEM_CALLS_LOG ;
-    }
-
-    [ -f "${JELASTIC_6RULES_FILE}" ] && { $IP6TABLES_RESTORE -n < "${JELASTIC_6RULES_FILE}" 2>>$ACTIONS_LOG ;
-        echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_6RULES_FILE}" >> $JEM_CALLS_LOG ;
-    }
-
-    [ -f "${JELASTIC_4NATRULES_FILE}" ] && { $IPTABLES_RESTORE -n < "${JELASTIC_4NATRULES_FILE}" 2>>$ACTIONS_LOG ;
-        echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_4NATRULES_FILE}" >> $JEM_CALLS_LOG ;
-    }
-
-    [ -f "${JELASTIC_6NATRULES_FILE}" ] && { $IP6TABLES_RESTORE -n < "${JELASTIC_6NATRULES_FILE}" 2>>$ACTIONS_LOG ;
-        echo "JELASTIC RULES FILE CONTENT"  >> $JEM_CALLS_LOG; cat "${JELASTIC_6NATRULES_FILE}" >> $JEM_CALLS_LOG ;
-    }
+    _loadRes=0
+    for j in $(seq 4 2 6) ; do
+        eval "_ruleFiles=(\${_rule${j}Files[*]})"
+        eval "_processRuleFile=processRule${j}File"
+        for i in $(seq 0 $((${#_ruleFiles[*]}-1)) ) ; do
+            $_processRuleFile ${_ruleFiles[$i]}
+            _res=$?
+            [[ "$_res" -ne 0 ]] && echo "Load contents of ${_ruleFiles[$i]} filed"
+            _loadRes=$((_loadRes+_res))
+        done
+    done
 
     if [ -f /proc/net/if_inet6 ] ; then
         $IP6TABLES -I INPUT -p icmpv6 -j ACCEPT
@@ -349,8 +356,11 @@ function doStart() {
     $IPTABLES -I INPUT -i lo -j ACCEPT
     $IPTABLES -I INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 
-
-    checkRule "INPUT" "-j REJECT --reject-with icmp-host-prohibited" || $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited
+    #Add reject only if there was no problem while loading rules
+    if [[ "$_loadRes" -gt 0 ]] ; then
+        checkRule "INPUT" "-j REJECT --reject-with icmp-host-prohibited" || $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited
+        return 2
+    fi
 
     log "saving rules"
     local issue_file="/etc/issue"
@@ -368,7 +378,7 @@ function doStart() {
         /sbin/service iptables save 2>/dev/null | $GRAB_OUTPUT
         /sbin/service ip6tables save &> /dev/null
     fi
-    return 0;
+    return 0
 }
 
 function describeFWStart() {
@@ -677,6 +687,6 @@ function dofwset() {
         vzctl umount ${CTID} >> $ACTIONS_LOG 2>&1
     fi
     log="$(vzexecGetLastStdOut) $(vzexecGetLastStdErr)"
-    writeJSONResponseOut "result=>0" "message=>Firewall rules set" "log=>${log//\"/\\\"}"
+    writeJSONResponseOut "result=>$(vzexecGetLastErrCode)" "message=>Firewall rules set" "log=>${log//\"/\\\"}"
     return 0
 }
