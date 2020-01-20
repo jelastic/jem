@@ -47,6 +47,7 @@ function Restore() {
 		  shift
 		done
 
+		[ ! -e "/var/cache" ] && mkdir -p "/var/cache/";
 		local dumpfile="/var/cache/tempdump$$.dump";
 		$WGET --no-check-certificate $dumpurl -O $dumpfile >> $ACTIONS_LOG 2>&1;
 		$GZIP -l ${dumpfile} > /dev/null 2>&1 && { mv "${dumpfile}" "${dumpfile}.gz" &&  $GZIP -d  "${dumpfile}.gz" && mv "${dumpfile}" "${dumpfile}.sql"; } || { mv "${dumpfile}" "${dumpfile}.sql"; }
