@@ -20,30 +20,34 @@ GITLIB_VERSION="0.1";
 inherit os;
 include output uninterract;
 
+function prepareUrl(){
+    local repo_proto=$(echo $URL | $SED -nre 's/(.*):\/\/(.*)/\1/p');
+    local host_and_uri=$(echo $URL | $SED -re 's/(.*:\/\/)(.*)/\2/');
+
+    AUTH=$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\$/%24/g'\
+                     -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
+                     -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
+                     -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
+
+    [ ! -z "$PASSWORD" ] && {
+    AUTH=${AUTH}:$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\$/%24/g'\
+                     -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
+                     -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
+                     -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");
+    }
+
+    [ ! -z "$repo_proto" ] && {
+        preparedUrl="$repo_proto://${AUTH}@${host_and_uri}";
+    } || {
+        preparedUrl="${AUTH}@${host_and_uri}";
+    }
+}
+
 function doCheckout(){
     [ ! -z "$WEBROOT" ] && { set -f; rm -Rf "${WEBROOT}/${PROJECT_NAME}"; set +f; }
 
     if [[ "$LOGIN" != "__GUEST__"  ]] ; then
-        local repo_proto=$(echo $URL | $SED -nre 's/(.*):\/\/(.*)/\1/p');
-        local host_and_uri=$(echo $URL | $SED -re 's/(.*:\/\/)(.*)/\2/');
-
-        AUTH=$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\$/%24/g'\
-                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
-                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
-                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
-
-        [ ! -z "$PASSWORD" ] && {
-        AUTH=${AUTH}:$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\$/%24/g'\
-                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
-                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
-                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");
-        }
-
-        [ ! -z "$repo_proto" ] && {
-            preparedUrl="$repo_proto://${AUTH}@${host_and_uri}";
-        } || {
-            preparedUrl="${AUTH}@${host_and_uri}";
-        }
+        prepareUrl;
         runNonInterractive "$GIT clone ${preparedUrl} ${WEBROOT}/${PROJECT_NAME}" >> $JEM_CALLS_LOG 2>&1;
         result=$?; [ $result -ne 0 ] && return $result;
         [ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
@@ -78,12 +82,11 @@ function doCheckout(){
     return 0;
 }
 
-
 function updateProject(){
     [ -d "${WEBROOT}/${PROJECT_NAME}" ] && cd "${WEBROOT}/${PROJECT_NAME}";
     [ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
             echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
-	       $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD  >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG};
+               $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD  >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG};
     }
     echo -n $(date +%D.%k:%M:%S.%N) >> "$VCS_UPDATE_LOG" 2>&1;
     runNonInterractive "$GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git pull"  > /dev/null 2>&1;
@@ -98,12 +101,11 @@ function updateProject(){
         [ -f "${WEBROOT}/ROOT/Gemfile" ] &&  {
                 inherit ruby-common;
                 bundleInstall;
-		reloadServiceSilent ${SERVICE} ;
+                reloadServiceSilent ${SERVICE} ;
         }
     }
     return 0;
 }
-
 
 function getLastRepoCommit(){
     [ -e ${WEBROOT}/${PROJECT_NAME}/.git ] && local last_repo_commit=$($GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git rev-parse HEAD 2>/dev/null)
@@ -111,40 +113,20 @@ function getLastRepoCommit(){
     echo $last_repo_commit;
 }
 
-
 function getLastRemoteCommit(){
     readProjectConfig;
     preparedUrl="${URL}";
 
     if [[ "$LOGIN" != "__GUEST__"  ]] ; then
-        local repo_proto=$(echo $URL | $SED -nre 's/(.*):\/\/(.*)/\1/p');
-        local host_and_uri=$(echo $URL | $SED -re 's/(.*:\/\/)(.*)/\2/');
-
-        AUTH=$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\$/%24/g'\
-                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
-                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
-                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
-
-        [ ! -z "$PASSWORD" ] && {
-                 AUTH=${AUTH}:$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
-                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
-                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
-                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");
-        }
-
-        [ ! -z "$repo_proto" ] && {
-            preparedUrl="$repo_proto://${AUTH}@${host_and_uri}";
-        } || {
-            preparedUrl="${AUTH}@${host_and_uri}";
-        }
+        prepareUrl;
     fi
 
     if [ "x${LOGIN}" == "xgit" ]; then
         URL=$($SED -e 's/git:\/\///g' -e 's/ssh:\/\///g' <<< "${URL}");    
-        last_remote=$(git ls-remote git@$URL $BRANCH 2>&1);
+        last_remote=$(git ls-remote git@$URL $BRANCH 2>/dev/null);
         result=$?;
     else
-        last_remote=$(git ls-remote $preparedUrl $BRANCH 2>&1 );
+        last_remote=$(git ls-remote $preparedUrl $BRANCH 2>/dev/null);
         result=$?;
     fi
 
@@ -161,25 +143,7 @@ function getLastRemoteCommit(){
 
 function vcsChangeUrl(){
     if [[ "$LOGIN" != "__GUEST__"  ]] ; then
-        local repo_proto=$(echo $URL | $SED -nre 's/(.*):\/\/(.*)/\1/p') ;
-        local host_and_uri=$(echo $URL | $SED -re 's/(.*:\/\/)(.*)/\2/') ;
-        AUTH=$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\$/%24/g'\
-                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
-                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g'\
-                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${LOGIN}");
-
-        [ ! -z "$PASSWORD" ] && {
-                 AUTH=${AUTH}:$($SED -e 's/\%/%25/g' -e 's/\^/%5E/g'  -e 's/\!/%21/g' -e 's/\#/%23/g' -e 's/\\$/%24/g'\
-                         -e 's/\&/%26/g' -e "s/'/%27/g" -e 's/(/%28/g' -e 's/)/%29/g' -e 's/\*/%2A/g'\
-                         -e 's/\+/%2B/g' -e 's/\,/%2C/g' -e 's/\:/%3A/g' -e 's/\;/%3B/g' -e 's/\=/%3D/g' -e 's/\//%2F/g' -e 's/\\./%2E/g'\
-                         -e 's/\?/%3F/g' -e 's/\@/%40/g' -e 's/\[/%5B/g' -e 's/\]/%5D/g' <<< "${PASSWORD}");
-        }
-
-        [ ! -z "$repo_proto" ] && {
-            preparedUrl="$repo_proto://${AUTH}@${host_and_uri}";
-        } || {
-            preparedUrl="${AUTH}@${host_and_uri}";
-        }
+        prepareUrl;
     else
         preparedUrl=$NEWURL ;
     fi
@@ -187,4 +151,3 @@ function vcsChangeUrl(){
     result=$?;
     return $result;
 }
-
