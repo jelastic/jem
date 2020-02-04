@@ -69,7 +69,7 @@ function onModLoadCallback() {
     log "Preload callback";
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -o c:,s:,d:,u:,g:,l:,m: -l ctid:,source:,destination:,ip:,uid:,gid:,movedata:,saveconfig::,force::,cluster: -- "$@" 2>/dev/null`;
+    local temp=`getopt -o c:,s:,d:,u:,g:,l:,m: -l ctid:,source:,destination:,ip:,uid:,gid:,movedata:,saveconfig:,force:,cluster: -- "$@" 2>/dev/null`;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
@@ -83,10 +83,10 @@ function onModLoadCallback() {
                 ;;
             --saveconfig)
                 shift;
-                SAVE_CONFIG=$1
+                SAVE_CONFIG=${1,,}
                 shift;
                 ;;
-            -o | --ctid)
+            -c | --ctid)
                 shift;
                 _CTID=$1
                 CTID=$1
