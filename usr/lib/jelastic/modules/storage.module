@@ -167,6 +167,12 @@ function _reloadAutoFS() {
     return $?
 }
 
+function _restartAutoFS() {
+    local _cmd="systemctl restart autofs || service autofs restart"
+    vzexecRun "$_cmd"
+    return $?
+}
+
 function _isVirtuozzoInstalled() {
     local vzmainconfig="/etc/sysconfig/vz";
     if [ -f "${vzmainconfig}" ] ; then
@@ -376,7 +382,11 @@ function processnfs() {
     fi
 
     if [[ $running -eq 0 ]] ; then
-        _reloadAutoFS
+	if [[ "x$SAVE_CONFIG" == "xfalse" ]] ; then
+	    _restartAutoFS
+	else
+            _reloadAutoFS
+	fi
     else
         log "unmounting"
         $VZCTL umount $CTID > /dev/null 2>&1
@@ -539,6 +549,10 @@ function dosetupUtils() {
     if [[ -n "$stdout" ]] ; then
         writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $stdout"
         return 1
+    fi
+
+    if [ -e "${VZ_CTID_ROOT}/etc/rc.d/init.d/autofs" ]; then  
+        $GREP killproc -A2 "${VZ_CTID_ROOT}/etc/rc.d/init.d/autofs" | $GREP -q 'sleep 1' || $SED -i '/killproc/{N;s/$/\n\t\tsleep 1;/}' "${VZ_CTID_ROOT}/etc/rc.d/init.d/autofs"
     fi
 
     [ -e "${VZ_CTID_ROOT}/etc/autofs.conf" ] && $SED -i "s/^timeout = .*/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "${VZ_CTID_ROOT}/etc/autofs.conf"
