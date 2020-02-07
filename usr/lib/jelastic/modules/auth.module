@@ -517,15 +517,14 @@ function _addNativeip() {
     local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
     if [[ "xstorage" == "x$computetype" ]] ; then
         _version=4
+        _UUID=$(cat /proc/sys/kernel/random/uuid)
         if isContainerRunning ${CTID} ; then
             if vzexecRun "grep -q \" $destinationPath fuse\" /proc/mounts" ; then
                 _createPath=0
                 _isFUSE=1
-                _UUID=$(cat /proc/sys/kernel/random/uuid)
             elif vzexecRun "fuse_avail=\$(grep \"fuse\" /proc/mounts | awk '{print \$2}'); [ -n \"\$fuse_avail\" ] &&  grep -q \$fuse_avail <<< \"$destinationPath\"" ; then
                 vzexecRun "[ ! -e \"${destinationPath}\" ]" && _createPath=1 || _createPath=0
                 _isFUSE=1
-                _UUID=$(cat /proc/sys/kernel/random/uuid)
             fi
         else
             _createPath=0
