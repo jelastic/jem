@@ -29,6 +29,7 @@ foreach my $p ( @params) {
     my $pVal = $cfg->val('require', $p);
     my $tmpVal = $p;
     $tmpVal =~ s/\//_/g;
+    $tmpVal =~ s/\./_/g;
     $$tmpVal=$cfg->val('require', $p);
     if ( $pVal =~ /;/ ) {
 	   my @tmpArr = split /;/, $pVal ;
