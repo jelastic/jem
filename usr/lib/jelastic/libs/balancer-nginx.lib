@@ -430,7 +430,7 @@ function addCommonHostConfig(){
 }
 
 function removeCommonHostConfig	(){
-  $SED -i "/$1/d"  "$UPSTREAM_COMMON_CONFIG" ;
+  $SED -i "/^$1$/d"  "$UPSTREAM_COMMON_CONFIG" ;
 }
 
 function weightChanged(){
