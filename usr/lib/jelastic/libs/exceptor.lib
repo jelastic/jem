@@ -50,6 +50,7 @@ function ensureDiskSpaceIsOK() {
         die -q
     }
     fres=$(cat $resfile)
+    /bin/rm -f $resfile
     [ -n "$fres" ] && return $fres
     return 1
 }

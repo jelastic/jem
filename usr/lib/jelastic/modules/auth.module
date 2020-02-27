@@ -295,8 +295,8 @@ function validateExports() {
             echo "removing backup file $f " >> $ACTIONS_LOG
             rm $f 2>/dev/null
         done
-        rm -f $keeplist 2>/dev/null
-        rm -f $fulllist 2>/dev/null
+        /bin/rm -f $keeplist 2>/dev/null
+        /bin/rm -f $fulllist 2>/dev/null
 
         for (( i = 0; i < ${#invalidExports[@]}; i++)) ; do
             lineToComment="/$(sed -re 's/\//\\\//g' <<< $(sed -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/(\\\\040|\\s)/g' <<< "${invalidExports[$i]}"))/ s/^#*/#/"
