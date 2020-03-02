@@ -29,6 +29,7 @@ DHCPD_CONFIG='/etc/dhcp/dhcpd.conf';
 NGINX_TCPMAP_CONFIG='/etc/nginx/tcpmaps/mappings.xml';
 NGINX_TCPMAP_TEMPLATE='/etc/nginx/templates/nginx.tcp.conf.tpl';
 NGINX_CONFIG_TEMPLATE='/etc/nginx/templates/nginx.conf.tpl' ;            # template of nginx configuration
+NGINX_NOBACKENDS_CONFIG_TEMPLATE='/etc/nginx/templates/nginx.conf.nobackends.tpl';
 DHCPD_CONFIG_TEMPLATE='/etc/dhcp/dhcpd.tpl';
 UPSTREAMS_LOCATION_PATH='/etc/nginx/upstreams';				# upstream configs location
 UPSTREAM_COMMON_CONFIG=$UPSTREAMS_LOCATION_PATH/common	;		# common upstream hosts
@@ -672,6 +673,14 @@ function unsetSSLforLB(){
     return 0;
 }
 
+function applyNoBackendsConfig(){
+    if [ "$(cat "$UPSTREAM_COMMON_CONFIG" | wc -l)" == "0" ]; then
+       if [ -f "${NGINX_NOBACKENDS_CONFIG_TEMPLATE}" ]; then
+           cp -f "${NGINX_NOBACKENDS_CONFIG_TEMPLATE}" "${NGINX_CONFIG}";
+       fi
+    fi
+}
+
 function rebuildCommon(){
     if ! grep -q -E 'upstream\s+default_upstream' "$NGINX_CONFIG" ; then
         reloadConfigs;
@@ -682,12 +691,13 @@ function rebuildCommon(){
     addGroupToDefaultUpsreamSection common && \
     addGroupToMappingsSection common && \
     addTCPPortMappings && \
-    unsetSSLforLB && local RETVAL="0" || local RETVAL="1" ;
+    unsetSSLforLB && \
+    applyNoBackendsConfig && \
+    local RETVAL="0" || local RETVAL="1" ;
     { reloadServiceSilent $SERVICE || restartServiceSilent $SERVICE; }
     enableService $SERVICE > /dev/null 2>&1
     return ${RETVAL}
 }
-
 
 function rebuildCommonTrafD(){
   NGINX_CONFIG_TEMPLATE="/etc/nginx/templates/nginx.conf.traf.distrib.tpl";
