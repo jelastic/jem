@@ -427,7 +427,7 @@ function clearTCPPortMappings(){
 }
 
 function addCommonHostConfig(){
-  echo "$1" >> "$UPSTREAM_COMMON_CONFIG" ;
+  $GREP -q "^$1$" "$UPSTREAM_COMMON_CONFIG" || echo "$1" >> "$UPSTREAM_COMMON_CONFIG";
 }
 
 function removeCommonHostConfig	(){
