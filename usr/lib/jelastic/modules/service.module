@@ -88,6 +88,9 @@ function doRestart(){
     else
         message="Failed to stop $1";
     fi
+    if [[ "${result}" -ne "0" ]]; then
+        result="4182" #Pre-defined error code for non-successul restart
+    fi
     writeJSONResponseOut "result=>${result}" "message=>${message}";
     return 0;
 }
