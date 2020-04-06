@@ -28,7 +28,13 @@ function doUsage() {
 
 function doStop(){
     [ ! -z "$1" ] && SERVICE=$1;
-    stopService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ;  writeJSONResponseOut "result=>$?" "message=>Service been stopped with code $?";
+    stopService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; 
+    local result=$?;
+    local resultCode="${result}"
+    if [[ "${result}" -ne "0" ]]; then
+        result="4184" #Pre-defined error code for non-successul stop
+    fi 
+    writeJSONResponseOut "result=>${result}" "message=>Service been stopped with code ${resultCode}";
 }
 
 function doRestart(){
@@ -89,20 +95,33 @@ function doRestart(){
         message="Failed to stop $1";
     fi
     if [[ "${result}" -ne "0" ]]; then
+        local resultMessage="result ${result} "
         result="4182" #Pre-defined error code for non-successul restart
     fi
-    writeJSONResponseOut "result=>${result}" "message=>${message}";
+    writeJSONResponseOut "result=>${result}" "message=${resultMessage}${message}";
     return 0;
 }
 
 function doStart(){
     [ ! -z "$1" ] && SERVICE=$1;
-    startService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; writeJSONResponseOut "result=>$?" "message=>Service been started with code $?";
+    startService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; 
+    local result=$?;
+    local resultCode="${result}"
+    if [[ "${result}" -ne "0" ]]; then
+        result="4183" #Pre-defined error code for non-successul start
+    fi 
+    writeJSONResponseOut "result=>${result}" "message=>Service been started with code ${resultCode}";
 }
 
 function doReload(){
     [ ! -z "$1" ] && SERVICE=$1;
-    reloadService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; writeJSONResponseOut "result=>$?" "message=>Service been reloaded with code $?";
+    reloadService "$SERVICE" >> "$ACTIONS_LOG"  2>&1 ; 
+    local result=$?;
+    local resultCode="${result}"
+    if [[ "${result}" -ne "0" ]]; then
+        result="4185" #Pre-defined error code for non-successul reload
+    fi 
+    writeJSONResponseOut "result=>${result}" "message=>Service been reloaded with code ${resultCode}";
 }
 
 function doEnable(){
