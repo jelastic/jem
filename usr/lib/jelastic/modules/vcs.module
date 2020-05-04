@@ -401,7 +401,7 @@ function doAutoUpdate(){
         [ $AUTOUPDATE == "true" ] && {
 	    LastRemoteCommitVal=$(getLastRemoteCommit)
             [ ${LAST_DEPLOYED_COMMIT} == $LastRemoteCommitVal ] && exit 0;
-            [ $LastRemoteCommitVal == "00000000000" ] && exit 0;
+            [ $LastRemoteCommitVal == "00000000000" ] && continue ;
             local next_allowed_update=$(( $LASTUPDATE + $UPDATE_INTERVAL * 60 ));
             local current_timestamp=`date +%s`;
             [ $next_allowed_update -lt $current_timestamp ] && doUpdate >> $JEM_CALLS_LOG && UPDATE_IS_OK="true" && writeProjectConfig;
