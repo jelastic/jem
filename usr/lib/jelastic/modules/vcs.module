@@ -400,7 +400,7 @@ function doAutoUpdate(){
         enableVCSLibrary;
         [ $AUTOUPDATE == "true" ] && {
 	    LastRemoteCommitVal=$(getLastRemoteCommit)
-            [ ${LAST_DEPLOYED_COMMIT} == $LastRemoteCommitVal ] && exit 0;
+            [ ${LAST_DEPLOYED_COMMIT} == $LastRemoteCommitVal ] && continue ;
             [ $LastRemoteCommitVal == "00000000000" ] && continue ;
             local next_allowed_update=$(( $LASTUPDATE + $UPDATE_INTERVAL * 60 ));
             local current_timestamp=`date +%s`;
