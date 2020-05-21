@@ -18,6 +18,9 @@ DEBUG=${DEBUG:="0"};
 export META_FILE="/etc/jelastic/metainf.conf";
 export JEM_CALLS_LOG="${JEM_CALLS_LOG:="/var/log/jem.log"}";
 
+[[ "x$1" == "xisolation" ]] && export JEM_CALLS_LOG="/var/log/jem-isolation.log"
+[[ "x$1" == "xhn" ]] && export JEM_CALLS_LOG="/var/log/jem-hn.log"
+
 export FIRST_RUN_SCENARIO="/var/lib/jelastic/firstrun";
 export PATH="/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin";
 
