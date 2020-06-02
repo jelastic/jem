@@ -89,56 +89,66 @@ function doExec() {
 }
 
 function describeExec() {
-    echo "Execute command";
+    echo "Execute command"
 }
 
 function describeExecParameters() {
-    echo "-c|--ctid <ct id> -n|--cmd <cmd> | -b|--cmdbase64 <cmd base64>";
+    echo "-c|--ctid <ct id> -n|--cmd <cmd> | -b|--cmdbase64 <cmd base64>"
 }
 
 function describeExecOptions() {
-    echo "-c|--ctid: container id";
-    echo "-n|--cmd: command to execute";
-    echo "-b|--cmdbase64: command to execute base64 encoded";
+    echo "-c|--ctid: container id"
+    echo "-n|--cmd: command to execute"
+    echo "-b|--cmdbase64: command to execute base64 encoded"
 }
 
 function doExec2() {
     if [ -z "$CTID" ] ; then
         writeJSONResponseErr "result=>99" "message=>CTID required"
         log "ctid required"
-        return 99;
+        return 1
     fi
 
+    doExec3
+}
+
+function describeExec3() {
+    echo "Execute command"
+}
+
+function describeExec3Parameters() {
+    echo "-b|--cmdbase64 <cmd base64>"
+}
+
+function describeExec3Options() {
+    echo "-b|--cmdbase64: command to execute base64 encoded"
+}
+
+function doExec3() {
     if [ ! -z "$CMDBASE64" ] ; then
         CMD="$(echo $CMDBASE64 | base64 -d)"
     fi
 
     if [ -z "$CMD" ] ; then
-        writeJSONResponseErr "result=>99" "message=>cmd or cmdbase64 required"
+        writeJSONResponseErr "result=>4008" "message=>cmd or CMDBASE64 required"
         log "command required"
-        return 99;
+        return 1;
     fi
 
     msg=""
-
-    vzexecSetCTID "$CTID"
-
-    if isContainerRunning $CTID ; then
-        if vzexecRun "$CMD" ; then
-            msg="Success"
-            res=0
-        else
-            msg="The operation could not be performed"
-            res=4109
-        fi
-        stout="$(vzexecGetLastStdOut)"
-        sterr="$(vzexecGetLastStdErr)"
-        stdout=$($SED -re 's/\\/\\\\/g;s/"/\\"/g' <<< "$stout")
-        stderr=$($SED -re 's/\\/\\\\/g;s/"/\\"/g' <<< "$sterr")
+    
+    if vzexecRun "$CMD" ; then
+        msg="Success"
+        res=0
     else
-        res=4110
-        msg="Can not execute command. Container is not running"
+        msg="The operation could not be performed"
+        res=4109
     fi
+    stout="$(vzexecGetLastStdOut)"
+    sterr="$(vzexecGetLastStdErr)"
+    stdout=$($SED -re 's/\\/\\\\/g;s/"/\\"/g' <<< "$stout")
+    stderr=$($SED -re 's/\\/\\\\/g;s/"/\\"/g' <<< "$sterr")
     printf "{\"result\":\"%s\",\"exitcode\":\"%s\",\"message\":\"%s\",\"stdout\":\"%s\",\"stderr\":\"%s\"}\n" "$res" "$(vzexecGetLastErrCode)" "$msg" "$stdout" "$stderr"
-    return 0;
+    return 0
 }
+
