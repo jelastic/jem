@@ -45,6 +45,7 @@ function onModLoadCallback() {
             -c   | --ctid )
                 shift;
                 CTID=$1;
+                vzexecSetCTID $CTID
                 shift;
                 ;;
             -b   | --cmdbase64 )
@@ -79,7 +80,6 @@ function doExec() {
         return 1;
     fi
 
-    vzexecSetCTID "$CTID"
     if vzexecRun "$CMD" ; then
         writeJSONResponseOut "result=>0" "message=>$(vzexecGetLastStdOut)"
     else
@@ -109,7 +109,11 @@ function doExec2() {
         return 1
     fi
 
-    doExec3
+    if isContainerRunning $CTID ; then
+        doExec3
+    else
+        writeJSONResponseErr "result=>4110" "message=>Can not execute command. Container is not running"
+    fi
 }
 
 function describeExec3() {
