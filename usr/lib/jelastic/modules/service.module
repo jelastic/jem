@@ -98,7 +98,7 @@ function doRestart(){
         local resultMessage="result ${result} "
         result="4182" #Pre-defined error code for non-successul restart
     fi
-    writeJSONResponseOut "result=>${result}" "message=${resultMessage}${message}";
+    writeJSONResponseOut "result=>${result}" "message=>${resultMessage}${message}";
     return 0;
 }
 
