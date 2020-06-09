@@ -188,7 +188,7 @@ function postAddReform(){
 
     retval="$?" 
 
-    [ "x${_DISABLE_PASS_AUTH}" == "xtrue" ] && doAction user access --action disable --type pwd &>>JEM_CALLS_LOG;
+    [ "x${_DISABLE_PASS_AUTH}" == "xtrue" ] && doAction user access --action disable --type pwd &>>$JEM_CALLS_LOG;
 
     return $retval
 
