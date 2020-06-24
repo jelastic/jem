@@ -296,6 +296,14 @@ function dump_active_ips_expanded(){
         sort -u
 }
 
+dump_active_ips_vms_expanded(){
+   prlctl list --vmtype vm -H -i | sed -rn 's/.*type=routed.*ips='"'"'([^'"'"']+)['"'"']/\1/p' |\
+      sed -r 's/[[:blank:]]+/\n/g' | \
+      sed -nr '/^[[:blank:]]*$/!{/^0[.]0[.]0[.]0$/!{s/[/][^/]+$//; p}}' | \
+      expand_ipv6 | \
+      sort -u
+}
+
 function inSubnet {
     local ip ip_a mask netmask sub sub_ip rval start end
     local readonly BITMASK=0xFFFFFFFF
