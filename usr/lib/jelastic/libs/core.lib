@@ -273,7 +273,14 @@ function startJemThreadQueueManager(){
                 shift;
             done
 
-        [ -z "$TQctid" ]  && TQctid="${$}$action";
+        if [ -z "$TQctid" ] ; then 
+            if [ "x$action" == "xfirewall" ] ; then
+                TQctid="a543228b28.$action"
+            else
+                TQctid="${$}$action"
+            fi
+        fi
+
         [ ! -z "$setgetTPL" ] && {
             [ ! -z "$nameTPL" -o ! -z "$versionTPL" ] && TQctid=$(md5sum <<< "${nameTPL}${versionTPL}X" | awk '{print $1}' )
         }
