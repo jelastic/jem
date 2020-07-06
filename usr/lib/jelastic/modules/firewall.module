@@ -59,6 +59,9 @@ declare -a CLOSEDPORTS;
 declare -r ERR_NO_METADATA=4080;
 CTID=0
 
+IPTABLES="$IPTABLES -w"
+IPTABLES_RESTORE="$IPTABLES_RESTORE -w"
+
 function _getbalancerRedirPorts() { return 0; }
 function _getapache_phpRedirPorts { return 0; }
 function _getnginx_phpRedirPorts { return 0; }
