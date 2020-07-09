@@ -23,11 +23,11 @@ LOG_FILE="${LOG_PATH}/${MANAGE_PROGRAM_NAME}.log";
 
 function log() {
     if [[ ${VERBOSE} -gt 0 ]]; then
-        echo -n $(date +%D.%k:%M:%S.%N) >> ${LOG_FILE};
+        echo -n $(date +%D.%k:%M:%S.%N) $action:$subaction [PID: $$] >> ${LOG_FILE};
         echo ": $@" >> ${LOG_FILE};
     fi
     if [[ ${VERBOSE} -gt 1 ]]; then
-        echo -n $(date +%D.%k:%M:%S.%N);
+        echo -n $(date +%D.%k:%M:%S.%N) $action:$subaction [PID: $$];
         echo ": $@"
     fi
 }
