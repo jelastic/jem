@@ -336,8 +336,8 @@ function _checkConfigs() {
 function _nfsReexport() {
     log "ReExporting shares"
     _checkConfigs || {
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)" ;
-        return 1;
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)" >> ${JEM_CALLS_LOG}
+        return 1
     }
     _adjustFirewall
 
@@ -349,12 +349,8 @@ function _nfsReexport() {
                 local err=$(vzexecGetLastStdErr)
                 [[ -z "${err// }" ]] && return $TRUE
 
-                if grep -q "does not support NFS export" <<< $err 2>&1; then
-                    writeJSONResponseErr "result=>2032" "message=>NFS: wrong configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports) | $err";
-                fi
-
-                writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports) | $err";
-                return 1;
+                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports) | $err " >> ${JEM_CALLS_LOG}
+                return 1
             fi
         fi
     }
@@ -369,7 +365,10 @@ function _nfsReexport() {
 }
 
 function doRestart() {
-    ! _nfsReexport && return 1
+    if ! _nfsReexport ; then
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not verify client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)"
+        return 1
+    fi
     writeJSONResponseOut "result=>0" "message=>Success"
     return 0
 }
