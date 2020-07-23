@@ -163,7 +163,7 @@ function searchProg() {
 #        ensureDiskSpaceIsOK;
         local prgName=${1};
         local cmdVar=$(sed -re "s/(.*)/\U\1/;s/-/_/g" <<< $prgName);
-        declare -p $cmdVar >/dev/null 2>&1 && { log "ERROR: Trying to redeclare $cmdVar"; return 1; }
+        declare -p $cmdVar >/dev/null 2>&1 && return 1;
         eval "command -v $prgName >/dev/null 2>&1 && $cmdVar=\$(which $prgName) || $cmdVar='die \"$prgName not found\"';";
         declare -r ${cmdVar};
         return 0;
