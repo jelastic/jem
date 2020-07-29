@@ -88,9 +88,11 @@ function deploy(){
     then
         [ ! -d  $APPS_DIR ] && mkdir -p $APPS_DIR && chown -R  $DATA_OWNER  ${APPS_DIR} 2>>"$JEM_CALLS_LOG";
         /bin/cp "${package_path}/${package_name}" "${APPS_DIR}/${context}.${ext}" 2>>"$JEM_CALLS_LOG";
+        [ -e "${APPS_DIR}/${context}.war" ] && rm -f "${APPS_DIR}/${context}.war";
         [ "$UID" == '0' ] && chown -R $DATA_OWNER "${APPS_DIR}/${context}.${ext}"
     else
         /bin/cp "${package_path}/${package_name}" "${WEBROOT}/${context}.${ext}" 2>>"$JEM_CALLS_LOG";
+        [ -e "${APPS_DIR}/${context}.ear" ] && rm -f "${APPS_DIR}/${context}.ear";
         [ "$UID" == '0' ] && chown -R $DATA_OWNER "${WEBROOT}/${context}.${ext}"
     fi
 
