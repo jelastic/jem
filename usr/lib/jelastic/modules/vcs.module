@@ -38,6 +38,7 @@ DEFAULT_LOGIN="__GUEST__";
 USERS_CRONFILE="/var/spool/cron/$($AWK  -F ":" '{ print $1 }' <<< $DATA_OWNER )";
 ROOT_CRONFILE="/var/spool/cron/root";
 AUTOUPDATE_CRON_STRING="* * * * * jem vcs autoupdate";
+REDEPLOY_CONF_FILE="/etc/jelastic/redeploy.conf";
 
 GITSSH_SCRIPT="/var/lib/jelastic/libs/gitssh.sh"
 export GIT_SSH=${GITSSH_SCRIPT};
@@ -413,6 +414,9 @@ function doAutoUpdate(){
 }
 
 function doEnableScheduler(){
+  if [ -f $REDEPLOY_CONF_FILE ]; then
+    $GREP -q "^$ROOT_CRONFILE" $REDEPLOY_CONF_FILE || echo "$ROOT_CRONFILE" >> $REDEPLOY_CONF_FILE;
+  fi
   [ -f $ROOT_CRONFILE ] && $GREP -q "\^$AUTOUPDATE_CRON_STRING"  $ROOT_CRONFILE || { echo "$AUTOUPDATE_CRON_STRING" >> $ROOT_CRONFILE; chmod 0644 $ROOT_CRONFILE; }
 }
 
