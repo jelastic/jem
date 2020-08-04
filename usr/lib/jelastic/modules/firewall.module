@@ -60,7 +60,9 @@ declare -r ERR_NO_METADATA=4080;
 CTID=0
 
 IPTABLES="$IPTABLES -w"
+IP6TABLES="$IP6TABLES -w"
 IPTABLES_RESTORE="$IPTABLES_RESTORE -w"
+IP6TABLES_RESTORE="$IP6TABLES_RESTORE -w"
 
 function _getbalancerRedirPorts() { return 0; }
 function _getapache_phpRedirPorts { return 0; }
