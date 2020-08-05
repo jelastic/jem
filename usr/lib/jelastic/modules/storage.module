@@ -528,10 +528,10 @@ function dosetupUtils() {
         checkCmd=$(checkPackageCmd $OS autofs nfs-common)
     elif [ "x$OS" == "xcentos" ] ; then
         if [ "$OS_ver" -eq "7" ]; then
-           installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-1j.el7.x86_64.rpm nfs-utils)
+           installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-2j.el7.x86_64.rpm nfs-utils)
         fi
         if [ "$OS_ver" -eq "6" ]; then
-           installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-1j.el6.x86_64.rpm nfs-utils)
+           installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-2j.el6.x86_64.rpm nfs-utils)
         fi
         checkCmd=$(checkPackageCmd $OS autofs nfs-utils)
     elif [ "x$OS" == "xfedora" ] ; then
