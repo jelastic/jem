@@ -55,6 +55,16 @@ function doCheckout(){
             cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
         }
         [ ! -z $BRANCH ] && cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1 && cd - >> $JEM_CALLS_LOG 2>&1;       ###### we removed --git-dir directive because of bug in GIT
+        REPO_PATH=$(dirname ${URL})
+        cd "${WEBROOT}/${PROJECT_NAME}" && submodule_list=($($GIT submodule | $AWK '{print $2}'))
+        for submodule_name in "${submodule_list[@]}"; do
+                submodule_url=$($GIT config -f .gitmodules --get submodule."${submodule_name}".url)
+                if [[ "$submodule_url" == "${REPO_PATH}"* ]]; then
+                        URL=$submodule_url;
+                        prepareUrl;
+                        $GIT config submodule."${submodule_name}".url ${preparedUrl};
+                fi
+        done
         cd "${WEBROOT}/${PROJECT_NAME}" && runNonInterractive "$GIT submodule update --init --recursive" >> $JEM_CALLS_LOG 2>&1 ; result=$? && cd - > /dev/null 2>&1;
         [ $result -ne 0 ] && return $result;
     else
