@@ -105,9 +105,9 @@ function onModLoadCallback() {
     [[ ! -z "${CTID}" ]] && {
         vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; };
         VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
-        NFS_CONFIG_DIR="$VZ_CTID_ROOT/etc/"
-        NFS_CONFIG_FILE="${NFS_CONFIG_DIR}exports"
-        EXPORTS_FILE="${VZ_CTID_ROOT}${CONTAINER_EXPORTS_FILE}"
+        NFS_CONFIG_DIR="$(vzctPath $VZ_CTID_ROOT /etc)"
+        NFS_CONFIG_FILE="$(vzctPath $VZ_CTID_ROOT /etc/exports)"
+        EXPORTS_FILE="$(vzctPath $VZ_CTID_ROOT $CONTAINER_EXPORTS_FILE)"
 
         if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
             res=$(vzexecGetLastStdOut)
@@ -119,11 +119,12 @@ function onModLoadCallback() {
 }
 
 function dosetupUtils() {
-    local issue_file="$VZ_CTID_ROOT/etc/issue";
-    local release_files="$VZ_CTID_ROOT/etc/*-release";
+    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
+    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
+    local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
 
     isContainerRunning ${CTID} && {
-        local computetype="$( [ -e "${VZ_CTID_ROOT}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "${VZ_CTID_ROOT}${METAINFOFILE}")"
+        local computetype="$( [ -e "$_metainf" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "$_metainf")"
         if [[ "xstorage" == "x$computetype" ]] ; then
             vzexecRun "systemctl enable nfs-server"
             return $TRUE
@@ -170,7 +171,7 @@ function dosetupUtils() {
     $TAR hzxf "${MOUNTPACKAGE}" -C "$VZ_CTID_ROOT/"
 
     # install systemD unit
-    [[ -d "/vz/root/${CTID}/lib/systemd/system" ]] && echo "$SystemDUnit" > "/vz/root/${CTID}/lib/systemd/system/unfsd.service"
+    [[ -d "$(vzctPath $VZ_CTID_ROOT /lib/systemd/system)" ]] && echo "$SystemDUnit" > "$(vzctPath $VZ_CTID_ROOT /lib/systemd/system/unfsd.service)"
     isContainerRunning ${CTID} && {
         vzexecRun "$installCmd"
 
@@ -222,7 +223,7 @@ function _adjustFirewall() {
     if [[ "$fwstatus" -gt 0 ]] ; then
         #firewall is not running in container (or old jem inside)
         set -f
-        [ -e "$VZ_CTID_ROOT/etc/exports" ] && NFSIPS=($($SED -re 's/.+(\s|\t)+((\*)|([0-9]+\.){3}[0-9]+(\/[0-9]{0,2})?).*/\2/g' -e '/#/d' "$VZ_CTID_ROOT/etc/exports" | sort | uniq | $SED -e '/^$/d' -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'))
+        [ -e "$(vzctPath $VZ_CTID_ROOT /etc/exports)" ] && NFSIPS=($($SED -re 's/.+(\s|\t)+((\*)|([0-9]+\.){3}[0-9]+(\/[0-9]{0,2})?).*/\2/g' -e '/#/d' "$(vzctPath $VZ_CTID_ROOT /etc/exports)" | sort | uniq | $SED -e '/^$/d' -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'))
 
         vzexecRun "which iptables"
         IPT="$(vzexecGetLastStdOut)"
@@ -281,7 +282,7 @@ function validateExports() {
     #IFS=$OIFS
     if [[ $? -eq 0 ]] ; then
         for (( i = 0; i < ${#dd[@]}; i++)) ; do
-            isValidShare ${dd[$i]} $1 "/vz/root/${CTID}" || invalidExports=("${invalidExports[@]}" "${dd[$i]}")
+            isValidShare ${dd[$i]} $1 "$VZ_CTID_ROOT" || invalidExports=("${invalidExports[@]}" "${dd[$i]}")
         done
         local backup="$1.backup-$(date +%d-%m-%Y.%H:%M:%S.%N)"
         cp -f "$1" "$backup" > /dev/null 2>&1
@@ -315,13 +316,15 @@ function validateExports() {
 
 function _checkConfigs() {
     local UNFSDBIN='/sbin/unfsd'
-    [[ ! -e "/vz/root/${CTID}/etc/exports" ]] && return 1
-    validateExports "/vz/root/${CTID}/etc/exports" || return 1
+    local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
+    
+    [[ ! -e "$(vzctPath $VZ_CTID_ROOT /etc/exports)" ]] && return 1
+    validateExports "$(vzctPath $VZ_CTID_ROOT /etc/exports)" || return 1
 
     isContainerRunning ${CTID} && {
-        local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
+        local computetype="$( [ -e "$_metainf" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "$_metainf")"
         if [[ "xstorage" == "x$computetype" ]] ; then
-            if [[ ! -e "/vz/root/${CTID}$MOUNTPROG" ]] ; then
+            if [[ ! -e "${VZ_CTID_ROOT}${MOUNTPROG}" ]] ; then
                 return $TRUE
             fi
         fi
@@ -334,22 +337,23 @@ function _checkConfigs() {
 }
 
 function _nfsReexport() {
+    local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
     log "ReExporting shares"
     _checkConfigs || {
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)" >> ${JEM_CALLS_LOG}
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration" "debug=>$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports))" >> ${JEM_CALLS_LOG}
         return 1
     }
     _adjustFirewall
 
     isContainerRunning ${CTID} && {
-        local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
+        local computetype="$( [ -e "$_metainf" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "$_metainf")"
         if [[ "xstorage" == "x$computetype" ]] ; then
-            if [[ ! -e "/vz/root/${CTID}$MOUNTPROG" ]] ; then
+            if [[ ! -e "${VZ_CTID_ROOT}${MOUNTPROG}" ]] ; then
                 vzexecRun "exportfs -ra"
                 local err=$(vzexecGetLastStdErr)
                 [[ -z "${err// }" ]] && return $TRUE
 
-                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports) | $err " >> ${JEM_CALLS_LOG}
+                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration" "debug=>$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
                 return 1
             fi
         fi
@@ -366,7 +370,7 @@ function _nfsReexport() {
 
 function doRestart() {
     if ! _nfsReexport ; then
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not verify client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)"
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not verify client configuration" "debug=>$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports))"
         return 1
     fi
     writeJSONResponseOut "result=>0" "message=>Success"
@@ -497,6 +501,7 @@ function _addNativeip() {
     local _UUID=""
     local _done=0
     local _version=$_NFS_VERSION
+    local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
 
 
     isContainerRunning ${CTID} ; running=$?
@@ -507,12 +512,12 @@ function _addNativeip() {
             dosetupUtils $CTID || return 1
         fi
 
-        if [[ ! -e "/vz/root/${CTID}${MOUNTPROG}" ]] ; then
+        if [[ ! -e "${VZ_CTID_ROOT}${MOUNTPROG}" ]] ; then
             dosetupUtils $CTID || return 1
         fi
     fi
 
-    local computetype="$( [ -e "/vz/root/${CTID}${METAINFOFILE}" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "/vz/root/${CTID}${METAINFOFILE}")"
+    local computetype="$( [ -e "$_metainf" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "$_metainf")"
     if [[ "xstorage" == "x$computetype" ]] ; then
         _version=4
         _UUID=$(cat /proc/sys/kernel/random/uuid)
@@ -539,20 +544,20 @@ function _addNativeip() {
     log "Adding IPs to exports file (${EXPORTS_FILE})"
     for i in "${IPLIST[@]}" ; do
         isValidIP $i || continue
-        if [[ -f "/vz/root/${CTID}${destinationPath}" ]] ; then
+        if [[ -f "$(vzctPath $VZ_CTID_ROOT ${destinationPath})" ]] ; then
             writeJSONResponseOut "result=>4150" "message=>Exporting regular file is not supported" ;
             return $FALSE
         fi
 
-        [[ ! -d "/vz/root/${CTID}${destinationPath}" ]] && [ ! -L "/vz/root/${CTID}${destinationPath}" ] && {
+        [[ ! -d "$(vzctPath $VZ_CTID_ROOT ${destinationPath})" ]] && [ ! -L "${VZ_CTID_ROOT}${destinationPath}" ] && {
             if [[ $_createPath -eq 1 ]] ; then
                 if [[ $_isFUSE -eq 1 ]]; then
                     if isContainerRunning ${CTID} ; then
                         vzexecRun "mkdir -p ${destinationPath}; chmod 0777 ${destinationPath}"
                     fi
                 else
-                    mkdir -p "/vz/root/${CTID}${destinationPath}"
-                    chmod 0777 "/vz/root/${CTID}${destinationPath}"
+                    mkdir -p "${VZ_CTID_ROOT}${destinationPath}"
+                    chmod 0777 "${VZ_CTID_ROOT}${destinationPath}"
                 fi
             fi
         }

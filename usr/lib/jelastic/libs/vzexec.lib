@@ -106,3 +106,10 @@ function vzexecRunStdOut() {
     echo $__STDOUT
     return $__ERRCODE
 }
+
+function vzctPath() {
+    local _root=$1
+    shift
+    set -- "$@" "$arg"
+    echo $(vzreadlink -q --vzroot="$_root" $* 2>/dev/null)
+}

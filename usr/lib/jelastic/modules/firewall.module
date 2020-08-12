@@ -621,9 +621,14 @@ function dofwset() {
         running=0
         vzctl mount ${CTID} >> $ACTIONS_LOG 2>&1
     fi
-    [ -d "/vz/root/${CTID}${JELASTIC_RULES_DIR}" ] || mkdir -p "/vz/root/${CTID}${JELASTIC_RULES_DIR}"
-    echo "*filter" > "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
-    echo "*filter" > "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
+    if [ -n "$CTID" ] ; then
+        VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
+        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+    fi
+    
+    [ -d "$(vzctPath $VZ_CTID_ROOT $JELASTIC_RULES_DIR)" ] || mkdir -p "${VZ_CTID_ROOT}${JELASTIC_RULES_DIR}"
+    echo "*filter" > "$(vzctPath $VZ_CTID_ROOT $JELASTIC_4RULES_FILE)"
+    echo "*filter" > "$(vzctPath $VZ_CTID_ROOT $JELASTIC_6RULES_FILE)"
     for ruleraw in ${RULES[@]} ; do
         rulevars=$(awk -F, '{print "proto="$1";ptype="$2";dport="$3";srchost="$4";dsthost="$5";chain="$6";raction="$7";tcptype="$8";cmd="$9";"}' <<< $ruleraw )
         eval $rulevars
@@ -680,15 +685,15 @@ function dofwset() {
         fi
 
         if [ "x$tcptype" == "xIPV4" ] ; then
-            echo -e $rulecmd >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
+            echo -e $rulecmd >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_4RULES_FILE)"
         else
-            echo -e $rulecmd >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
+            echo -e $rulecmd >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_6RULES_FILE)"
         fi
 
         echo "CTID $CTID RULE $rulecmd" >> ${JEM_CALLS_LOG} 2>&1
     done
-    echo "COMMIT" >> "/vz/root/${CTID}${JELASTIC_4RULES_FILE}"
-    echo "COMMIT" >> "/vz/root/${CTID}${JELASTIC_6RULES_FILE}"
+    echo "COMMIT" >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_4RULES_FILE)"
+    echo "COMMIT" >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_6RULES_FILE)"
     if [[ $running -eq 1 ]] ; then
         vzexecRun "jem firewall start"
     else
