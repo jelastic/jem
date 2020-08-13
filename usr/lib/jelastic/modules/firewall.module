@@ -695,6 +695,11 @@ function dofwset() {
         vzctl umount ${CTID} >> $ACTIONS_LOG 2>&1
     fi
     log="$(vzexecGetLastStdOut) $(vzexecGetLastStdErr)"
-    writeJSONResponseOut "result=>$(vzexecGetLastErrCode)" "message=>Firewall rules set" "log=>${log//\"/\\\"}"
+    local _errCode=$(vzexecGetLastErrCode)
+    if [[ "$_errCode" -gt 0 ]] ; then
+        writeJSONResponseOut "result=>4068" "message=>Firewall rules are not set properly" "log=>${log//\"/\\\"}"
+    else
+        writeJSONResponseOut "result=>0" "message=>Firewall rules set" "log=>${log//\"/\\\"}"
+    fi
     return 0
 }
