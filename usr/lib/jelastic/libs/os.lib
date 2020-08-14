@@ -386,8 +386,8 @@ function getExportedDirList()
 {
     [ ! -f "$1" ] && return 1
     OIFS=$IFS;IFS=$'\n'
-    adir=("${adir[@]}" $(sed -rne '/^#/d' -e '/^"/d' -e 's/([^ ]+)\s+.*/\1/' -e '/^$/d' -e p "$1"))
-    adir=("${adir[@]}" $(sed -rne '/^#/d' -e '/^[^"]/d' -e 's/"(.*)"\s+.*/"\1"/' -e '/^$/d' -e p "$1"))
+    adir=("${adir[@]}" $(sed -rne 's/^[ \t]*//' -e '/^#/d' -e '/^"/d' -e 's/([^ ]+)\s+.*/\1/' -e '/^$/d' -e p "$1"))
+    adir=("${adir[@]}" $(sed -rne 's/^[ \t]*//' -e '/^#/d' -e '/^[^"]/d' -e 's/"(.*)"\s+.*/"\1"/' -e '/^$/d' -e p "$1"))
     IFS=$OIFS
     for a in "${adir[@]}"; do
         b="${a/#\"/}"
