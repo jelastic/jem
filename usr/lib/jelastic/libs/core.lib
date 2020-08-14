@@ -427,7 +427,8 @@ function doAction() {
                 exit $result
             }
         else
-            echo "{\"result\":4181, \"message\": \"Internal error. Contact support.\"}"
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction onModLoadCallback failed with result $res" >> ${JEM_CALLS_LOG};
+            [ -w "$resultFile" ] && echo "4181" >$resultFile
         fi
     );
     [[ $? -eq 124 ]] && {
@@ -443,16 +444,21 @@ function doAction() {
         }
     }
 
-    source "${modfile}" 2>/dev/null || die "Couldn't source ${modfile}";
-    if isFunction "cleanup${subaction^}Callback" ; then
-        "cleanup${subaction^}Callback" "$@"
-    fi
-    [ -e "$ACTION_STATE_FILE" ] && rm -f $ACTION_STATE_FILE
-
     [ -e "$resultFile" ] && {
         [ -z "${actionResult}" ] && actionResult=$(cat $resultFile );
         rm -f "$resultFile";
     }
+
+    #call cleanup if onModLoadCallback has no errors
+    if [[ "$actionResult" -ne 4181 ]] then
+        source "${modfile}" 2>/dev/null || die "Couldn't source ${modfile}";
+        if isFunction "cleanup${subaction^}Callback" ; then
+            "cleanup${subaction^}Callback" "$@"
+        fi
+    fi
+
+    [ -e "$ACTION_STATE_FILE" ] && rm -f $ACTION_STATE_FILE
+
     echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
     [[ $actionResult -gt 0 ]] && {
         echo ":[FAIL]      [PID: $$]" >> ${JEM_CALLS_LOG} 2>&1;
