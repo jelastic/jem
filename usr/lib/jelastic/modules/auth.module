@@ -340,7 +340,7 @@ function _nfsReexport() {
     local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
     log "ReExporting shares"
     _checkConfigs || {
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration" "debug=>$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports))" >> ${JEM_CALLS_LOG}
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. exports:$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports))" >> ${JEM_CALLS_LOG}
         return 1
     }
     _adjustFirewall
@@ -353,7 +353,7 @@ function _nfsReexport() {
                 local err=$(vzexecGetLastStdErr)
                 [[ -z "${err// }" ]] && return $TRUE
 
-                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration" "debug=>$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
+                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. exports:$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
                 return 1
             fi
         fi
@@ -370,7 +370,7 @@ function _nfsReexport() {
 
 function doRestart() {
     if ! _nfsReexport ; then
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not verify client configuration" "debug=>$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports))"
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not verify client configuration"
         return 1
     fi
     writeJSONResponseOut "result=>0" "message=>Success"
@@ -582,7 +582,7 @@ function _addNativeip() {
         if [[ $_done -eq 1 ]] ; then
             if ! _nfsReexport ; then
                 _removeNativeip
-                writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
+                writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
                 return 1
             fi
 
@@ -622,11 +622,13 @@ function _addNativeip() {
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: timeout has elapsed" >> ${JEM_CALLS_LOG};
             lasterr=$(vzexecGetLastErrCode)
             if [[ "$lasterr" -ne 0 ]] ; then
-                writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
+                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID showmount fails. exports: $(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
+                writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
             fi
             return $lasterr
         else
-            writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
+            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID Error adding export entry. exports: $(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
+            writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
         fi
     fi
     return $?
@@ -669,7 +671,8 @@ function _removeNativeip() {
     fi
 
     _checkConfigs || {
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" "debug=>$(cat /vz/root/${CTID}/etc/exports)";
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _checkConfigs failed. exports: $(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" 
         return $FALSE
     }
 
