@@ -450,7 +450,7 @@ function doAction() {
     }
 
     #call cleanup if onModLoadCallback has no errors
-    if [[ "$actionResult" -ne 4181 ]] then
+    if [[ "$actionResult" -ne 4181 ]] ; then
         source "${modfile}" 2>/dev/null || die "Couldn't source ${modfile}";
         if isFunction "cleanup${subaction^}Callback" ; then
             "cleanup${subaction^}Callback" "$@"
