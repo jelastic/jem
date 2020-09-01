@@ -158,6 +158,22 @@ function onModLoadCallback() {
     return 0
 }
 
+function _hasActiveMounts() {
+    #-hosts is /net/host
+    #dir:path -> /path/*
+    _cmd='[ -f /etc/auto.master ] && sed -re "/^#/d" -e "s/dir:(.*)/+ \1\/*/g" -e "/\s/!d" -e "s/.+\s(.*)/\1/g" -e "s/-hosts/\/net\/host/g" /etc/auto.master'
+    vzexecRun "$_cmd"
+    autoFSMaps=$(vzexecGetLastStdOut)
+    if [ -n "$autofs" ] ; then
+        while IFS= read -r amap ; do
+            #skipping also cdrom. it is not available in jelastic vzcontainers
+            vzexecRun "[ -f '$f' ] && sed -re '/^#/d' -e '/^$/d' -e '/\/dev\/cdrom/d' $f"
+            [ -n "$(vzexecGetLastStdOut)" ] && return 0
+        done <<< "$autoFSMaps"
+    fi
+    return 1
+}
+
 function _reloadAutoFS() {
     local _cmd="systemctl reload autofs || service autofs reload"
     vzexecRun "$_cmd" && return 0
@@ -382,11 +398,16 @@ function processnfs() {
     fi
 
     if [[ $running -eq 0 ]] ; then
-	if [[ "x$SAVE_CONFIG" == "xfalse" ]] ; then
-	    _restartAutoFS
-	else
-            _reloadAutoFS
-	fi
+        if hasActiveMounts ; then
+            vzexecRun "$_ENABLEAUTOFSCMD"
+            if [[ "x$SAVE_CONFIG" == "xfalse" ]] ; then
+                _restartAutoFS
+            else
+                _reloadAutoFS
+            fi
+        else
+            vzexecRun "$_DISABLEAUTOFSCMD"
+        fi
     else
         log "unmounting"
         $VZCTL umount $CTID > /dev/null 2>&1
@@ -486,7 +507,18 @@ function doRemount() {
         done
         return 0
     fi
-    _reloadAutoFS
+    
+    isContainerRunning ${CTID} ; running=$?
+    
+    if [[ $running -eq 0 ]] ; then
+        if hasActiveMounts ; then
+            vzexecRun "$_ENABLEAUTOFSCMD"
+            _reloadAutoFS
+        else
+            vzexecRun "$_DISABLEAUTOFSCMD"
+        fi
+    fi
+    
     return 0;
 }
 
@@ -561,19 +593,12 @@ function dosetupUtils() {
         [ -e "$(vzctPath $VZ_CTID_ROOT /etc/init.d/autofs)" ] && $SED -i -re 's/PROG=automount/PROG=automount\n_SYSTEMCTL_SKIP_REDIRECT="true"/' "$(vzctPath $VZ_CTID_ROOT /etc/init.d/autofs)"
     fi
 
-    if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xsuse" ] ; then
-        if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
-            vzexecRun "chkconfig autofs on"
-        fi
-    fi
-
     if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "7" ] ; then
         $SED -i -re '/automount/d' "$(vzctPath $VZ_CTID_ROOT /etc/nsswitch.conf)"
         echo -e "\nautomount:  files" >> "$(vzctPath $VZ_CTID_ROOT /etc/nsswitch.conf)"
     fi
     echo '/- /etc/autofs.jelastic' >> "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)"
-    vzexecRun "systemctl enable autofs"
-    vzexecRun "systemctl start autofs"
+    vzexecRun "$_DISABLEAUTOFSCMD"
     return 0
 }
 
@@ -704,8 +729,14 @@ function doUmount() {
     if [[ $running -ne 0 ]] ; then
         $VZCTL umount $CTID > /dev/null 2>&1
     else
-        _reloadAutoFS
+        if hasActiveMounts ; then
+            vzexecRun "$_ENABLEAUTOFSCMD"
+            _reloadAutoFS
+        else
+            vzexecRun "$_DISABLEAUTOFSCMD"
+        fi
     fi
+    
     $retfunc "message=>$msg";
     return 0;
 }
@@ -791,4 +822,42 @@ function describeUmountOptions() {
     echo "-o|--ctid: container ID ";
     echo "-d|--destination: destination path";
 }
+
+defineBigInline _DISABLEAUTOFSCMD <<'EOF'
+    if pgrep automount >/dev/null ; then 
+        if [ -d /run/systemd/system ] ; then
+            systemctl disable autofs; 
+            systemctl stop autofs; 
+        elif command -V initctl >/dev/null 2>&1 ; then 
+            update-rc.d autofs disable ; 
+        else 
+            chkconfig autofs off; 
+            service autofs stop ; 
+        fi;
+    else
+        if [ -d /run/systemd/system ] ; then
+            systemctl disable autofs; 
+        elif command -V initctl >/dev/null 2>&1 ; then 
+            update-rc.d autofs disable ;
+        else 
+            chkconfig autofs off;
+        fi
+    fi
+EOF
+
+defineBigInline _ENABLEAUTOFSCMD <<'EOF'
+    if [ -d /run/systemd/system ] ; then
+        systemctl enable autofs; 
+        if ! pgrep automount >/dev/null ; then 
+            systemctl start autofs; 
+        fi
+    elif command -V initctl >/dev/null 2>&1 ; then 
+        update-rc.d autofs enable ; 
+    else 
+        chkconfig autofs on; 
+        if ! pgrep automount >/dev/null ; then 
+            service autofs start ; 
+        fi
+    fi;
+EOF
 
