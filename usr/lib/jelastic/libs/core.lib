@@ -294,14 +294,15 @@ function startJemThreadQueueManager(){
 
     [ -f $jempidfile ] && {
         echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
-        echo ":[WAITING]   [PID: $(cat $jempidfile 2>/dev/null)] Current PID: $$. Action: $action Subaction: $subaction" >> ${JEM_CALLS_LOG} 2>&1;
+        _jempid=$(cat $jempidfile 2>/dev/null)
+        echo ":[WAITING]   [PID: $_jempid] Current PID: $$. Action: $action Subaction: $subaction" >> ${JEM_CALLS_LOG} 2>&1;
 
         while [[ $(kill -0 $(cat $jempidfile 2>/dev/null) > /dev/null 2>&1; echo $?) -eq 0 ]]; do
             sleep $sleep_period;
         done
 
         echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
-        echo ":[PROCESSING][PID: $(cat $jempidfile 2>/dev/null)] Current PID: $$. Action: $action Subaction: $subaction" >> ${JEM_CALLS_LOG} 2>&1;
+        echo ":[PROCESSING][PID: $_jempid] Current PID: $$. Action: $action Subaction: $subaction" >> ${JEM_CALLS_LOG} 2>&1;
     }
     ${SUDO_COMMAND} touch $jempidfile;
     ${SUDO_COMMAND} chmod 666 $jempidfile;
