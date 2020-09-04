@@ -17,7 +17,6 @@
 [ -n "${VSFTPDLIB_VERSION:-}" ] && return 0;
 VSFTPDLIB_VERSION="0.1";
 
-
 include log output os;
 
 PEM_KEY=/etc/vsftpd/vsftpd.pem
@@ -27,20 +26,12 @@ ORG="Jelastic, Inc";
 FTP_USERNAME="jelastic-ftp"; 
 SHELLS_FILE="/etc/shells";
 
-
-
-
-
-
 function setvsFtpCert(){
     APPSERVER_USER_UID=$(id -u jelastic 2>/dev/null || echo 700 )
     chown -R  $APPSERVER_USER_UID $MOUNT_DIR 2>/dev/null;
 
     [ -d "/var/ftp/pub" ]  && rmdir "/var/ftp/pub/" >/dev/null 2>&1;
-    [ -f /usr/lib/systemd/system/vsftpd.service ] && rm -f /usr/lib/systemd/system/vsftpd.service >/dev/null 2>&1;
-    [ -f /usr/lib/systemd/system/vsftpd.target ] && rm -f /usr/lib/systemd/system/vsftpd.target >/dev/null 2>&1;
-    [ -f /usr/lib/systemd/system/vsftpd@.service ] && rm -f /usr/lib/systemd/system/vsftpd@.service >/dev/null 2>&1;
-    systemctl daemon-reload &>/dev/null ;
+    [ -f /etc/rc.d/init.d/vsftpd ] && rm -f /etc/rc.d/init.d/vsftpd;
 
 umask 77 ; echo "$COUNTRY
 $STATE
@@ -53,7 +44,7 @@ $EMAIL" |  openssl req -x509 -nodes -days 1826 -newkey rsa:1024  -keyout $PEM_KE
         getent passwd $FTP_USERNAME >/dev/null || /usr/sbin/adduser -o --uid $APPSERVER_USER_UID --home-dir $MOUNT_DIR --shell /bin/false $FTP_USERNAME 2>/dev/null;
         /sbin/chkconfig --add vsftpd --level 345 2>&1 1>/dev/null
         chown root:root /etc/vsftpd/ -R >/dev/null  2>&1
-        /sbin/chkconfig  vsftpd on >/dev/null  2>&1
+        systemctl enable vsftpd.service >/dev/null  2>&1
         restartServiceSilent vsftpd ;
 return 0;
 }
