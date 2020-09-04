@@ -31,7 +31,9 @@ function setvsFtpCert(){
     chown -R  $APPSERVER_USER_UID $MOUNT_DIR 2>/dev/null;
 
     [ -d "/var/ftp/pub" ]  && rmdir "/var/ftp/pub/" >/dev/null 2>&1;
-    [ -f /etc/rc.d/init.d/vsftpd ] && rm -f /etc/rc.d/init.d/vsftpd;
+    if [ -f /usr/lib/systemd/system/vsftpd.service ]; then 
+        [ -f /etc/rc.d/init.d/vsftpd ] && rm -f /etc/rc.d/init.d/vsftpd;
+    fi
 
 umask 77 ; echo "$COUNTRY
 $STATE
@@ -44,7 +46,12 @@ $EMAIL" |  openssl req -x509 -nodes -days 1826 -newkey rsa:1024  -keyout $PEM_KE
         /usr/sbin/adduser -o --uid $APPSERVER_USER_UID --home-dir $MOUNT_DIR --shell /bin/false $FTP_USERNAME 2>/dev/null;
         /sbin/chkconfig --add vsftpd --level 345 2>&1 1>/dev/null
         chown root:root /etc/vsftpd/ -R >/dev/null  2>&1
-        systemctl enable vsftpd.service >/dev/null  2>&1
+        if [ -f /usr/lib/systemd/system/vsftpd.service ]; then
+            systemctl enable vsftpd.service >/dev/null  2>&1
+        else
+            /sbin/chkconfig --add vsftpd --level 345 2>&1 1>/dev/null
+            /sbin/chkconfig  vsftpd on >/dev/null  2>&1
+        fi
         restartServiceSilent vsftpd ;
 return 0;
 }
