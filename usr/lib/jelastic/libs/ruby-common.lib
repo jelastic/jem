@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
 [ -n "${RUBYCOMMONLIB_VERSION:-}" ] && return 0;
 RUBYCOMMONLIB_VERSION="0.1";
+
+source /etc/profile
 
 [ -e "${MANAGE_CORE_PATH}/${COMPUTE_TYPE}"-deploy.lib ] && { include ${COMPUTE_TYPE}-deploy; }
 include log ;
@@ -40,14 +40,30 @@ function bundleInstall(){
         envs="development production test";
         [[ -n $bundle_type && $envs =~ $bundle_type ]] && { 
     	    VERBOSE=1;
-            log "${bundle} install --deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) " ;
-            cd ${APPWEBROOT} && ${bundle} install --deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG ;
-            resultcode=$? ;
+	    WITHOUT_ENVS=$( $SED 's/'${bundle_type}'//g' <<< $envs )
+	    log "${bundle} install set deployment true without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) " ;
+	    if [ "${RUBY_MAJOR_VERSION}" -ge "24" ]; then
+            cd ${APPWEBROOT} && {
+                ${bundle} config set deployment true >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG;
+                ${bundle} config set without ${WITHOUT_ENVS} >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG;
+                ${bundle} install >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG;
+            }
+	    else
+                cd ${APPWEBROOT} && ${bundle} install --deployment --without  ${WITHOUT_ENVS} >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG ;
+	    fi
+	    resultcode=$? ;
             if [ "${resultcode}" -eq 16 ] ; then
-                log "${bundle} install --no-deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) " ;
-                cd ${APPWEBROOT} && ${bundle} install --no-deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} &&
-                ${bundle} install --deployment --without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} ;
-                cd ${APPWEBROOT} && ${bundle} clean >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG ;
+		log "${bundle} install --no-deployment without  $( $SED 's/'${bundle_type}'//g' <<< $envs ) " ;
+		if [ "${RUBY_MAJOR_VERSION}" -ge "24" ]; then
+                    cd ${APPWEBROOT} && ${bundle} config set without ${WITHOUT_ENVS} >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG && 
+                    ${bundle} install --no-deployment 2>>${BUNDLE_INSTALL_LOG} &&
+                    ${bundle} config set deployment true >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG &&
+                    ${bundle} install >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG};
+		else
+                    cd ${APPWEBROOT} && ${bundle} install --no-deployment --without ${WITHOUT_ENVS} >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} &&
+                    ${bundle} install --deployment --without ${WITHOUT_ENVS} >>${BUNDLE_INSTALL_LOG} 2>>${BUNDLE_INSTALL_LOG} ;
+		fi
+		cd ${APPWEBROOT} && ${bundle} clean --force >>${BUNDLE_INSTALL_LOG} 2>>$ACTIONS_LOG ;
             fi
             shopt -s dotglob;
             chown -hR ${DATA_OWNER} "${APPWEBROOT}" 2>>"$JEM_CALLS_LOG";
@@ -69,3 +85,4 @@ export PATH=$PATH:\$PATHVENDOR
     }
     return 0;
 }
+
