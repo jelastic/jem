@@ -110,6 +110,6 @@ function vzexecRunStdOut() {
 function vzctPath() {
     local _root=$1
     shift
-    set -- "$@" "$arg"
+    set -- "$@"
     echo $(vzreadlink -q --vzroot="$_root" $* 2>/dev/null)
 }
