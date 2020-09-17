@@ -46,8 +46,8 @@ function ensureDiskSpaceIsOK() {
     )
     res=$?
     [[ $res -eq 137 ]] && {
-        echo "{\"result\":4132, \"message\": \"Execution timed out\"}"
-        die -q
+        writeJSONResponseErr "result=>4132" "message=>Execution timed out";   
+        die -q;
     }
     fres=$(cat $resfile)
     /bin/rm -f $resfile
