@@ -36,8 +36,8 @@ function ensureDiskSpaceIsOK() {
         local disk_space_usage_critical_state=97
         local disk_inode_usage_critical_state=97
         local fstype="$(getFSType '/')"
-        local disk_space_usage_percentage=$(df -l -h 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1)
-        local disk_inode_usage_percentage=$(df -l -i 2>/dev/null  | $GREP "/$" | $GREP -o [[:alnum:]]*% | $SED  's/%//g' | head -n 1)
+        local disk_space_usage_percentage=$(df -h / 2>/dev/null  | tail -1 | $GREP -o [[:alnum:]]*% | $SED  's/%//g')
+        local disk_inode_usage_percentage=$(df -i / 2>/dev/null  | tail -1 | $GREP -o [[:alnum:]]*% | $SED  's/%//g')
         [ ${disk_space_usage_percentage} -lt ${disk_space_usage_critical_state} ] || { writeJSONResponseErr "result=>4075" "message=>No free diskspace"; echo 1 > $resfile; exit; }
 
         [[ "${fstype}" == "reiserfs" ]] && { echo 0 > $resfile; exit; }
@@ -59,7 +59,7 @@ function ensureFileCanBeUncompressed(){
     VERBOSE=1;
     local fileToUncompress=$1;
     local uncompressed_zip_size=0;
-    [ -z ${resource_data_dize} ] && { resource_data_dize=0; freebytesleft=$(( 1024 *  $(df -l 2>/dev/null | $GREP "/$" | $AWK '{ print $4 }' | head -n 1 2>/dev/null)-1024*1024)); }
+    [ -z ${resource_data_dize} ] && { resource_data_dize=0; freebytesleft=$(( 1024 *  $(df -l / 2>/dev/null | tail -1 | $AWK '{ print $4 }' )-1024*1024)); }
     local uncompressed_size;
 
     mimeType=$($FILE --mime-type "${fileToUncompress}" | $AWK '{print $2}')
