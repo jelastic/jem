@@ -397,7 +397,7 @@ function processnfs() {
     fi
 
     if [[ $running -eq 0 ]] ; then
-        if hasActiveMounts ; then
+        if _hasActiveMounts ; then
             vzexecRun "$_ENABLEAUTOFSCMD"
             if [[ "x$SAVE_CONFIG" == "xfalse" ]] ; then
                 _restartAutoFS
@@ -510,7 +510,7 @@ function doRemount() {
     isContainerRunning ${CTID} ; running=$?
     
     if [[ $running -eq 0 ]] ; then
-        if hasActiveMounts ; then
+        if _hasActiveMounts ; then
             vzexecRun "$_ENABLEAUTOFSCMD"
             _reloadAutoFS
         else
@@ -728,7 +728,7 @@ function doUmount() {
     if [[ $running -ne 0 ]] ; then
         $VZCTL umount $CTID > /dev/null 2>&1
     else
-        if hasActiveMounts ; then
+        if _hasActiveMounts ; then
             vzexecRun "$_ENABLEAUTOFSCMD"
             _reloadAutoFS
         else
