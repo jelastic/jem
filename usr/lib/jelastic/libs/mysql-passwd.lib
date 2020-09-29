@@ -53,7 +53,7 @@ function setPassword() {
 		then
         	[ -f /etc/init.d/mysqld ] && SERVICE="mysqld"
 		fi
-		echo "Using service $SERVICE"  >> $LOG_FILE
+		echo ":Using service $SERVICE $SECONDS"  >> $LOG_FILE
 		stopService ${SERVICE} >> $LOG_FILE 2>&1
         [ -f "/var/lib/mysql/auto.cnf" ] && rm "/var/lib/mysql/auto.cnf";
 
@@ -63,21 +63,20 @@ function setPassword() {
 			then
 				break;
 			fi
-			sleep 1
+			sleep 0.5
 			tries=$(($tries-1))
 			stopService ${SERVICE} >> $LOG_FILE 2>&1
 		done
 
-		echo "Mysql stopped" >> $LOG_FILE
+		echo ":Mysql stopped $SECONDS" >> $LOG_FILE
 
 		if ps ax | $GREP -v grep | $GREP -q  mysqld ;  then /usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1; fi
 		${SERVICE_CMD} ${SERVICE} regenerate-config  >> $LOG_FILE 2>&1
-		eval $MYSQLD_SAFE --skip-grant-tables --user=mysql  --pid-file=$pid >> $LOG_FILE 2>&1 &
+		eval $MYSQLD_SAFE --skip-grant-tables --skip-networking --user=mysql  --pid-file=$pid >> $LOG_FILE 2>&1 &
 
-		sleep 5;
 		while [ ! -e $pid ]
 		do
-		    sleep 1
+		    sleep 0.5
 		    tries2=$(($tries2-1))
 			if [ "$tries2" -lt 0  ]
 			then
@@ -88,7 +87,7 @@ function setPassword() {
 				die -q
 			fi
 		done
-		sleep 2
+		echo ":Mysql started mysqld-safe $SECONDS" >> $LOG_FILE
 		val=$(sed 's/\.//' <<< $COMPUTE_TYPE_FULL_VERSION )
 		[ -z "$val" ] && val=0 ;
                if [ "x$COMPUTE_TYPE" == "xmysql" -a $val -ge 57  ] ; then
@@ -100,22 +99,23 @@ function setPassword() {
 		$MYSQL $db --execute="DELETE FROM mysql.user WHERE user = '';"
 		$MYSQL $db --execute="FLUSH PRIVILEGES;"
 
-		sleep 2
+		echo ":Mysql set password $SECONDS" >> $LOG_FILE
 		/usr/bin/killall mysqld 1>>$LOG_FILE 2>&1; /usr/bin/killall mysqld_safe 1>>$LOG_FILE 2>&1;
 
 		tries=200
-		echo "Stopping Mysql after set password " >> $LOG_FILE
+		echo ":Stopping Mysql after set password $SECONDS" >> $LOG_FILE
 		while [ "$tries" -gt 0 ]
 		do
 			if ! ps ax | $GREP -v grep | $GREP -q mysql ;
 			then
 				break;
 			fi
-			sleep 1
+			sleep 0.5
 			tries=$(($tries-1))
 			stopService ${SERVICE} >> $LOG_FILE 2>&1
 		done
 
+		echo ":Stopped Mysql after set password $SECONDS" >> $LOG_FILE
 		startService ${SERVICE}  >>$LOG_FILE 2>&1
 		if ! ps ax | $GREP -v grep | $GREP -q  mysql ;
 		then
@@ -124,6 +124,7 @@ function setPassword() {
 
 		fi
 
+		echo ":Started Mysql after set password $SECONDS" >> $LOG_FILE
                 val=$(sed 's/\.//' <<< $COMPUTE_TYPE_FULL_VERSION )
                 isDefPassLifetime=0
                 defPassLifetime=$($MYSQL -u "${user}" -p"${password}" -NB -e "show global variables like 'default_password_lifetime'" 2>&1 | $SED -re '/mysql/d' | $SED -rne '/default_password_lifetime/s/default_password_lifetime\s+([0-9]+)/\1/p')
@@ -144,6 +145,6 @@ function setPassword() {
                     done
                 fi
 
-		echo "Password updated" >> $LOG_FILE
+		echo ":Password updated $SECONDS" >> $LOG_FILE
 		$CHKCONFIG --level 3 ${SERVICE} on >>$LOG_FILE 2>&1
 }
