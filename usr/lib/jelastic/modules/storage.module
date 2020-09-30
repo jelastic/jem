@@ -163,13 +163,13 @@ function _hasActiveMounts() {
     #dir:path -> /path/*
     _cmd='[ -f /etc/auto.master ] && sed -re "/^#/d" -e "s/dir:(.*)/+ \1\/*/g" -e "/\s/!d" -e "s/.+\s(.*)/\1/g" -e "s/-hosts/\/net\/host/g" /etc/auto.master'
     vzexecRun "$_cmd"
-    autoFSMaps=$(vzexecGetLastStdOut)
+    autoFSMaps=($(vzexecGetLastStdOut))
     if [ -n "$autoFSMaps" ] ; then
-        while IFS= read -r f ; do
+        for f in ${autoFSMaps[*]} ; do
             #skipping also cdrom. it is not available in jelastic vzcontainers
-            vzexecRun "[ -f '$f' ] && sed -re '/^#/d' -e '/^$/d' -e '/\/dev\/cdrom/d' $f"
+            vzexecRun "[ -f \"$f\" ] && sed -re '/^#/d' -e '/^$/d' -e '/\/dev\/cdrom/d' $f"
             [ -n "$(vzexecGetLastStdOut)" ] && return 0
-        done <<< "$autoFSMaps"
+        done
     fi
     return 1
 }
