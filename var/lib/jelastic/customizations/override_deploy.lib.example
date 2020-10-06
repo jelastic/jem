@@ -1,0 +1,14 @@
+#!/bin/bash
+
+### In this library you can customize any previously defined function
+### Customizations will be kept after the container redeploy
+### For successful end of operation - function should return status code 0
+
+# Examples:
+
+#function _deploy(){
+#
+#
+#}
+
+
