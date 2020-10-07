@@ -629,6 +629,16 @@ function addNginxSticky(){
   fi
 }
 
+function swapNginxProxyProtocol(){
+  protocol=$1
+  if [ "x${protocol}" == "xhttps" ]; then
+        $SED -i -re "/(^|\s)proxy_pass\s/s/proxy_pass\s+http:\/\//proxy_pass https:\/\//" $NGINX_CONFIG;
+  else
+        $SED -i -re "/(^|\s)proxy_pass\s/s/proxy_pass\s+https:\/\//proxy_pass http:\/\//" $NGINX_CONFIG;
+  fi
+  writeJSONResponseOut "result=>0" "message=>Ok";
+}
+
 function setConfigVariables(){
   local temp=`getopt -o -n: -l stickyname: -- "$@" 2>>"$JEM_CALLS_LOG"`
   [[ $? != 0 ]] && die -q "Terminating...";

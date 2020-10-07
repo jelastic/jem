@@ -202,6 +202,14 @@ function doAddSticky(){
     addNginxSticky ; 
 }
 
+function doEnableProxySSL(){
+    swapNginxProxyProtocol "https" ;
+}
+
+function doDisableProxySSL(){
+    swapNginxProxyProtocol "http" ;
+}
+
 function postRebuildCommonCallback(){
     ExtendPerm ;
 }
