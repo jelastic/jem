@@ -480,7 +480,7 @@ function doEditProject(){
     changeUrlresult=0;
   fi
 
-  [[ "$OLD_PROJECT_NAME" !=  "$PROJECT_NAME" ]] && {
+  ( [[ -n "${OLD_PROJECT_NAME}" ]] && [[ -n "${PROJECT_NAME}" ]] && [[ "$OLD_PROJECT_NAME" != "$PROJECT_NAME" ]] ) && {
     # doAction deploy rename -o $OLD_PROJECT_NAME -n $PROJECT_NAME > /dev/null 2>&1;
     if [ ! -d "${WEBROOT}/${PROJECT_NAME}/" ]; then
         if [ "x${COMPUTE_TYPE}" != "xmaven" ]; then
