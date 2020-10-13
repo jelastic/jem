@@ -25,6 +25,9 @@ inherit default exceptor;
 [ ${COMPUTE_TYPE} == "tomee" ] && COMPUTE_TYPE="tomcat" ;
 [ -e "${MANAGE_CORE_PATH}/${COMPUTE_TYPE}"-deploy.lib ] && { include ${COMPUTE_TYPE}-deploy; }
 
+[ -f /.jelenv ] && export $(grep RESTART_AFTER_DEPLOY /.jelenv 2>/dev/null | tr -d '"') >/dev/null
+
+RESTART_AFTER_DEPLOY=${RESTART_AFTER_DEPLOY^^}
 
 function verifyUnpackedContent(){
     local context=$1
@@ -71,7 +74,9 @@ function deploy(){
     getPackageName;
     ensureFileCanBeUncompressed "${package_path}/${package_name}";
 
-    stopServiceSilent ${SERVICE} ;
+    if [ "x$RESTART_AFTER_DEPLOY" != "x0" ] && [ "x$RESTART_AFTER_DEPLOY" != "xDISABLED" ] && [ "x$RESTART_AFTER_DEPLOY" != "xFALSE" ]; then
+        stopServiceSilent ${SERVICE} ;
+    fi
 
     if [ -e "${WEBROOT}/$context" ]
     then
@@ -98,7 +103,10 @@ function deploy(){
 
     applyPostDeploy;
     clearCache;
-    startServiceSilent ${SERVICE} ;
+
+    if [ "x$RESTART_AFTER_DEPLOY" != "x0" ] && [ "x$RESTART_AFTER_DEPLOY" != "xDISABLED" ] && [ "x$RESTART_AFTER_DEPLOY" != "xFALSE" ]; then
+        startServiceSilent ${SERVICE} ;
+    fi
 
     verifyUnpackedContent "${context}";
 
@@ -127,7 +135,9 @@ function renameContext(){
         echo "Wrong arguments for rename" 1>&2
         exit 1
     fi
-    stopServiceSilent ${SERVICE} ;
+    if [ "x$RESTART_AFTER_DEPLOY" != "x0" ] && [ "x$RESTART_AFTER_DEPLOY" != "xDISABLED" ] && [ "x$RESTART_AFTER_DEPLOY" != "xFALSE" ]; then
+        stopServiceSilent ${SERVICE} ;
+    fi
     applyPreRename;
     shopt -s dotglob;
     [ -e ${WEBROOT}/${oldContext}.war ] && mv ${WEBROOT}/${oldContext}.war  ${WEBROOT}/${newContext}.war && war_deploy_result=0 || war_deploy_result=1;
@@ -141,7 +151,9 @@ function renameContext(){
 
     shopt -u dotglob;
     applyPostRename;
-    startServiceSilent ${SERVICE} ;
+    if [ "x$RESTART_AFTER_DEPLOY" != "x0" ] && [ "x$RESTART_AFTER_DEPLOY" != "xDISABLED" ] && [ "x$RESTART_AFTER_DEPLOY" != "xFALSE" ]; then
+        startServiceSilent ${SERVICE} ;
+    fi
     verifyUnpackedContent "${newContext}";
 
 }
