@@ -287,7 +287,7 @@ function doUpdate(){
     enableVCSLibrary;
     applyHook ${PROJECT_NAME} preUpdate || { writeJSONResponseErr "result=>4127" "message=>Pre-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
     [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${PROJECT_NAME} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
-    if [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" -o "x${COMPUTE_TYPE}" == "xlitespeed" ] && [ "x${PROJECT_NAME}" == "xROOT" ] && [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
+    if [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" -o "x${COMPUTE_TYPE}" == "xlitespeed" -o "x${COMPUTE_TYPE}" == "xlemp" ] && [ "x${PROJECT_NAME}" == "xROOT" ] && [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
         local NEXT_DIR=ROOT_`date +%Y.%m.%d-%H.%M.%S`;
         if [ -h ${WEBROOT}/ROOT ] ; then
             local CURRENT_DIR=`readlink ${WEBROOT}/ROOT | $GREP -o "ROOT_[0-9.-]*"`;
