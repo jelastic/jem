@@ -170,8 +170,11 @@ function generateUpstreams(){
     for i in  $( sort -u ${GROUP_CONFIG} )
     do
       local ip=$( $SED -nre 's/^([a-z0-9\.\-]{1,})([_| ](([a-z=0-9\ _]{1,})*))?/\1/p' <<< ${i} )
-      local weight=$( $SED -nre 's/([a-z0-9\.\-]{1,})[_| ](([weight=[0-9]{1,}_?)*)/\3/p' <<< ${i} )
-      [ "$2" == "tcp" ] && upstreams[$count]="server ${ip}:BPORT ;" || upstreams[$count]="server ${ip} ${weight};"
+      local weight=$( $SED -nre 's/.*([a-z0-9\.\-\=]{1,}[_| ])+([weight=[0-9]{1,}).*/\2/p' <<< ${i} )
+      local port=$( $SED -nre 's/.*([a-z0-9\.\-\=]{1,}[_| ])+port=([[0-9]{1,}).*/\2/p' <<< ${i} )
+      [ "x$port" = "x80" ] && port="";
+      [ -n "$port" ] && port=":${port}";
+      [ "$2" == "tcp" ] && upstreams[$count]="server ${ip}:BPORT ;" || upstreams[$count]="server ${ip}${port} ${weight};"
       ((count++))
     done
     IFS=$OLD_IFS
@@ -448,10 +451,13 @@ function weightChanged(){
     OLD_IFS=$IFS; IFS=$'\n';
        for i in  $( sort -u ${UPSTREAM_COMMON_CONFIG} )
     do
-	ip=$( $SED -nre 's/^([a-z0-9\.\:\-]{1,})([_| ](([a-z=0-9\ _]{1,})*))?/\1/p' <<< ${i} )
+	ip=$( $SED -nre 's/^([a-z0-9\.\-]{1,})([_| ](([a-z=0-9\ _]{1,})*))?/\1/p' <<< ${i} )
+	port=$( $SED -nre 's/.*([a-z0-9\.\-\=]{1,}[_| ])+port=([[0-9]{1,}).*/\2/p' <<< ${i} )
 	weight=$( $SED -nre 's/.*([a-z0-9\.\-\=]{1,}[_| ])+([weight=[0-9]{1,}).*/\2/p' <<< ${i} )
 	backup=$( $SED -nre 's/.*([a-z0-9\.\-\=]{1,}[_| ])+(backup).*/\2/p' <<< ${i} )
 	ip_a[$count]=$ip;
+	[ "x$port" = "x80" ] && port="";
+	[ -n "$port" ] && port=":${port}";
 	[ "${weight#weight=}" == "0" ] && [ -n "${backup}" ] && weight=;
 		[ -z ${weight#weight=} ] && [ -z "$backup" ] && {
         	log "For $ip value for weight not found" ;
@@ -460,6 +466,7 @@ function weightChanged(){
       	} || {
         weight_a[$count]=${weight#weight=} ;
         backup_a[$count]=${backup} ;
+        port_a[$count]=${port} ;
       	}
 
       ((count++))
@@ -484,10 +491,10 @@ function weightChanged(){
 
   for ((count=1; count <= ${#ip_a[@]}; count++))
   do
-        log "IP: ${ip_a[$count]}  WEIGT:${weight_a[$count]}  OLD:${old_val[$count]} ${old_backup}"
+        log "IP: ${ip_a[$count]}${port_a[$count]}  WEIGT:${weight_a[$count]}  OLD:${old_val[$count]} ${old_backup}"
         new_opts=;
         [ -z ${weight_a[$count]} ] && new_opts="${new_opts} ${backup_a[$count]}" || new_opts="${new_opts} weight=${weight_a[$count]} ${backup_a[$count]}"
-        $SED -i -re "s/${ip_a[$count]}[a-z0-9= ]*;/${ip_a[$count]} ${new_opts};/" $NGINX_CONFIG ;
+        $SED -i -re "s/${ip_a[$count]}[a-z0-9:= ]*;/${ip_a[$count]}${port_a[$count]} ${new_opts};/" $NGINX_CONFIG ;
    done
   reloadServiceSilent $SERVICE ;
 
@@ -495,7 +502,7 @@ function weightChanged(){
 
 function swapHostsHTD(){
     VERBOSE=1
-    local temp=$(getopt -o s:,d: -l source:,destination:  -- $@ 2>/dev/null );
+    local temp=$(getopt -o s:,d:,p: -l source:,destination:,port:  -- $@ 2>/dev/null );
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
     while [ $# -gt 0 ]
@@ -509,6 +516,10 @@ function swapHostsHTD(){
                 HOST_DESTINATION=$2;
                 shift;
                 ;;
+	    -p | --port )
+                PORT_DESTINATION=$2;
+                shift;
+                ;;
             --)
                 shift;
                 break;
@@ -520,12 +531,28 @@ function swapHostsHTD(){
     [ -z "$HOST_DESTINATION" ] && { writeJSONResponseErr "result=>4066" "message=>DESTINATION required" ; return 66; }
 
     log "Source: ${HOST_SOURCE}, Destination: ${HOST_DESTINATION}" ;
+    [ -n "$PORT_DESTINATION" ] && { log "Port: ${PORT_DESTINATION}"; }
 
-    $SED -i -re "s/server\s*${HOST_SOURCE}([ |:])/server ${HOST_DESTINATION}\1/" $NGINX_CONFIG;
+    if [ -n "$PORT_DESTINATION" ]; then
+      [ ${PORT_DESTINATION} != "80" ] && PORT_SERVER=":${PORT_DESTINATION}";
+      $SED -i -re "s/server\s*${HOST_SOURCE}\:?[[:digit:]]+?(\s)/server ${HOST_DESTINATION}${PORT_SERVER}\1/" $NGINX_CONFIG;
+    else
+      $SED -i -re "s/server\s*${HOST_SOURCE}([ |:])/server ${HOST_DESTINATION}\1/" $NGINX_CONFIG;
+    fi
+
 #    MAP_SOURCE=$( $SED -e 's/\./\\\\./g' <<< $HOST_SOURCE )
 #    MAP_DESTINATION=$( $SED -e 's/\./\\\\./g' <<< $HOST_DESTINATION )
 #    $SED -i -re "s/${MAP_SOURCE}/${MAP_DESTINATION}/" $NGINX_CONFIG;
+
     $SED -i -re "s/^\s*${HOST_SOURCE}\s*/${HOST_DESTINATION} /" ${UPSTREAM_COMMON_CONFIG} ;
+    if [ -n "$PORT_DESTINATION" ]; then
+      [ ${PORT_DESTINATION} != "80" ] && PORT_COMMON=" port=${PORT_DESTINATION}";
+      if $GREP -qE "${HOST_DESTINATION}.*[[:space:]]port=" ${UPSTREAM_COMMON_CONFIG} ; then
+        $SED -i "/${HOST_DESTINATION}/{s/[[:space:]]port=[[:digit:]]\+/${PORT_COMMON}/}" ${UPSTREAM_COMMON_CONFIG};
+      else
+        $SED -i "/${HOST_DESTINATION}/{s/${HOST_DESTINATION}/${HOST_DESTINATION}${PORT_COMMON}/}" ${UPSTREAM_COMMON_CONFIG};
+      fi
+    fi
     writeJSONResponseOut "result=>0" "message=>Ok";
 }
 
@@ -551,7 +578,7 @@ function removeHostHTD(){
     [ -z "$HOST_REMOVE" ] && { writeJSONResponseErr "result=>4065" "message=>SOURCE required" ; return 65; }
     log "Host: ${HOST_REMOVE}" ;
     MAP_HREMOVE=$( $SED -e 's/\./\\\\./g' <<< $HOST_REMOVE )
-    $PERL -i -p0e "s/server\s${HOST_REMOVE}\s*[:a-z0-9\=]{0,}\s*;//g" $NGINX_CONFIG;
+    $PERL -i -p0e "s/server\s${HOST_REMOVE}:?[0-9]+?\s*[:a-z0-9\=]{0,}\s*;//g" $NGINX_CONFIG;
     $PERL -i -p0e "s/~${MAP_HREMOVE}\\\\:80\\$\s*common;//g" $NGINX_CONFIG;
 
     $SED -i "/${HOST_REMOVE}\s*/d" ${UPSTREAM_COMMON_CONFIG} ;
@@ -560,7 +587,7 @@ function removeHostHTD(){
 
 function addNodeHTD(){
     VERBOSE=1
-    local temp=$(getopt -o h: -l host:  -- $@ 2>/dev/null );
+    local temp=$(getopt -o h:,p: -l host:,port:  -- $@ 2>/dev/null );
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
     while [ $# -gt 0 ]
@@ -568,6 +595,10 @@ function addNodeHTD(){
         case "$1" in
             -h | --host)
                 HOST_ADD=$2;
+                shift;
+                ;;
+            -p | --port)
+                PORT_ADD=$2;
                 shift;
                 ;;
             --)
@@ -579,13 +610,18 @@ function addNodeHTD(){
     done;
     [ -z "$HOST_ADD" ] && { writeJSONResponseErr "result=>4065" "message=>SOURCE required" ; return 65; }
     log "Host: ${HOST_ADD}" ;
+    [ -n "$PORT_ADD" ] && { log "Port: ${PORT_ADD}" ; }
     if $GREP -vE "^\s*#" $NGINX_CONFIG | $GREP -q ${HOST_ADD} ; then
         writeJSONResponseOut "result=>0" "message=>Ok";
         return 0 ;
     fi
 
     regex_line=$(generateMapRegexFromIp ${HOST_ADD})
-    $SED -i "/### UPSTREAMPROTO for common ###/{s/}\s*###/server ${HOST_ADD} weight=1; } ###/}"  $NGINX_CONFIG;
+    if [ -n "$PORT_ADD" ] && [ "${PORT_ADD}" != "80" ] ; then
+      $SED -i "/### UPSTREAMPROTO for common ###/{s/}\s*###/server ${HOST_ADD}:${PORT_ADD} weight=1; } ###/}"  $NGINX_CONFIG;
+    else
+      $SED -i "/### UPSTREAMPROTO for common ###/{s/}\s*###/server ${HOST_ADD} weight=1; } ###/}"  $NGINX_CONFIG;
+    fi
     OLDIFS=$IFS
     IFS=$'\n'
     for line in $( $GREP pair $NGINX_TCPMAP_CONFIG  | $GREP -v '!--' )
@@ -598,7 +634,11 @@ function addNodeHTD(){
       $SED -i -re  "${LINE},/### UPSTREAMPROTO/{s/###/server ${HOST_ADD}:${bend_port}\; ###/}" $NGINX_CONFIG;
     done
     IFS=$OLDIFS
-    echo "${HOST_ADD} weight=1" >> $UPSTREAM_COMMON_CONFIG ;
+    if [ -n "$PORT_ADD" ] && [ "${PORT_ADD}" != "80" ] ; then
+      echo "${HOST_ADD} port=${PORT_ADD} weight=1" >> $UPSTREAM_COMMON_CONFIG ;
+    else
+      echo "${HOST_ADD} weight=1" >> $UPSTREAM_COMMON_CONFIG ;
+    fi
     writeJSONResponseOut "result=>0" "message=>Ok";
 }
 
