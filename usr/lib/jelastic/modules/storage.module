@@ -829,10 +829,12 @@ defineBigInline _DISABLEAUTOFSCMD <<'EOF'
             systemctl disable autofs; 
             systemctl stop autofs; 
         elif command -V initctl >/dev/null 2>&1 ; then 
-            update-rc.d autofs disable ; 
-        else 
-            chkconfig autofs off; 
-            service autofs stop ; 
+            if command -V update-rc.d >/dev/null 2>&1 ; then 
+                update-rc.d autofs disable ; 
+            else 
+                chkconfig autofs off; 
+                service autofs stop ; 
+            fi;
         fi;
     else
         if [ -d /run/systemd/system ] ; then
@@ -852,7 +854,14 @@ defineBigInline _ENABLEAUTOFSCMD <<'EOF'
             systemctl start autofs; 
         fi
     elif command -V initctl >/dev/null 2>&1 ; then 
-        update-rc.d autofs enable ; 
+        if command -V update-rc.d >/dev/null 2>&1 ; then 
+            update-rc.d autofs enable ; 
+        else
+            chkconfig autofs on;
+        fi
+        if ! pgrep automount >/dev/null ; then 
+            service autofs start ;
+        fi
     else 
         chkconfig autofs on; 
         if ! pgrep automount >/dev/null ; then 
