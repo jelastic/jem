@@ -133,7 +133,7 @@ function __injected_not_vds_add() {
     #vzctl exec ${_CTID} "jem user add"
     vzexecRun jem user add ${DISABLE_PASS_FLAG}
     if [ "$(vzexecGetLastErrCode)" -eq 0 ]; then
-        _homedir="${prefix}$(vzexecGetLastStdOut | $SED -rn 's/.*["]homedir["]:[[:blank:]]*["]([^"]+)["].*/\1/p')"
+        _homedir=$(vzreadlink --vzroot="${prefix}" $(vzexecGetLastStdOut | $SED -rn 's/.*["]homedir["]:[[:blank:]]*["]([^"]+)["].*/\1/p'))
         DATA_OWNER="$(vzexecGetLastStdOut | $SED -rn 's/.*["]data_owner["]:[[:blank:]]*["]([^"]+)["].*/\1/p')"
         _UID=${DATA_OWNER/:*}
         _GUID=${DATA_OWNER/*:}
