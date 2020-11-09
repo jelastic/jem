@@ -43,6 +43,7 @@ $dataHash{'jelastic_internalip_local'} = $ENV{'internalIp'} if ( defined ($ENV{'
 $dataHash{'jelastic_externalip_local'} = $ENV{'externalIp'} if ( defined ($ENV{'externalIp'}) ) ;
 $dataHash{'jelastic_domain_local'} = $ENV{'localDomain'} if ( defined ($ENV{'localDomain'}) ) ;
 $dataHash{'jelastic_short_hostname_local'} = $ENV{'localShortHostname'} if ( defined ($ENV{'localShortHostname'}) ) ;
+$dataHash{'jelastic_nodeid_local'} = $ENV{'localNodeid'} if ( defined ($ENV{'localNodeid'}) ) ;
 
 my @ip_ar = split ( /\./, $ENV{'internalIp'}, 5 );
 $dataHash{'jelastic_internalip_local_reverse'} = "$ip_ar[2].$ip_ar[1].$ip_ar[0]";

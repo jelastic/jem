@@ -73,6 +73,7 @@ function doApply(){
     isFunction externalip && { externalIp=$(externalip); export externalIp=$externalIp; }
     isFunction localdomain && { localDomain=$(localdomain); export localDomain=$localDomain; }
     isFunction localshorthostname && { localShortHostname=$(localshorthostname); export localShortHostname=$localShortHostname; }
+    isFunction localnodeid && { localNodeid=$(localnodeid); export localNodeid=$localNodeid; }
     TPL_LIST=$($FIND ${ERB_DIR} -mindepth 1 -type f  -printf '%P\n' | sort ) 
     for tpl in ${TPL_LIST}
     do
