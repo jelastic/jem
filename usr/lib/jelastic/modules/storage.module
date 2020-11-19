@@ -559,6 +559,9 @@ function dosetupUtils() {
         installCmd="$(installPackageCmd $OS install nfs-common)"
         checkCmd=$(checkPackageCmd $OS autofs nfs-common)
     elif [ "x$OS" == "xcentos" ] ; then
+        if [ "$OS_ver" -eq "8" ]; then
+           installCmd=$(installPackageCmd $OS install http://repository.jelastic.com/pub/autofs-5.1.6-1j.el8.x86_64.rpm nfs-utils)
+        fi
         if [ "$OS_ver" -eq "7" ]; then
            installCmd=$(installPackageCmd $OS install http://repository.jelastic.com/pub/autofs-5.1.6-1j.el7.x86_64.rpm nfs-utils)
         fi
