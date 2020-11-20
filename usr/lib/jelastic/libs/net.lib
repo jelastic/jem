@@ -225,15 +225,21 @@ function getLocalNSAddr() {
 function getInfraAddresses() {
 #    : ${1:?"Missing param: arrInfraAddr"};
 #    local arrResult=$1;
-    NSIP=$(getLocalNSAddr | tail -n 1);
-
-    [[ -z "${NSIP}" ]] && {
-        warn "Couldn't determine local nameservers"
-        return 1;
-    }
-
-    domain=$(host ${NSIP} | $SED -re '/NXDOMAIN/d;s/.*\s+(rslv[0-9]{0,3}|resolver)\.(\S+)\.$/\2/g;/arpa/d' | tail -n 1);
-    [ -z "${domain}" ] && return 1;
+   NSIPs=( $(getLocalNSAddr) )
+   (( ${#NSIPs[@]} == 0 )) && {
+      warn "Couldn't determine local nameservers"
+      return 1;
+   }
+   for i in 1 2 ; do
+      for NSIP in ${NSIPs[@]}; do
+         local response="$(host ${NSIP})"
+         (( $? == 0 )) || continue
+         domain=$($SED -re '/NXDOMAIN/d;s/.*\s+(rslv[0-9]{0,3}|resolver)\.(\S+)\.$/\2/g;/arpa/d' <<< "$response" | tail -n 1);
+         [[ -z "$domain" ]] || break 2
+      done
+      sleep 2
+   done
+   [ -z "${domain}" ] && return 1;
 
     ## TODO: Need to replace to the v4 code {{{
     RSLV_ADDR="$(getHostIP "rslv.${domain}")";
