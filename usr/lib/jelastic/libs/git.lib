@@ -43,6 +43,13 @@ function prepareUrl(){
     }
 }
 
+function updateSubmodules(){
+    cd "${WEBROOT}/${PROJECT_NAME}" && {
+        [ -f .gitmodules ] && runNonInterractive "$GIT  submodule update --init --recursive" >> $JEM_CALLS_LOG 2>&1 || true;
+        return $?;
+    }
+}
+
 function doCheckout(){
     [ ! -z "$WEBROOT" ] && { set -f; rm -Rf "${WEBROOT}/${PROJECT_NAME}"; set +f; }
 
@@ -55,8 +62,8 @@ function doCheckout(){
             cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
         }
         [ ! -z $BRANCH ] && cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1 && cd - >> $JEM_CALLS_LOG 2>&1;       ###### we removed --git-dir directive because of bug in GIT
-        cd "${WEBROOT}/${PROJECT_NAME}" && runNonInterractive "$GIT submodule update --init --recursive" >> $JEM_CALLS_LOG 2>&1 ; result=$? && cd - > /dev/null 2>&1;
         [ $result -ne 0 ] && return $result;
+        updateSubmodules || return $?;
     else
         if [ "x$NO_EXPECT" == "xtrue" ] ; then
             $GIT clone "$URL" "${WEBROOT}/${PROJECT_NAME}" >> "$VCS_UPDATE_LOG"  2>&1;
@@ -64,10 +71,7 @@ function doCheckout(){
             runNonInterractive "$GIT clone $URL ${WEBROOT}/${PROJECT_NAME}" > /dev/null 2>&1;
             result=$?; [ $result -ne 0 ] && return $result;
         fi
-        cd "${WEBROOT}/${PROJECT_NAME}" && {
-            runNonInterractive "$GIT  submodule update --init --recursive" > /dev/null 2>&1;
-            result=$?; [ $result -ne 0 ] && return $result;
-        }
+        updateSubmodules || return $?;
         [ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
             echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
             cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD  >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
@@ -91,8 +95,7 @@ function updateProject(){
     echo -n $(date +%D.%k:%M:%S.%N) >> "$VCS_UPDATE_LOG" 2>&1;
     runNonInterractive "$GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git pull"  > /dev/null 2>&1;
     result=$?; [ $result -ne 0 ] && return $result;
-    cd "${WEBROOT}/${PROJECT_NAME}" && runNonInterractive  "$GIT  submodule update --init --recursive" > /dev/null 2>&1;
-    result=$?; [ $result -ne 0 ] && return $result;
+    updateSubmodules || return $?;
     cd "${WEBROOT}/${PROJECT_NAME}" && runNonInterractive  "$GIT  gc" > /dev/null 2>&1;
     result=$?; [ $result -ne 0 ] && return $result;
     [ ! -z "$BRANCH" ] && [ "$($GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" branch | $GREP "$BRANCH" | cut -d" " -f1)" != "*" ] && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" checkout "$BRANCH"  >> "$VCS_UPDATE_LOG" 2>&1;
