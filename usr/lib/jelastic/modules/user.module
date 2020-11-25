@@ -105,7 +105,7 @@ function __injected() {
     $VZCTL exec $CTID 'if ! cd /root/.ssh 2>/dev/null >/dev/null; then mkdir -p /root/.ssh 2>/dev/null >/dev/null || rm /root && mkdir -p /root/.ssh; chmod 0700 /root/.ssh; fi'
     pubkey=$(cat "${tmpfile}.pub")
     privkey=$(cat "${tmpfile}")
-
+    $VZCTL exec $CTID "[ -f /root/.ssh/id_rsa ] && chmod 400  /root/.ssh/id_rsa";
     if $VZCTL exec $CTID "[[ -f '/root/.ssh/id_rsa' ]]" && $VZCTL exec $CTID "ssh-keygen -l -f /root/.ssh/id_rsa" &>/dev/null && [[ "$_REGENERATE_KEY" != "yes" ]]; then
         $VZCTL exec $CTID 'grep -q "$(ssh-keygen -y -f /root/.ssh/id_rsa)" /root/.ssh/authorized_keys' || \
         $VZCTL exec $CTID "echo \"\$(ssh-keygen -y -f /root/.ssh/id_rsa) $label\" >> /root/.ssh/authorized_keys"
