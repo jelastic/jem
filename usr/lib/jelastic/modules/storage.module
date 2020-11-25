@@ -516,26 +516,26 @@ function dosetupUtils() {
     fi
 
     if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
-        vzexecRun "apt update; curl -sLO http://spacewalk.jelastic.com/pub/autofs_5.1.5-1_amd64.deb"
+        vzexecRun "apt update; curl -sLO http://repository.jelastic.com/pub/autofs_5.1.6-1j_amd64.deb"
         if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "8" ]; then
             vzexecRun "$(installPackageCmd $OS install autofs)"
-            vzexecRun "DEBIAN_FRONTEND=noninteractive dpkg -i ./autofs_5.1.5-1_amd64.deb"
+            vzexecRun "DEBIAN_FRONTEND=noninteractive dpkg -i ./autofs_5.1.6-1j_amd64.deb"
         else
-            vzexecRun "$(installPackageCmd $OS install ./autofs_5.1.5-1_amd64.deb)"
+            vzexecRun "$(installPackageCmd $OS install ./autofs_5.1.6-1j_amd64.deb)"
         fi
-        vzexecRun "rm -f autofs_5.1.5-1_amd64.deb"
+        vzexecRun "rm -f autofs_5.1.6-1j_amd64.deb"
         installCmd="$(installPackageCmd $OS install nfs-common)"
         checkCmd=$(checkPackageCmd $OS autofs nfs-common)
     elif [ "x$OS" == "xcentos" ] ; then
+        if [ "$OS_ver" -eq "8" ]; then
+           installCmd=$(installPackageCmd $OS install http://repository.jelastic.com/pub/autofs-5.1.6-1j.el8.x86_64.rpm nfs-utils)
+        fi
         if [ "$OS_ver" -eq "7" ]; then
-           installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-2j.el7.x86_64.rpm nfs-utils)
+           installCmd=$(installPackageCmd $OS install http://repository.jelastic.com/pub/autofs-5.1.6-1j.el7.x86_64.rpm nfs-utils)
         fi
         if [ "$OS_ver" -eq "6" ]; then
-           installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-2j.el6.x86_64.rpm nfs-utils)
+           installCmd=$(installPackageCmd $OS install http://repository.jelastic.com/pub/autofs-5.1.6-1j.el6.x86_64.rpm nfs-utils)
         fi
-        checkCmd=$(checkPackageCmd $OS autofs nfs-utils)
-    elif [ "x$OS" == "xfedora" ] ; then
-        installCmd=$(installPackageCmd $OS install http://spacewalk.jelastic.com/pub/autofs-5.1.5-1j.fc23.x86_64.rpm nfs-utils)
         checkCmd=$(checkPackageCmd $OS autofs nfs-utils)
     else
         installCmd=$(installPackageCmd $OS install autofs nfs-utils)
