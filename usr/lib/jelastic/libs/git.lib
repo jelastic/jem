@@ -44,10 +44,11 @@ function prepareUrl(){
 }
 
 function updateSubmodules(){
-    cd "${WEBROOT}/${PROJECT_NAME}" && {
-        [ -f .gitmodules ] && runNonInterractive "$GIT  submodule update --init --recursive" >> $JEM_CALLS_LOG 2>&1 || true;
-        return $?;
-    }
+    if [ -f "${WEBROOT}/${PROJECT_NAME}/.gitmodules" ]; then
+       cd "${WEBROOT}/${PROJECT_NAME}"; runNonInterractive "$GIT  submodule update --init --recursive" >> $JEM_CALLS_LOG 2>&1; return $?;
+    else
+        return 0;
+    fi
 }
 
 function doCheckout(){
