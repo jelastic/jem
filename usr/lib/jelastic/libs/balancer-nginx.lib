@@ -478,7 +478,7 @@ function weightChanged(){
   for c_ip in ${ip_a[@]}
   do
     OLD_VAL=$($SED '/^\s*#/d' ${NGINX_CONFIG} | tr '\n' ' ' | $SED -nre  "s/.*server\s+${c_ip}[^;.\n]*?weight=([0-9a-z ]{1,})[\s|\;| ].*/\1/p" )
-    OLD_BACKUP=$(grep -o "${c_ip}[a-z0-9= ]*;" ${NGINX_CONFIG} |grep -o "backup")
+    OLD_BACKUP=$(grep -o "${c_ip}${port_a[$count]}[a-z0-9= ]*;" ${NGINX_CONFIG} |grep -o "backup")
     [ -z "$OLD_VAL" ] && [ -z "$OLD_BACKUP" ] && {
       log "For $c_ip old value for weight not found" ;
       toActionLog "For $c_ip old value for weight not found" ;
@@ -491,7 +491,7 @@ function weightChanged(){
 
   for ((count=1; count <= ${#ip_a[@]}; count++))
   do
-        log "IP: ${ip_a[$count]}${port_a[$count]}  WEIGT:${weight_a[$count]}  OLD:${old_val[$count]} ${old_backup}"
+        log "IP: ${ip_a[$count]}${port_a[$count]}  WEIGHT: ${weight_a[$count]}  OLD: ${old_val[$count]} ${old_backup}"
         new_opts=;
         [ -z ${weight_a[$count]} ] && new_opts="${new_opts} ${backup_a[$count]}" || new_opts="${new_opts} weight=${weight_a[$count]} ${backup_a[$count]}"
         $SED -i -re "s/${ip_a[$count]}[a-z0-9:= ]*;/${ip_a[$count]}${port_a[$count]} ${new_opts};/" $NGINX_CONFIG ;
@@ -578,8 +578,8 @@ function removeHostHTD(){
     [ -z "$HOST_REMOVE" ] && { writeJSONResponseErr "result=>4065" "message=>SOURCE required" ; return 65; }
     log "Host: ${HOST_REMOVE}" ;
     MAP_HREMOVE=$( $SED -e 's/\./\\\\./g' <<< $HOST_REMOVE )
-    $PERL -i -p0e "s/server\s${HOST_REMOVE}:?[0-9]+?\s*[:a-z0-9\=]{0,}\s*;//g" $NGINX_CONFIG;
-    $PERL -i -p0e "s/~${MAP_HREMOVE}\\\\:80\\$\s*common;//g" $NGINX_CONFIG;
+    $PERL -i -p0e "s/server\s${HOST_REMOVE}:?([0-9]+)?\s*[:a-z0-9\=]{0,}\s*;//g" $NGINX_CONFIG;
+    $PERL -i -p0e "s/~${MAP_HREMOVE}\\\\:[0-9]+\\$\s*common;//g" $NGINX_CONFIG;
 
     $SED -i "/${HOST_REMOVE}\s*/d" ${UPSTREAM_COMMON_CONFIG} ;
     writeJSONResponseOut "result=>0" "message=>Ok";
