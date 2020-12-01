@@ -679,6 +679,32 @@ function swapNginxProxyProtocol(){
   writeJSONResponseOut "result=>0" "message=>Ok";
 }
 
+function setNginxProxyTimeout(){
+    VERBOSE=1
+    local temp=$(getopt -o t: -l timeout: -- $@ 2>/dev/null );
+    [[ $? != 0 ]] && die -q "Terminating...";
+    eval set -- "$temp";
+    while [ $# -gt 0 ]
+    do
+        case "$1" in
+            -t | --timeout)
+                TIMEOUT_SET=$2;
+                shift;
+                ;;
+            --)
+                shift;
+                break;
+                ;;
+        esac;
+        shift;
+    done;
+    [ -z "$TIMEOUT_SET" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
+    log "Timeout: ${TIMEOUT_SET}" ;
+
+    $SED -i -re "/(^|\s)proxy_connect_timeout\s/s/proxy_connect_timeout\s+[0-9]+s/proxy_connect_timeout ${TIMEOUT_SET}s/" $NGINX_CONFIG;
+    writeJSONResponseOut "result=>0" "message=>Ok";
+}
+
 function setConfigVariables(){
   local temp=`getopt -o -n: -l stickyname: -- "$@" 2>>"$JEM_CALLS_LOG"`
   [[ $? != 0 ]] && die -q "Terminating...";
