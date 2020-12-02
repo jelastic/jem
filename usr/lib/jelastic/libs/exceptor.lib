@@ -35,13 +35,21 @@ function ensureDiskSpaceIsOK() {
     timeout -s 9 $DF_TIMEOUT_SEC cat <(
         local disk_space_usage_critical_state=97
         local disk_inode_usage_critical_state=97
+        if [[ -f /proc/vz/version ]]; then
+            local disk_space_error=4204
+            local disk_inodes_error=4205
+            local additional_text=" on host"
+        else
+            local disk_space_error=4075
+            local disk_inodes_error=4076
+        fi
         local fstype="$(getFSType '/')"
         local disk_space_usage_percentage=$(df -h / 2>/dev/null  | tail -1 | $GREP -o [[:alnum:]]*% | $SED  's/%//g')
         local disk_inode_usage_percentage=$(df -i / 2>/dev/null  | tail -1 | $GREP -o [[:alnum:]]*% | $SED  's/%//g')
-        [ ${disk_space_usage_percentage} -lt ${disk_space_usage_critical_state} ] || { writeJSONResponseErr "result=>4075" "message=>No free diskspace"; echo 1 > $resfile; exit; }
+        [ ${disk_space_usage_percentage} -lt ${disk_space_usage_critical_state} ] || { writeJSONResponseErr "result=>$disk_space_error" "message=>No free diskspace$additional_text"; echo 1 > $resfile; exit; }
 
         [[ "${fstype}" == "reiserfs" ]] && { echo 0 > $resfile; exit; }
-        [ ${disk_inode_usage_percentage} -lt ${disk_inode_usage_critical_state} ] || { writeJSONResponseErr "result=>4076" "message=>No free inodes"; echo 1 > $resfile; exit; }
+        [ ${disk_inode_usage_percentage} -lt ${disk_inode_usage_critical_state} ] || { writeJSONResponseErr "result=>$disk_inodes_error" "message=>No free inodes$additional_text"; echo 1 > $resfile; exit; }
         echo 0 > $resfile
     )
     res=$?
