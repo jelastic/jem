@@ -25,9 +25,9 @@ inherit default exceptor;
 [ ${COMPUTE_TYPE} == "tomee" ] && COMPUTE_TYPE="tomcat" ;
 [ -e "${MANAGE_CORE_PATH}/${COMPUTE_TYPE}"-deploy.lib ] && { include ${COMPUTE_TYPE}-deploy; }
 
-[ -f /.jelenv ] && export $(grep RESTART_AFTER_DEPLOY /.jelenv 2>/dev/null | tr -d '"') >/dev/null
+[ -f /.jelenv ] && export $(grep HOT_DEPLOY /.jelenv 2>/dev/null | tr -d '"') >/dev/null
 
-RESTART_AFTER_DEPLOY=${RESTART_AFTER_DEPLOY^^}
+HOT_DEPLOY=${HOT_DEPLOY^^}
 
 function verifyUnpackedContent(){
     local context=$1
@@ -74,7 +74,7 @@ function deploy(){
     getPackageName;
     ensureFileCanBeUncompressed "${package_path}/${package_name}";
 
-    if [ "x$RESTART_AFTER_DEPLOY" != "x0" ] && [ "x$RESTART_AFTER_DEPLOY" != "xDISABLED" ] && [ "x$RESTART_AFTER_DEPLOY" != "xFALSE" ]; then
+    if [ "x$HOT_DEPLOY" != "x1" ] && [ "x$HOT_DEPLOY" != "xENABLED" ] && [ "x$HOT_DEPLOY" != "xTRUE" ]; then
         stopServiceSilent ${SERVICE} ;
     fi
 
@@ -104,7 +104,7 @@ function deploy(){
     applyPostDeploy;
     clearCache;
 
-    if [ "x$RESTART_AFTER_DEPLOY" != "x0" ] && [ "x$RESTART_AFTER_DEPLOY" != "xDISABLED" ] && [ "x$RESTART_AFTER_DEPLOY" != "xFALSE" ]; then
+    if [ "x$HOT_DEPLOY" != "x1" ] && [ "x$HOT_DEPLOY" != "xENABLED" ] && [ "x$HOT_DEPLOY" != "xTRUE" ]; then
         startServiceSilent ${SERVICE} ;
     fi
 
@@ -135,7 +135,7 @@ function renameContext(){
         echo "Wrong arguments for rename" 1>&2
         exit 1
     fi
-    if [ "x$RESTART_AFTER_DEPLOY" != "x0" ] && [ "x$RESTART_AFTER_DEPLOY" != "xDISABLED" ] && [ "x$RESTART_AFTER_DEPLOY" != "xFALSE" ]; then
+    if [ "x$HOT_DEPLOY" != "x1" ] && [ "x$HOT_DEPLOY" != "xENABLED" ] && [ "x$HOT_DEPLOY" != "xTRUE" ]; then
         stopServiceSilent ${SERVICE} ;
     fi
     applyPreRename;
@@ -151,11 +151,10 @@ function renameContext(){
 
     shopt -u dotglob;
     applyPostRename;
-    if [ "x$RESTART_AFTER_DEPLOY" != "x0" ] && [ "x$RESTART_AFTER_DEPLOY" != "xDISABLED" ] && [ "x$RESTART_AFTER_DEPLOY" != "xFALSE" ]; then
+    if [ "x$HOT_DEPLOY" != "x1" ] && [ "x$HOT_DEPLOY" != "xENABLED" ] && [ "x$HOT_DEPLOY" != "xTRUE" ]; then
         startServiceSilent ${SERVICE} ;
     fi
     verifyUnpackedContent "${newContext}";
-
 }
 
 function describeDeploy(){
