@@ -622,7 +622,7 @@ function doMount() {
     local mtype sourceIP sourceMount
     isContainerRunning ${CTID} ; running=$?
     [[ $running -ne 0 ]] && $VZCTL mount $CTID > /dev/null 2>&1
-    [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -i "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
+    [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -ci -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
     [ -f "$(vzctPath $VZ_CTID_ROOT $CONTAINER_MOUNTS_STORAGE)" ] || { touch "${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}" 2>/dev/null ; dosetupUtils ${_CTID}; }
 
     # parse connection string
