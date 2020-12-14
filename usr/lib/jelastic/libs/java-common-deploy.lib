@@ -25,10 +25,6 @@ inherit default exceptor;
 [ ${COMPUTE_TYPE} == "tomee" ] && COMPUTE_TYPE="tomcat" ;
 [ -e "${MANAGE_CORE_PATH}/${COMPUTE_TYPE}"-deploy.lib ] && { include ${COMPUTE_TYPE}-deploy; }
 
-[ -f /.jelenv ] && export $(grep HOT_DEPLOY /.jelenv 2>/dev/null | tr -d '"') >/dev/null
-
-HOT_DEPLOY=${HOT_DEPLOY^^}
-
 function verifyUnpackedContent(){
     local context=$1
     local pull_inverval_for_content=2s;
@@ -74,9 +70,7 @@ function deploy(){
     getPackageName;
     ensureFileCanBeUncompressed "${package_path}/${package_name}";
 
-    if [ "x$HOT_DEPLOY" != "x1" ] && [ "x$HOT_DEPLOY" != "xENABLED" ] && [ "x$HOT_DEPLOY" != "xTRUE" ]; then
-        stopServiceSilent ${SERVICE} ;
-    fi
+    stopServiceSilent ${SERVICE} ;
 
     if [ -e "${WEBROOT}/$context" ]
     then
@@ -104,9 +98,7 @@ function deploy(){
     applyPostDeploy;
     clearCache;
 
-    if [ "x$HOT_DEPLOY" != "x1" ] && [ "x$HOT_DEPLOY" != "xENABLED" ] && [ "x$HOT_DEPLOY" != "xTRUE" ]; then
-        startServiceSilent ${SERVICE} ;
-    fi
+    startServiceSilent ${SERVICE} ;
 
     verifyUnpackedContent "${context}";
 
@@ -135,9 +127,7 @@ function renameContext(){
         echo "Wrong arguments for rename" 1>&2
         exit 1
     fi
-    if [ "x$HOT_DEPLOY" != "x1" ] && [ "x$HOT_DEPLOY" != "xENABLED" ] && [ "x$HOT_DEPLOY" != "xTRUE" ]; then
-        stopServiceSilent ${SERVICE} ;
-    fi
+    stopServiceSilent ${SERVICE} ;
     applyPreRename;
     shopt -s dotglob;
     [ -e ${WEBROOT}/${oldContext}.war ] && mv ${WEBROOT}/${oldContext}.war  ${WEBROOT}/${newContext}.war && war_deploy_result=0 || war_deploy_result=1;
@@ -151,9 +141,7 @@ function renameContext(){
 
     shopt -u dotglob;
     applyPostRename;
-    if [ "x$HOT_DEPLOY" != "x1" ] && [ "x$HOT_DEPLOY" != "xENABLED" ] && [ "x$HOT_DEPLOY" != "xTRUE" ]; then
-        startServiceSilent ${SERVICE} ;
-    fi
+    startServiceSilent ${SERVICE} ;
     verifyUnpackedContent "${newContext}";
 }
 
