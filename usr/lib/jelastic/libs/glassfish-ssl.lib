@@ -48,7 +48,7 @@ function runAsadminCmd(){
 
 function mergeGFKeystore(){
 	[ -f "$GF_KEYSTORE" ] && rm "$GF_KEYSTORE" && cp "$GF_KEYSTORE_ORIG" "$GF_KEYSTORE";
-	[ -f "$GF_KEYSTORE" ] && $_KEYTOOL -importkeystore -srckeystore "$SSL_CONFIG_DIR/${DEFAULT_DOMAIN}.jks" -destkeystore "$GF_KEYSTORE" -srcstorepass "changeit" -deststorepass "changeit" > /dev/null  2>&1;
+	[ -f "$GF_KEYSTORE" ] && $_KEYTOOL -importkeystore -noprompt -srckeystore "$SSL_CONFIG_DIR/${DEFAULT_DOMAIN}.jks" -destkeystore "$GF_KEYSTORE" -srcstorepass "changeit" -deststorepass "changeit" > /dev/null  2>&1;
 }
 
 function setModificationDate(){
