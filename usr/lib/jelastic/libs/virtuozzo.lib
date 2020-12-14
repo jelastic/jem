@@ -44,6 +44,13 @@ function vzIsContainerExists() {
     return $?
 }
 
+
+function isVMexist(){
+    : ${1:?"Missing ENVID param"};
+    local envid=$1
+    prlctl list -H $envid &>/dev/null && return 0 || return 1
+}
+
 #
 # readFileFromCtontainer
 #

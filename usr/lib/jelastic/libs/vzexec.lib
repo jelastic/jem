@@ -28,6 +28,7 @@ declare __ERRCODE
 
 $PROGRAM 'vzctl';
 $PROGRAM 'vzlist';
+$PROGRAM 'prlctl';
 
 #__EXEC="$VZCTL exec2"
 __EXEC="/bin/bash -c "
@@ -38,6 +39,15 @@ function vzexecSetCTID() {
         __EXEC="/bin/bash -c "
     else
         __EXEC="$VZCTL exec2"
+    fi
+}
+
+vzexecSetENVID(){
+    __ENVID=$1
+    if [ -z "$__ENVID" ] ; then
+        __EXEC="/bin/bash -c "
+    else
+        __EXEC="$PRLCTL exec"
     fi
 }
 
@@ -58,6 +68,23 @@ function vzexecRun() {
     __STDERR=$(<$_tmperr)
     rm -f $_tmperr
     [[ "$VERBOSE" -gt 0 ]] && echo -e "`date +%D.%k:%M:%S.%N`: vzexec command done ($__CTID) (PID: $$): $*\n`date +%D.%k:%M:%S.%N`: vzexec stdout ($__CTID):${__STDOUT}\n`date +%D.%k:%M:%S.%N`: vzexec stderr ($__CTID):${__STDERR}" >> ${JEM_CALLS_LOG}
+    return $__ERRCODE
+}
+
+function prlExecRun() {
+    local buffer;
+
+    local _tmperr
+
+    _tmperr=$(mktemp -u --tmpdir=/tmp)
+
+    [[ "$VERBOSE" -gt 0 ]] && echo -e "`date +%D.%k:%M:%S.%N`: prlexec command start ($__CTID) (PID: $$): $*" >> ${JEM_CALLS_LOG}
+
+    __STDOUT=$( set -f ; $__EXEC $__ENVID $@ 2>$_tmperr; );
+    __ERRCODE=$?
+    __STDERR=$(<$_tmperr)
+    rm -f $_tmperr
+    [[ "$VERBOSE" -gt 0 ]] && echo -e "`date +%D.%k:%M:%S.%N`: prlexec command done ($__CTID) (PID: $$): $*\n`date +%D.%k:%M:%S.%N`: prlexec stdout ($__CTID):${__STDOUT}\n`date +%D.%k:%M:%S.%N`: prlexec stderr ($__CTID):${__STDERR}" >> ${JEM_CALLS_LOG}
     return $__ERRCODE
 }
 

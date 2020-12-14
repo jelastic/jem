@@ -29,7 +29,7 @@ function doUsage() {
 function onModLoadCallback() {
     log "Preload callback";
     local shortopts="c:,b:,n:"
-    local longopts="ctid:,cmd:,cmdbase64:"
+    local longopts="ctid:,envid:,cmd:,cmdbase64:"
 
     local temp=$(getopt -o $shortopts -l $longopts -- params "$@" 2>/dev/null);
     [[ $? != 0 ]] && die -q "Terminating...";
@@ -42,10 +42,16 @@ function onModLoadCallback() {
                 CMD=$1;
                 shift;
                 ;;
-            -c   | --ctid )
+            -c   | --ctid  )
                 shift;
                 CTID=$1;
                 vzexecSetCTID $CTID
+                shift;
+                ;;
+            --envid  )
+                shift;
+                ENVID=$1;
+                vzexecSetENVID $ENVID
                 shift;
                 ;;
             -b   | --cmdbase64 )
@@ -59,7 +65,12 @@ function onModLoadCallback() {
                 ;;
         esac;
     done;
-    [ -n "$CTID" ] && { vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; }
+    if [[ ! -z "$CTID" ]]; then
+        vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; };
+    fi
+    if [[ ! -z "$ENVID" ]]; then
+        isVMexist $ENVID || { writeJSONResponseErr "result=>4003" "message=>envid $ENVID not found"; die -q; };
+    fi
     return 0;
 }
 
@@ -156,3 +167,37 @@ function doExec3() {
     return 0
 }
 
+function doExecVM() {
+    if [ -z "$ENVID" ] ; then
+        writeJSONResponseErr "result=>99" "message=>ENVID required"
+        log "ctid required"
+        return 1
+    fi
+
+    if [ ! -z "$CMDBASE64" ] ; then
+        CMD="$(echo $CMDBASE64 | base64 -d)"
+    fi
+
+    if [ -z "$CMD" ] ; then
+        writeJSONResponseErr "result=>4008" "message=>cmd or CMDBASE64 required"
+        log "command required"
+        return 1;
+    fi
+
+     msg=""
+
+    if prlExecRun "$CMD" ; then
+        msg="Success"
+        res=0
+    else
+        msg="The operation could not be performed"
+        res=4109
+    fi
+    stout="$(vzexecGetLastStdOut)"
+    sterr="$(vzexecGetLastStdErr)"
+    stdout=$($SED -re 's/\\/\\\\/g;s/"/\\"/g' <<< "$stout")
+    stderr=$($SED -re 's/\\/\\\\/g;s/"/\\"/g' <<< "$sterr")
+    printf "{\"result\":\"%s\",\"exitcode\":\"%s\",\"message\":\"%s\",\"stdout\":\"%s\",\"stderr\":\"%s\"}\n" "$res" "$(vzexecGetLastErrCode)" "$msg" "$stdout" "$stderr"
+    return 0
+
+}
