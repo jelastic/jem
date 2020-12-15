@@ -170,7 +170,7 @@ function doExec3() {
 function doExecVM() {
     if [ -z "$ENVID" ] ; then
         writeJSONResponseErr "result=>99" "message=>ENVID required"
-        log "ctid required"
+        log "envid required"
         return 1
     fi
 
