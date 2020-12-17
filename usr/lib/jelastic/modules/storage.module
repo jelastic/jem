@@ -586,7 +586,7 @@ function dosetupUtils() {
         $GREP killproc -A2 "$(vzctPath $VZ_CTID_ROOT /etc/rc.d/init.d/autofs)" | $GREP -q 'sleep 1' || $SED -i '/killproc/{N;s/$/\n\t\tsleep 1;/}' "$(vzctPath $VZ_CTID_ROOT /etc/rc.d/init.d/autofs)"
     fi
 
-    [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -i "s/^timeout = .*/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
+    [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -ci -e "s/^timeout = .*/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
 
     if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "7" ] ; then
         [ -e "$(vzctPath $VZ_CTID_ROOT /etc/init.d/autofs)" ] && $SED -i -re 's/PROG=automount/PROG=automount\n_SYSTEMCTL_SKIP_REDIRECT="true"/' "$(vzctPath $VZ_CTID_ROOT /etc/init.d/autofs)"
