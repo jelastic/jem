@@ -108,7 +108,7 @@ function __injected() {
     $VZCTL exec $CTID "[ -f /root/.ssh/id_rsa ] && chmod 400  /root/.ssh/id_rsa";
     if $VZCTL exec $CTID "[[ -f '/root/.ssh/id_rsa' ]]" && \
         $VZCTL exec $CTID "ssh-keygen -l -f /root/.ssh/id_rsa" &>/dev/null && \
-        $VZCTL exec $CTID "! grep -q "DEK-Info:" /root/.ssh/id_rsa" && \
+        $VZCTL exec $CTID 'ssh-keygen -y -P "" -f /root/.ssh/id_rsa &>/dev/null' && \
         [[ "$_REGENERATE_KEY" != "yes" ]]; then
             $VZCTL exec $CTID "[[ -f /root/.ssh/authorized_keys ]]" && $VZCTL exec $CTID 'grep -q "$(ssh-keygen -y -f /root/.ssh/id_rsa)" /root/.ssh/authorized_keys' || \
             $VZCTL exec $CTID "echo \"\$(ssh-keygen -y -f /root/.ssh/id_rsa) $label\" >> /root/.ssh/authorized_keys"
