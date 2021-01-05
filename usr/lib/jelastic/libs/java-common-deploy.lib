@@ -144,7 +144,9 @@ function renameContext(){
     [ -e ${APPS_DIR}/${oldContext}.ear ] && mv ${APPS_DIR}/${oldContext}.ear  ${APPS_DIR}/${newContext}.ear && ear_deploy_result=0 || ear_deploy_result=1;
     [ $(( $war_deploy_result & $ear_deploy_result )) -ne 0  ] && {
         shopt -u dotglob;
-        startServiceSilent ${SERVICE} ;
+        if [ "x$HOT_DEPLOY" != "x1" ] && [ "x$HOT_DEPLOY" != "xENABLED" ] && [ "x$HOT_DEPLOY" != "xTRUE" ]; then
+            startServiceSilent ${SERVICE};
+        fi
         writeJSONResponseErr "result=>4052" "message=>Context does not exist";
         die -q;
     }
