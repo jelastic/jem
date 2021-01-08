@@ -59,11 +59,6 @@ declare -a CLOSEDPORTS;
 declare -r ERR_NO_METADATA=4080;
 CTID=0
 
-IPTABLES="$IPTABLES -w"
-IP6TABLES="$IP6TABLES -w"
-IPTABLES_RESTORE="$IPTABLES_RESTORE -w"
-IP6TABLES_RESTORE="$IP6TABLES_RESTORE -w"
-
 function _getbalancerRedirPorts() { return 0; }
 function _getapache_phpRedirPorts { return 0; }
 function _getnginx_phpRedirPorts { return 0; }
@@ -247,8 +242,48 @@ function onModLoadCallback() {
                 shift;
                 break;
                 ;;
-        esac;
-    done;
+        esac
+    done
+
+    #do we started "inside"
+    if [[ "$CTID" -eq 0 ]] ; then
+        local issue_file=/etc/issue
+        local release_files=/etc/*-release
+        issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+        OS=$(detectOS "$issue_string")
+        OS_ver=$(getOSVersion "$issue_string")
+        OS_ver=${OS_ver%%.*}
+
+        #JE-56437 {{{
+        if [ "x$OS" == "xubuntu" ] ; then
+            [ -d "$JELASTIC_RULES_DIR" ] || mkdir -p "$JELASTIC_RULES_DIR"
+            [ -e '/etc/iptables/rules.v4' ] && [ ! -L "$CUSTOM_RULES_FILE" ] && ln -s '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE
+            [ -e '/etc/iptables/rules.v6' ] && [ ! -L "$CUSTOM_6RULES_FILE" ] && ln -s '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE
+        fi
+        #}}}
+
+        if [ "x$OS" == "xcentos" -a "$OS_ver" -ge "7" ] ; then
+            IPTABLES="$IPTABLES -w"
+            IP6TABLES="$IP6TABLES -w"
+            IPTABLES_RESTORE="$IPTABLES_RESTORE -w"
+            IP6TABLES_RESTORE="$IP6TABLES_RESTORE -w"
+        fi
+    else
+        VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
+        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+
+        #JE-56437 {{{
+        local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
+        local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
+        issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+        OS=$(detectOS "$issue_string")
+        if [ "x$OS" == "xubuntu" ] ; then
+            [ -d "$(vzctPath $VZ_CTID_ROOT $JELASTIC_RULES_DIR)" ] || mkdir -p "${VZ_CTID_ROOT}${JELASTIC_RULES_DIR}"
+            vzexecRun "[ -e '/etc/iptables/rules.v4' ] && [ ! -L "$CUSTOM_RULES_FILE" ] && ln -s '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE"
+            vzexecRun "[ -e '/etc/iptables/rules.v6' ] && [ ! -L "$CUSTOM_6RULES_FILE" ] && ln -s '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE"
+        fi
+        #}}}
+    fi
     return 0
 }
 
@@ -620,10 +655,6 @@ function dofwset() {
     if ! isContainerRunning ${CTID} ; then
         running=0
         vzctl mount ${CTID} >> $ACTIONS_LOG 2>&1
-    fi
-    if [ -n "$CTID" ] ; then
-        VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
-        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
     fi
     
     [ -d "$(vzctPath $VZ_CTID_ROOT $JELASTIC_RULES_DIR)" ] || mkdir -p "${VZ_CTID_ROOT}${JELASTIC_RULES_DIR}"
