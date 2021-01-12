@@ -20,6 +20,9 @@ $PROGRAM 'grep';
 
 inherit default exceptor;
 
+TOMCAT_CONF_DIR=$TOMCAT_HOME'conf/'
+SERVERXML=$TOMCAT_CONF_DIR"server.xml"
+
 [ ! -z "$WEBROOT" -a ! -d "$WEBROOT" ] && mkdir -p ${WEBROOT};
 
 [ ${COMPUTE_TYPE} == "tomee" ] && COMPUTE_TYPE="tomcat" ;
@@ -30,6 +33,11 @@ inherit default exceptor;
 HOT_DEPLOY=${HOT_DEPLOY^^}
 
 function verifyUnpackedContent(){
+    
+    if [ -e ${SERVERXML} ]; then 
+        $GREP -q unpackWARs=[\'\"]false[\'\"] ${SERVERXML} && return 0;
+    fi 
+    
     local context=$1
     local pull_inverval_for_content=2s;
     local pull_inverval_for_directory=2s;
