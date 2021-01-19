@@ -673,8 +673,16 @@ function swapNginxProxyProtocol(){
   protocol=$1
   if [ "x${protocol}" == "xhttps" ]; then
         $SED -i -re "/(^|\s)proxy_pass\s/s/proxy_pass\s+http:\/\//proxy_pass https:\/\//" $NGINX_CONFIG;
+        [ -f "$NGINX_SSL_CONFIG" ] && \
+          $SED -i -re "/(^|\s)proxy_pass\s/s/proxy_pass\s+http:\/\//proxy_pass https:\/\//" $NGINX_SSL_CONFIG;
+        [ -f "$NGINX_SSL_CONFIG.disabled" ] && \
+          $SED -i -re "/(^|\s)proxy_pass\s/s/proxy_pass\s+http:\/\//proxy_pass https:\/\//" "$NGINX_SSL_CONFIG.disabled";
   else
         $SED -i -re "/(^|\s)proxy_pass\s/s/proxy_pass\s+https:\/\//proxy_pass http:\/\//" $NGINX_CONFIG;
+        [ -f "$NGINX_SSL_CONFIG" ] && \
+          $SED -i -re "/(^|\s)proxy_pass\s/s/proxy_pass\s+https:\/\//proxy_pass http:\/\//" $NGINX_SSL_CONFIG;
+        [ -f "$NGINX_SSL_CONFIG.disabled" ] && \
+          $SED -i -re "/(^|\s)proxy_pass\s/s/proxy_pass\s+https:\/\//proxy_pass http:\/\//" "$NGINX_SSL_CONFIG.disabled";
   fi
   writeJSONResponseOut "result=>0" "message=>Ok";
 }
