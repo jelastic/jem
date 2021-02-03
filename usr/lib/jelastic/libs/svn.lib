@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
 [ -n "${SVNLIB_VERSION:-}" ] && return 0;
 SVNLIB_VERSION="0.1";
 
@@ -25,29 +23,18 @@ $PROGRAM 'grep';
 
 function doCheckout(){
     set -f
-	rm  -Rf "${WEBROOT}/${PROJECT_NAME}";
-	set +f
-	echo -n $(date +%D.%k:%M:%S.%N ) >> "$VCS_UPDATE_LOG" 2>&1;
-	$SVN co $URL --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force "${WEBROOT}/${PROJECT_NAME}" >> "$VCS_UPDATE_LOG" 2>&1;
-	result=$?
-	[[ $result -ne 0 ]] && {
-		[ ! -d "${WEBROOT}/${PROJECT_NAME}/" ] && mkdir -p "${WEBROOT}/${PROJECT_NAME}/" 1>/dev/null 2>&1 ;
-                updateOwnership "${WEBROOT}/${PROJECT_NAME}";
-		return $result;
-	}
-	[ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
-                inherit ruby-common;
-                bundleInstall;
-        }
-	return 0;
-
-
-}
-
-function updateProject(){
-    echo -n $(date +%D.%k:%M:%S.%N ) >> "$VCS_UPDATE_LOG" 2>&1;
-    $SVN revert -R  "${WEBROOT}/${PROJECT_NAME}" > "${VCS_LOG_DIR}/deploy.log.log";
-    $SVN up "${WEBROOT}/${PROJECT_NAME}" --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force  >> "$VCS_UPDATE_LOG" 2>&1;
+    rm  -Rf "${WEBROOT}/${PROJECT_NAME}";
+    set +f
+    echo -n "$(date +%D.%k:%M:%S.%N ) "| tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG" 2>&1;
+    $SVN co $URL --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force "${WEBROOT}/${PROJECT_NAME}" >> "$ACTIONS_LOG" 2>&1;
+    result=$?
+    cat ${ACTIONS_LOG} | tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG";
+    [[ $result -ne 0 ]] && {
+        [ ! -d "${WEBROOT}/${PROJECT_NAME}/" ] && mkdir -p "${WEBROOT}/${PROJECT_NAME}/" 1>/dev/null 2>&1 ;
+        updateOwnership "${WEBROOT}/${PROJECT_NAME}";
+        echo "Host $(hostname) Repository $URL Directory ${WEBROOT}/${PROJECT_NAME}" >> $ACTIONS_LOG; 
+        { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; };
+    }
     [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
         inherit ruby-common;
         bundleInstall;
@@ -55,9 +42,26 @@ function updateProject(){
     return 0;
 }
 
+function updateProject(){
+    echo -n "$(date +%D.%k:%M:%S.%N ) "| tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG" 2>&1;
+    $SVN revert -R  "${WEBROOT}/${PROJECT_NAME}" > "${VCS_LOG_DIR}/deploy.log.log";
+    $SVN up "${WEBROOT}/${PROJECT_NAME}" --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force  >> "$ACTIONS_LOG" 2>&1;
+    result=$?;
+    cat ${ACTIONS_LOG} | tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG";
+    if [ $result -ne 0 ] ; then
+        echo "Host $(hostname) Repository $URL Directory ${WEBROOT}/${PROJECT_NAME}" >> $ACTIONS_LOG;
+        { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; };
+    else
+        [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
+            inherit ruby-common;
+            bundleInstall;
+        }
+    fi
+    return $result;
+}
+
 function getLastRepoCommit(){
     readProjectConfig;
-    #local project_name="$1";
     local last_repo_commit=$($SVN --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert info "${WEBROOT}/${PROJECT_NAME}" 2>&1 | $GREP Revision: |cut -c11-);
     [ -z "${last_repo_commit}" ] && last_repo_commit="00000000000" && LAST_DEPLOYED_COMMIT="00000000000";
     echo $last_repo_commit;
@@ -71,11 +75,13 @@ function getLastRemoteCommit(){
 }
 
 function vcsChangeUrl(){
-    mes=$($SVN switch --relocate --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force  "$OLDURL" "$URL" "${WEBROOT}/${PROJECT_NAME}/" >> $ACTIONS_LOG 2>&1);
+    echo -n "$(date +%D.%k:%M:%S.%N ) "| tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG" 2>&1;
+    $SVN switch --relocate --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force  "$OLDURL" "$URL" "${WEBROOT}/${PROJECT_NAME}/" >> $ACTIONS_LOG 2>&1;
     result=$?;
+    cat ${ACTIONS_LOG} | tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG";
     if [ $result -ne 0 ] ; then
+        echo "Host $(hostname) Repository $URL Directory ${WEBROOT}/${PROJECT_NAME}" >> $ACTIONS_LOG;
         { writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q; };
     fi
     return $result;
 }
-
