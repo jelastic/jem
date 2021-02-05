@@ -31,8 +31,8 @@ function runNonInterractive(){
         $EXPECT -c "eval spawn \"$command\" ; expect -timeout 60 -re U { send \r } ; expect -timeout 60 -re "Pass" { send \r }  ; interact;" | tee -a $VCS_UPDATE_LOG > $F_ERR_HANDLER  2>/dev/null || $EXPECT -c "eval spawn $command >> $VCS_UPDATE_LOG ; " | tee -a $VCS_UPDATE_LOG > $F_ERR_HANDLER  2>/dev/null;
         [ -f $F_ERR_HANDLER ] && ERR_HANDLER=$(<$F_ERR_HANDLER) && rm $F_ERR_HANDLER;
         [[ $ERR_HANDLER == *fatal:* || $ERR_HANDLER == *error:* ]] && {
-            echo "Host $(hostname) Repository $URL Directory ${WEBROOT}/${PROJECT_NAME}" >> $ACTIONS_LOG
-            echo "$ERR_HANDLER"  >> $ACTIONS_LOG 2>/dev/null;
+            echo "NodeId $(hostname |grep -o "node[0-9]*") Host $(hostname) URL $URL Directory ${WEBROOT}/${PROJECT_NAME}" >> $ACTIONS_LOG
+            echo "$ERR_HANDLER" | grep -i -v "Password" >> $ACTIONS_LOG 2>/dev/null;
             if [ ${COMPUTE_TYPE} == "apache-ruby" -o ${COMPUTE_TYPE} == "nginx-ruby" ] ; then 
                 [ ! -d "${WEBROOT}/${PROJECT_NAME}/" ] && mkdir -p "${WEBROOT}/${PROJECT_NAME}/" 1>/dev/null 2>&1 ; # TODO: add git url validation
                 updateOwnership "${WEBROOT}/${PROJECT_NAME}";
@@ -41,5 +41,5 @@ function runNonInterractive(){
         } || { 
             return 0; 
         }
-        ##### laster need to be moved to git.lib
+        ##### later needs to be moved to git.lib
 }
