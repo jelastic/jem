@@ -262,7 +262,7 @@ function checkMount() {
     esac
 
     retries=5
-    cmdShowmount='showmount -e '$1' 2>/dev/null | grep "'$2'"'
+    cmdShowmount='showmount -e '$1' | grep "'$2'"'
 
     localCIPs=($(getTargetIPs $CTID))
 
@@ -310,7 +310,7 @@ function processnfs() {
 
     isContainerRunning ${CTID} ; running=$?
     if [[ $running -ne 0 ]] ; then
-        log "Container $CTID is not running. Mounting"
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> ${JEM_CALLS_LOG}
         $VZCTL mount $CTID > /dev/null 2>&1
     fi
 
@@ -322,9 +322,13 @@ function processnfs() {
     OS_ver=${OS_ver%%.*}
 
     if [[ "x$OS" == "xalpine" ]] ; then
-        log "OS is ALPINE"
-        if [[ ! -e "$(vzctPath $VZ_CTID_ROOT $MOUNTPROG_APK)" ]] ; then
-            dosetupUtils ${_CTID} || return 2
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. " >> ${JEM_CALLS_LOG}
+
+        if vzexecRun "[[ ! -e \"$MOUNTPROG_APK\" ]]" ; then
+            if ! dosetupUtils ${_CTID} ; then
+                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Error installing utils $(gatherCTInfo) " >> ${JEM_CALLS_LOG}
+                return 2
+            fi
         fi
 
         [[ ! -z "${CTID}" ]] && {
@@ -347,6 +351,7 @@ function processnfs() {
 
     if [[ $running -eq 0 ]] ; then
         if ! checkMount $sourceIP "$sourceMountUnEsc" ; then
+            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Destination NFS server is not reachable. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
             echo "Destination NFS server is not reachable. Server IP: $(vzctl exec2 ${CTID} host ${sourceIP} 2>/dev/null), Client IP: $($AWK '/[ \t]*'${CTID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo )"
             return 1
         fi
@@ -354,14 +359,15 @@ function processnfs() {
 
     if ! preparePath "${_DESTINATION}" "${_CTID}" ; then
         echo "Can not create path ${_DESTINATION}"
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Can not create path ${_DESTINATION}. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1
     fi
 
     if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
-        log "registering ${sourceIP}:${sourceMount} in ${_CTID}"
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : registering ${sourceIP}:${sourceMount} in ${_CTID}" >> ${JEM_CALLS_LOG}
         out=$(echo -e $mntEntry >> ${MOUNTS_STORAGE})
         if [[ ! -z "${out}" ]] ; then
-           log "$out"
+            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : $out" >> ${JEM_CALLS_LOG}
         fi
     fi
 
@@ -386,6 +392,7 @@ function processnfs() {
                     fi
                     log $out
                     msg="${msg}. Server IP is: $(host ${sourceIP}), RPC connection: $(timeout 1 bash -c "cat < /dev/null > /dev/tcp/${sourceIP}/111" 2>/dev/null; echo $?)"
+                    echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Error mounting share. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
                     res=4111
                 else
                     res=0
@@ -601,6 +608,19 @@ function dosetupUtils() {
     return 0
 }
 
+function gatherCTInfo() {
+    isContainerRunning $CTID || {
+        echo "Container $CTID is not running"
+    }
+
+    _ctAutoFSFile="$(vzexecRun " [ -e \"/etc/autofs.conf\" ] && cat $MOUNTS_STORAGE || echo \"/etc/autofs.conf not found\""; vzexecGetLastStdOut)"
+    _ctFstab="$(vzexecRun " [ -e \"/etc/fstab\" ] && cat /etc/fstab || echo \"/etc/fstab not found\""; vzexecGetLastStdOut)"
+    _ctIptablesRules="$(vzexecRun "iptables -S"; vzexecGetLastStdOut)"
+    _ctIpInfo="$(vzexecRun "ip a l; ip r l; cat /etc/resolvconf" ; vzexecGetLastStdOut)"
+
+    echo -e "\n`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID \n=====\nContainer $CTID Info:\nautofs:\n$_ctAutoFSFile\nfstab:\n$_ctFstab\nip info:\n$_ctIpInfo\niptables:\n$_ctIptablesRules\n=====\n"
+}
+
 function doMount() {
     [[ -z ${_SOURCE} && -z ${_DESTINATION} ]] && {
         out=$($EXEC "mount -a" 2>&1)
@@ -620,9 +640,15 @@ function doMount() {
 
     local mtype sourceIP sourceMount
     isContainerRunning ${CTID} ; running=$?
-    [[ $running -ne 0 ]] && $VZCTL mount $CTID > /dev/null 2>&1
-    [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -ci -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
-    [ -f "$(vzctPath $VZ_CTID_ROOT $CONTAINER_MOUNTS_STORAGE)" ] || { touch "${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}" 2>/dev/null ; dosetupUtils ${_CTID}; }
+    if [[ $running -ne 0 ]] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> ${JEM_CALLS_LOG}
+        $VZCTL mount $CTID > /dev/null 2>&1
+    fi
+
+    vzexecRun " [ -e \"/etc/autofs.conf\" ] && sed -ci -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
+    if ! vzexecRun " [ -f \"$CONTAINER_MOUNTS_STORAGE\" ] || { touch \"$CONTAINER_MOUNTS_STORAGE\" 2>/dev/null; false; }" ; then
+        dosetupUtils $_CTID
+    fi
 
     # parse connection string
     _SOURCE="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< "$_SOURCE")"
@@ -630,7 +656,7 @@ function doMount() {
     mtype=${mtype,,}
     atype=${atype,,}
     atype=$($SED -re 's/;//g' <<< $atype)
-    log "protocol=${mtype} source=${sourceIP} sourceMount=${sourceMount}"
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - protocol=${mtype} source=${sourceIP} sourceMount=${sourceMount}" >> ${JEM_CALLS_LOG}
     [[ -z "${mtype}" ]] && mtype="nfs"
 
     # for local mounts (bind)

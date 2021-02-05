@@ -131,9 +131,9 @@ function dosetupUtils() {
         fi
     }
 
-    if [[ ! -e "${MOUNTPACKAGE}" ]] ; then
-        log "${MOUNTPACKAGE} not found!"
-        exit 1;
+    if [[ ! -e "$MOUNTPACKAGE" ]] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error installing unfsd. $MOUNTPACKAGE not found" >> ${JEM_CALLS_LOG}
+        return 1
     fi
 
     local addPackages=""
@@ -156,11 +156,15 @@ function dosetupUtils() {
 
     #JE-25896
     if [ "x$OS" == "xalpine" ] ; then
-        writeJSONResponseErr "result=>4112" "message=>NFS: Alpine linux is not supported"
+        writeJSONResponseErr "result=>4112" "message=>NFS: Alpine Linux is not supported"
         return $FALSE
     fi
     if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "5" ] ; then
-        writeJSONResponseErr "result=>4112" "message=>NFS: Centos 5 is not supported"
+        writeJSONResponseErr "result=>4112" "message=>NFS: CentOS 5 is not supported"
+        return $FALSE
+    fi
+    if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
+        writeJSONResponseErr "result=>4112" "message=>NFS: CentOS 6 is not supported"
         return $FALSE
     fi
     if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "6" ] ; then
@@ -168,11 +172,12 @@ function dosetupUtils() {
         return $FALSE
     fi
 
-    $TAR hzxf "${MOUNTPACKAGE}" -C "$VZ_CTID_ROOT/"
+    $TAR hzxf "$MOUNTPACKAGE" -C "$VZ_CTID_ROOT/"
 
     # install systemD unit
     [[ -d "$(vzctPath $VZ_CTID_ROOT /lib/systemd/system)" ]] && echo "$SystemDUnit" > "$(vzctPath $VZ_CTID_ROOT /lib/systemd/system/unfsd.service)"
-    isContainerRunning ${CTID} && {
+
+    isContainerRunning $CTID && {
         vzexecRun "$installCmd"
 
         #log output from package manager
@@ -200,24 +205,30 @@ function dosetupUtils() {
             fi
         fi
 
-        vzexecRun "[ -f /etc/init.d/rpcbind ] && /etc/init.d/rpcbind restart"
-        vzexecRun "systemctl restart rpcbind"
-        vzexecRun 'sname="rpcbind.service"; srv="/lib/systemd/system/$sname"; [ -f "$srv" ] && ln -s $srv "/etc/systemd/system/multi-user.target.wants/$sname"'
-        vzexecRun 'sname="rpcbind.target"; srv="/lib/systemd/system/$sname"; [ -f "$srv" ] && ln -s $srv "/etc/systemd/system/multi-user.target.wants/$sname"'
-        vzexecRun "systemctl enable unfsd"
-        vzexecRun 'sed -i "s/\/usr\/sbin\/unfsd/\/sbin\/unfsd/g" /etc/init.d/unfsd.jelastic'
-        vzexecRun 'sed -i "s/\/usr\/sbin\/unfsd/\/sbin\/unfsd/g" /etc/rc.d/init.d/unfsd.jelastic'
-        if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xsuse" ] ; then
-            vzexecRun "chkconfig --level 345 rpcbind on"
-            vzexecRun "chkconfig --level 345 unfsd.jelastic on"
+
+        if ! vzexecRun "$_INSTALLUNFSDCMD" ; then
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error installing unfsd." >> ${JEM_CALLS_LOG}
+            return 1
         fi
-        vzexecRun "/etc/init.d/unfsd.jelastic start"
     }
-    return $TRUE
+    return 0
+}
+
+function gatherCTInfo() {
+    isContainerRunning $CTID || {
+        echo "Container $CTID is not running"
+    }
+
+    _ctExportsFile="$(vzexecRun "[[ -e $CONTAINER_EXPORTS_FILE ]] && cat $CONTAINER_EXPORTS_FILE || echo \"$CONTAINER_EXPORTS_FILE not found\""; vzexecGetLastStdOut)"
+    _ctIptablesRules="$(vzexecRun "iptables -S"; vzexecGetLastStdOut)"
+    _ctIpInfo="$(vzexecRun "ip a l; ip r l" ; vzexecGetLastStdOut)"
+
+    echo -e "\n`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID \n=====\nContainer $CTID Info:\nexports:\n$_ctExportsFile\nip info:\n$_ctIpInfo\niptables:\n$_ctIptablesRules\n=====\n"
 }
 
 function _adjustFirewall() {
     isContainerRunning ${CTID} || return $FALSE;
+
     vzexecRun "jem firewall isEnabled"
     fwstatus=$(vzexecGetLastErrCode)
     if [[ "$fwstatus" -gt 0 ]] ; then
@@ -233,40 +244,31 @@ function _adjustFirewall() {
             if [[ "${#NFSIPS[@]}" -gt 0 ]] ; then
                 for nfsip in ${NFSIPS[@]} ; do
                     if [ "$nfsip" == "*" ] ; then
-                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j ACCEPT"
-                        vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -j ACCEPT"
-                        vzexecRun "$IPT -I INPUT -p tcp -m multiport --dports 111,2049 -j ACCEPT"
-                        vzexecRun "$IPT -I INPUT -p udp -m multiport --dports 111,2049 -j ACCEPT"
+                        # whole network requested
+                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j ACCEPT; $IPT -D INPUT -p udp -m multiport --dports 111,2049 -j ACCEPT; $IPT -I INPUT -p tcp -m multiport --dports 111,2049 -j ACCEPT; $IPT -I INPUT -p udp -m multiport --dports 111,2049 -j ACCEPT"
 
                         #all network exported
                         __allnetwork=1
                         break
                     else
                         #remove rule if already exists
-                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
-                        vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT; $IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
                         #add new rule for selected IP
-                        vzexecRun "$IPT -I INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
-                        vzexecRun "$IPT -I INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                        vzexecRun "$IPT -I INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT; $IPT -I INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
                     fi
                 done
             fi
-            vzexecRun "$IPT -D INPUT -i lo -j ACCEPT"
-            vzexecRun "$IPT -I INPUT -i lo -j ACCEPT"
+            vzexecRun "$IPT -D INPUT -i lo -j ACCEPT; $IPT -I INPUT -i lo -j ACCEPT"
 
             if [[ "$__allnetwork" -eq 0 ]] ; then
-                vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -j DROP"
-                vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
-
                 #DROP ALL OTHER SOURCES
-                vzexecRun "$IPT -A INPUT -p udp -m multiport --dports 111,2049 -j DROP"
-                vzexecRun "$IPT -A INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
+                vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -j DROP; $IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
+                vzexecRun "$IPT -A INPUT -p udp -m multiport --dports 111,2049 -j DROP; $IPT -A INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
             fi
 
             vzexecRun "service iptables save"
             #JE-26417
-            vzexecRun "[ -x /etc/init.d/iptables-persistent ] && /etc/init.d/iptables-persistent save"
-            vzexecRun "[ -x /etc/init.d/netfilter-persistent ] && /etc/init.d/netfilter-persistent save"
+            vzexecRun "[ -x /etc/init.d/iptables-persistent ] && /etc/init.d/iptables-persistent save ; [ -x /etc/init.d/netfilter-persistent ] && /etc/init.d/netfilter-persistent save"
         fi
         set +f
     else
@@ -318,29 +320,27 @@ function _checkConfigs() {
     local UNFSDBIN='/sbin/unfsd'
     local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
     
-    [[ ! -e "$(vzctPath $VZ_CTID_ROOT /etc/exports)" ]] && return 1
+    vzexecRun "[[ ! -e '/etc/exports' ]]" && return 1
     validateExports "$(vzctPath $VZ_CTID_ROOT /etc/exports)" || return 1
 
-    isContainerRunning ${CTID} && {
+    isContainerRunning $CTID && {
         local computetype="$( [ -e "$_metainf" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "$_metainf")"
         if [[ "xstorage" == "x$computetype" ]] ; then
-            if [[ ! -e "${VZ_CTID_ROOT}${MOUNTPROG}" ]] ; then
-                return $TRUE
-            fi
+            vzexecRun "[[ ! -e $MOUNTPROG ]]" && return 0
         fi
 
         vzexecRun "$UNFSDBIN -T"
         errCode=$(vzexecGetLastErrCode)
-        [[ "$errCode" -ne 0 ]] && return $FALSE
+        [[ "$errCode" -ne 0 ]] && return 1
     }
-    return $TRUE
+    return 0
 }
 
 function _nfsReexport() {
     local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
     log "ReExporting shares"
     _checkConfigs || {
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. exports:$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports))" >> ${JEM_CALLS_LOG}
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1
     }
     _adjustFirewall
@@ -348,12 +348,12 @@ function _nfsReexport() {
     isContainerRunning ${CTID} && {
         local computetype="$( [ -e "$_metainf" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "$_metainf")"
         if [[ "xstorage" == "x$computetype" ]] ; then
-            if [[ ! -e "${VZ_CTID_ROOT}${MOUNTPROG}" ]] ; then
+            if vzexecRun "[[ ! -e $MOUNTPROG ]]" ; then
                 vzexecRun "exportfs -ra"
                 local err=$(vzexecGetLastStdErr)
                 [[ -z "${err// }" ]] && return $TRUE
 
-                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. exports:$(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
+                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. exports:$(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
                 return 1
             fi
         fi
@@ -538,29 +538,56 @@ function _addNativeip() {
 
     if [ -e "${EXPORTS_FILE}" ] ; then
         dPath="\"$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< $destinationPath)\"\s+"
-        aCurrentIPs=($(grep -E "$dPath" "${EXPORTS_FILE}" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])(\/[0-9]{2})?'))
+        if [[ $running -ne 0 ]] ; then
+            if vzexecRun "grep -E \"$dPath\" \"$CONTAINER_EXPORTS_FILE\"" ; then
+                aCurrentIPs=($(vzexecGetLastStdOut | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])(\/[0-9]{2})?'))
+            fi
+        else
+            aCurrentIPs=($(grep -E "$dPath" "$EXPORTS_FILE" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])(\/[0-9]{2})?'))
+        fi
     fi
 
     log "Adding IPs to exports file (${EXPORTS_FILE})"
     for i in "${IPLIST[@]}" ; do
         isValidIP $i || continue
-        if [[ -f "$(vzctPath $VZ_CTID_ROOT ${destinationPath})" ]] ; then
-            writeJSONResponseOut "result=>4150" "message=>Exporting regular file is not supported" ;
-            return $FALSE
-        fi
 
-        [[ ! -d "$(vzctPath $VZ_CTID_ROOT ${destinationPath})" ]] && [ ! -L "${VZ_CTID_ROOT}${destinationPath}" ] && {
-            if [[ $_createPath -eq 1 ]] ; then
-                if [[ $_isFUSE -eq 1 ]]; then
-                    if isContainerRunning ${CTID} ; then
-                        vzexecRun "mkdir -p ${destinationPath}; chmod 0777 ${destinationPath}"
-                    fi
-                else
+        if [[ $running -ne 0 ]] ; then
+            # container is mounted, but not running. Try to perform operations directly on mounted fs
+            # ---------------------------------------------------------------------------------------
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> ${JEM_CALLS_LOG}
+
+            if [[ -f "$(vzctPath $VZ_CTID_ROOT ${destinationPath})" ]] ; then
+                writeJSONResponseOut "result=>4150" "message=>Exporting regular files via NFS is not supported. Please export directory" ;
+                return $FALSE
+            fi
+
+            [[ ! -d "$(vzctPath $VZ_CTID_ROOT ${destinationPath})" ]] && [ ! -L "${VZ_CTID_ROOT}${destinationPath}" ] && {
+                if [[ $_createPath -eq 1 ]] ; then
+                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - creating directory ${VZ_CTID_ROOT}${destinationPath} " >> ${JEM_CALLS_LOG}
                     mkdir -p "${VZ_CTID_ROOT}${destinationPath}"
                     chmod 0777 "${VZ_CTID_ROOT}${destinationPath}"
                 fi
+            }
+
+        else
+            # container is running. use vzctl
+            # ---------------------------------------------------------------------------------------
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is running. Performing all operations via vzctl" >> ${JEM_CALLS_LOG}
+            if vzexecRun "[[ -f \"$destinationPath\" ]]" ; then
+                writeJSONResponseOut "result=>4150" "message=>Exporting regular files via NFS is not supported. Please export directory" ;
+                return $FALSE
             fi
-        }
+
+            if vzexecRun "[[ ! -d \"$destinationPath\" ]] && [ ! -L \"$destinationPath\" ]" ; then
+                if [[ $_createPath -eq 1 ]] && [[ $_isFUSE -eq 1 ]] ; then
+                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - creating directory $destinationPath" >> ${JEM_CALLS_LOG}
+                    if ! vzexecRun "mkdir -p \"$destinationPath\" && chmod 0777 \"$destinationPath\"" ; then
+                        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - Error creating directory: $(vzexecGetLastStdErr; vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG}
+                    fi
+                fi
+            fi
+        fi
+
         if [[ -z $(indexOf "${aCurrentIPs[*]}" "$i") ]] ; then
             log "${DESTINATION}\t${i}${DEFAULTEXPORTOPT}"
             [[ "x${accessMode}" == "xro" ]] && DEFAULTEXPORTOPT=$($SED -re 's/,rw,/,ro,/g' <<< $DEFAULTEXPORTOPT)
@@ -568,19 +595,30 @@ function _addNativeip() {
             if [[ $_version -eq 4 ]] ; then
                 [[ ! -z "$_UUID" ]] && _opts="$DEFAULTEXPORTOPT,fsid=$_UUID"
             fi
-            echo -e "\"${destinationPath}\"\t${i}($_opts)" >> "${EXPORTS_FILE}"
+
+            if [[ $running -ne 0 ]] ; then
+                echo -e "\"${destinationPath}\"\t$i($_opts)" >> "${EXPORTS_FILE}"
+            else
+                if ! vzexecRun "\"\"${destinationPath}\"\t$i($_opts)\">> $CONTAINER_EXPORTS_FILE" ; then
+                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error adding entry. Error: $(vzexecGetLastStdErr; vzexecGetLastStdOut). $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+                fi
+            fi
+
             _done=1
         else
-            log "${i} already in list"
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - entry for $i already exists" >> ${JEM_CALLS_LOG}
             _done=1
         fi
     done
 
     if [[ $running -ne 0 ]] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - umounting container" >> ${JEM_CALLS_LOG}
         $VZCTL umount $CTID > /dev/null 2>&1
     else
         if [[ $_done -eq 1 ]] ; then
             if ! _nfsReexport ; then
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - ReExporting data fail. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+
                 _removeNativeip
                 writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
                 return 1
@@ -588,7 +626,7 @@ function _addNativeip() {
 
             if [ -z "$JELASTIC_CHECK_MOUNT" ]; then
                 if ! vzexecRun "rpcinfo -p $1 | grep -q mountd" ; then
-                    log "mountd procedures not found on RPC server. Checking remote share will be disabled"
+                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - mountd procedures not found on RPC server. Checking remote share will be disabled" >> ${JEM_CALLS_LOG}
                     JELASTIC_CHECK_MOUNT=0
                 fi
                 JELASTIC_CHECK_MOUNT=1
@@ -596,22 +634,24 @@ function _addNativeip() {
 
             case "$JELASTIC_CHECK_MOUNT" in
                 false|0)
-                    log "remote server checking disabled for CTID $CTID"
+                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - remote server checking disabled" >> ${JEM_CALLS_LOG}
                     return 0
                     ;;
                 true|1)
-                    log "remote server checking enabled for CTID $CTID"
+                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - remote server checking enabled" >> ${JEM_CALLS_LOG}
                     ;;
             esac
 
             retries=5
-            vzexecRun "showmount -e 127.0.0.1 2>/dev/null | grep -qP \"$IPLIST\""
+            vzexecRun "showmount -e 127.0.0.1 | grep -qP \"$IPLIST\""
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - showmount $(vzexecGetLastStdErr; vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG}
+
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: checking exports" >> ${JEM_CALLS_LOG};
             while [[ $retries -gt 0 ]] ; do
                 if [[ "$(vzexecGetLastErrCode)" -gt 0 ]]; then
                     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: $(vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG};
                     sleep 4
-                    vzexecRun "showmount -e 127.0.0.1 2>/dev/null | grep -qP \"$IPLIST\""
+                    vzexecRun "showmount -e 127.0.0.1 | grep -qP \"$IPLIST\""
                     retries=$((retries-1))
                 else
                     [[ $_isFUSE -eq 1 ]] && _isFUSE="true" || _isFUSE="false"
@@ -622,12 +662,12 @@ function _addNativeip() {
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: timeout has elapsed" >> ${JEM_CALLS_LOG};
             lasterr=$(vzexecGetLastErrCode)
             if [[ "$lasterr" -ne 0 ]] ; then
-                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID showmount fails. exports: $(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
+                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID showmount fails. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
                 writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
             fi
             return $lasterr
         else
-            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID Error adding export entry. exports: $(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
+            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID Error adding export entry. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
             writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
         fi
     fi
@@ -671,7 +711,7 @@ function _removeNativeip() {
     fi
 
     _checkConfigs || {
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _checkConfigs failed. exports: $(cat $(vzctPath $VZ_CTID_ROOT /etc/exports)) | $err " >> ${JEM_CALLS_LOG}
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _checkConfigs failed. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
         writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" 
         return $FALSE
     }
@@ -683,10 +723,11 @@ function _removeNativeip() {
         if [ ! -z "$IPT" ] ; then
            for i in "${IPLIST[@]}" ; do
                 isValidIP $i || continue
-                log "removing ${i} from ${EXPORTS_FILE}"
-                $SED -i -re "/\"?$DESTINATION\"?\s+${i//./\\.}/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
-                vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $i -j ACCEPT"
-                vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $i -j ACCEPT"
+                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i | $err " >> ${JEM_CALLS_LOG}
+                if ! vzexecRun "sed -i -re \"/\"?$DESTINATION\"?\s+${i//./\\.}/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}\" $CONTAINER_EXPORTS_FILE" ; then
+                    echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID error removing $i " >> ${JEM_CALLS_LOG}
+                fi
+                vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $i -j ACCEPT; $IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $i -j ACCEPT"
             done
         fi
         #JE-26420
@@ -698,7 +739,7 @@ function _removeNativeip() {
     else
         for i in "${IPLIST[@]}" ; do
             isValidIP $i || continue
-            log "removing ${i} from ${EXPORTS_FILE}"
+            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i | $err " >> ${JEM_CALLS_LOG}
             $SED -i -re "/\"?$DESTINATION\"?\s+/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
         done
     fi
@@ -825,4 +866,18 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 Alias=unfsd.service
+EOF
+
+defineBigInline _INSTALLUNFSDCMD <<'EOF'
+if [ -d /run/systemd/system ] ; then
+    systemctl restart rpcbind
+    systemctl enable unfsd
+else
+    [ -f /etc/init.d/rpcbind ] && /etc/init.d/rpcbind restart
+    sed -i "s/\/usr\/sbin\/unfsd/\/sbin\/unfsd/g" /etc/init.d/unfsd.jelastic
+    sed -i "s/\/usr\/sbin\/unfsd/\/sbin\/unfsd/g" /etc/rc.d/init.d/unfsd.jelastic
+    chkconfig --level 345 rpcbind on
+    chkconfig --level 345 unfsd.jelastic on
+    /etc/init.d/unfsd.jelastic start
+fi
 EOF
