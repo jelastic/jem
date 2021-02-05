@@ -429,14 +429,14 @@ function processlocal() {
     local mntEntry="${sourceMount}\t${_DESTINATION}\tnone\trw,bind\t0\t0"
 
     if [ -z "$_CTID" ] ; then
-        log "there is no CTID. Local mounts available only via hardnode call"
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : there is no CTID. Local mounts available only via hardnode call $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         echo "CTID required"
         return 1;
     fi
 
     isContainerRunning ${CTID} ; running=$?
     [[ $running -ne 0 ]] && {
-        log "Container $CTID is not running. Mounting"
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Container $CTID is not running. Mounting" >> ${JEM_CALLS_LOG}
         $VZCTL mount $CTID > /dev/null 2>&1
     }
 
@@ -448,12 +448,12 @@ function processlocal() {
 
     if [[ ${#aCurrentMounts[@]} -gt 0 ]] ; then
         if indexOf "${aCurrentMounts[*]}" "${sourceMount}" >/dev/null; then
-            log "${sourceMount} already mounted"
+            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : ${sourceMount} already mounted" >> ${JEM_CALLS_LOG}
             echo "already mounted"
             return 0;
         fi
     else
-        log "cannot get fstab entries"
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : cannot get fstab entries" >> ${JEM_CALLS_LOG}
     fi
 
     if ! preparePath "${_DESTINATION}" 1 ; then
@@ -474,6 +474,7 @@ function processlocal() {
     fi
 
     if [[ "$_MOVEDATA" -gt 0 ]] ; then
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : moving data from $hnDstPath to $hnSrcPath" >> ${JEM_CALLS_LOG}
         $RSYNC -aP --force "${hnDstPath}/" "${hnSrcPath}/" >> $ACTIONS_LOG 2>&1
         rm -fr "${hnDstPath}/*" >> $ACTIONS_LOG 2>&1
     fi
@@ -487,7 +488,7 @@ function processlocal() {
     fi
     res=$?
     if [[ $res -gt 0 ]]; then
-        log "error mounting share"
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : error mounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1;
     fi
     return 0;
@@ -744,6 +745,7 @@ function doUmount() {
                 [[ ! -z "${out}" ]] && log "${out}";
                 retfunc="writeJSONResponseOut result=>0"
             else
+                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : error umounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
                 retfunc="writeJSONResponseErr result=>99"
             fi
         else
