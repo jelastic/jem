@@ -531,6 +531,11 @@ function doRemount() {
 }
 
 function dosetupUtils() {
+    if ! isContainerRunning $CTID ; then
+        writeJSONResponseErr "result=>4110" "message=>Can not execute command. Container is not running"
+        return 1
+    fi
+
     local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
     local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
 
@@ -645,11 +650,12 @@ function doMount() {
     if [[ $running -ne 0 ]] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> ${JEM_CALLS_LOG}
         $VZCTL mount $CTID > /dev/null 2>&1
-    fi
-
-    vzexecRun " [ -e \"/etc/autofs.conf\" ] && sed -ci -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
-    if ! vzexecRun " [ -f \"$CONTAINER_MOUNTS_STORAGE\" ] || { touch \"$CONTAINER_MOUNTS_STORAGE\" 2>/dev/null; false; }" ; then
-        dosetupUtils $_CTID
+        [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -ci -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
+    else
+        vzexecRun " [ -e \"/etc/autofs.conf\" ] && sed -ci -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
+        if ! vzexecRun " [ -f \"$CONTAINER_MOUNTS_STORAGE\" ] || { touch \"$CONTAINER_MOUNTS_STORAGE\" 2>/dev/null; false; }" ; then
+            dosetupUtils $_CTID
+        fi
     fi
 
     # parse connection string
