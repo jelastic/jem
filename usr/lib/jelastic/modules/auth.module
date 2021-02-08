@@ -33,12 +33,9 @@ VERBOSE=1
 EXPORTS_PATH="/etc/exports"
 EXPORTS_EXT=""
 CONTAINER_EXPORTS_FILE="${EXPORTS_PATH}${EXPORTS_EXT}"
-CONTAINER_NFS_CONFIG_FILE="/etc/ganesha/ganesha.conf"
-CONTAINER_NFS_CONFIG_DIR="/etc/ganesha"
-NFS_CONFIG_DIR="/etc/ganesha"
-NFS_CONFIG_FILE="/etc/ganesha/ganesha.conf"
+NFS_CONFIG_DIR="/etc"
 DEFAULTEXPORTOPT="async,rw,no_subtree_check,no_root_squash"
-NFS_BACKEND="Native"  #posible values native,ganesha
+NFS_BACKEND="Native"
 _NFS_VERSION=3
 MOUNTPROG="/sbin/unfsd"
 MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-server.tar.gz"
@@ -378,111 +375,6 @@ function doRestart() {
     return 0
 }
 
-function getGaneshaCfgValue() {
-    local cfgFile="$1"
-    local key=$2
-    cfgFile=("${cfgFile[*]//\}/$'\n'\}}")
-    cfgFile=("${cfgFile[*]//{/{$'\n'}")
-    cfgFile=("${cfgFile[*]//\    =/=}")
-    cfgFile=("${cfgFile[*]//=\   /=}")
-    cfgFile=("${cfgFile[*]//\ =\ /=}")
-    local result=$($SED -re "/$key/!d" <<< "${cfgFile:0:${#cfgFile}}" | $SED -re "/#.*$key/d" | $SED -re "s/.*($key=([^;]*)).*/\2/g")
-    log "$key = $result"
-    echo "${result}"
-}
-
-function getGaneshaLastExportedID() {
-    OLDIFS=$IFS;IFS=$'\n'
-    local configFiles=($(find "${NFS_CONFIG_DIR}/jelastic" -type f))
-    IFS=$OLDIFS
-    local IDS=()
-    local result=0
-    for (( i=0; i<${#configFiles[@]}; i++ )); do
-        log "getting export_id from ${configFiles[$i]}"
-        IDS=(${IDS[*]} $(getGaneshaCfgValue "$(<"${configFiles[$i]}")" "Export_Id"))
-    done
-    [[ ! -z "${IDS[*]}" ]] && {
-        _ids="${IDS[*]}"
-        result=$(sort -r <<< "${_ids//\ /$'\n'}" | head -n 1)
-        log "lastis is $result"
-    }
-    echo "${result}"
-}
-
-function makeConfigFileName() {
-    local _path="${1}"
-    _path="${_path[*]//\//_}"
-    _path="${_path[*]// /_}.conf"
-    echo "${_path}"
-}
-
-function replaceGaneshaClientsBlock() {
-    local _config="${1}"
-    local _newClients="${2}"
-    [[ -e "${_config}" ]] && return 1
-
-    _newClients=${_newClients//\}/\\\}}
-    _newClients=${_newClients//\{/\\\{}
-    _newClients=${_newClients////\\/}
-    _newClients=${_newClients//$'\n'/\\n}
-    re='0,/\}/s//\}\n'$_newClients'\n/'
-
-    $SED -i -re "/CLIENT/d" "$_config"
-    $SED -i -re "$re" "$_config"
-    return $?
-}
-
-
-function _addGaneshaip() {
-    if [[ -z "${IPLIST[*]}" ]] ; then
-        log "ADD: Empty ip list. Nothing to do. Exiting";
-        return;
-    fi
-    local aCurrentIPs=()
-
-    eval "$(sed -re "/^R[OW]:.*/{s/^((RO|RW):)?(\/.*)/accessMode='\2';destinationPath='\3'/g;ta};s/^(\/.*)/destinationPath='\1'/g;ta;s/(.*)/errValue='\1'/;q1;:a;q0;" <<< "$DESTINATION")"
-    [[ -z "$errValue" ]] && {
-        writeJSONResponseErr "result=>4066" "message=>Wrong param. DESTINATION required" ;
-        return 1;
-    }
-    _destPath="${NFS_CONFIG_DIR}/jelastic/$(makeConfigFileName "$destinationPath")"
-    [[ -z "${accessMode}" ]] && accessMode="RW"
-    ACCESSMODE=${accessMode^^}
-
-    [[ ! -e "${NFS_CONFIG_FILE}" ]] && echo "${GENERICCONF}" > "${NFS_CONFIG_FILE}"
-
-    if [[ -e "${_destPath}" ]] ; then
-        aCurrentIPs=($(getGaneshaCfgValue "$(<${_destPath})" "Clients"))
-    else
-        SHAREPATH="${destinationPath}"
-        PSEUDO="${destinationPath}"
-        ID="$(getGaneshaLastExportedID)"
-        let ID=ID+1
-        echo "$(renderTemplate "$SHARETEMPLATE")" > "${_destPath}"
-        includeFile="${CONTAINER_NFS_CONFIG_DIR}/jelastic/${_destPath##*/}"
-        echo "%include ${includeFile}" >> "${NFS_CONFIG_FILE}"
-        $SED -i -re "/${includeFile//\//\\/}/d" "${NFS_CONFIG_FILE}"
-    fi
-
-    log "Adding IPs to exports file (${_destPath})"
-    for i in "${IPLIST[@]}" ; do
-        isValidIP ${i%\/*} || continue
-        if [[ -z $(indexOf "${aCurrentIPs[*]}" "$i") ]] ; then
-            aCurrentIPs=(${aCurrentIPs[*]} "$i")
-            log "${i} added"
-        else
-            log "${i} already in list"
-        fi
-    done
-
-    sIP="${aCurrentIPs[*]}"
-    IP="${sIP// /,}"
-    newClientSection=$(renderTemplate "$CLIENTSECTION")
-    replaceGaneshaClientsBlock "$_destPath" "$newClientSection"
-
-    return $?
-}
-
 function _addNativeip() {
     if [[ -z "${IPLIST[*]}" ]] ; then
         log "ADD: Empty ip list. Nothing to do. Exiting";
@@ -672,31 +564,6 @@ function _addNativeip() {
             writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
         fi
     fi
-    return $?
-}
-
-
-function _removeGaneshaip() {
-    if [[ -z "${IPLIST[*]}" ]] ; then
-        log "REMOVE: Empty ip list. Nothing to do. Exiting";
-        return;
-    fi
-
-    [[ ! -e "${NFS_CONFIG_FILE}" ]] && return 0
-
-    _destPath="${NFS_CONFIG_DIR}/jelastic/$(makeConfigFileName "$DESTINATION").conf"
-    local aCurrentIPs=()
-    if [[ -e "${_destPath}" ]] ; then
-        aCurrentIPs=($(getGaneshaCfgValue "$(<${_destPath})" "Clients"))
-    fi
-    for i in "${aCurrentIPs[@]}" ; do
-        aCurrentIPs=($(removeValueFromArray "${aCurrentIPs[*]}" "${i}"));
-    done
-    sIP="${aCurrentIPs[*]}"
-    IP="${sIP// /,};"
-    newClientSection=$(renderTemplate "$CLIENTSECTION")
-    replaceGaneshaClientsBlock "$_destPath" "$newClientSection"
-
     return $?
 }
 
