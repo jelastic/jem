@@ -43,7 +43,7 @@ function doGather(){
 
     for ((n=0; n < ${#iniVarNames[@]}; n++))
     do
-        if [[ "$JELASTIC_DB_CLUSTER" != "slave" || ${iniVarNames[$n]##*_} == "all" ]]; then
+        if [[ "$JELASTIC_DB_CLUSTER" != "slave" || ${iniVarNames[$n]##*_} == "all" || ${iniVarNames[$n]} == "jelastic_gate_publickey" ]]; then
             var='';
             log  "Module: $action Action: $subaction index: $n element: ${iniVarNames[$n]}" ;
             fName=$( sed -re 's/_all$//' -e 's/.*_(.*)/\1/' <<< ${iniVarNames[$n]} ) ;
