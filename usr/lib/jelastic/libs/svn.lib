@@ -21,11 +21,15 @@ inherit os;
 include output;
 $PROGRAM 'grep';
 
+function writeGeneralLogInfo(){
+    echo -n "$(date +%D.%k:%M:%S.%N ) NodeId - $(hostname|awk -F - {'print $1'}|grep -o [0-9]*); Host - $(hostname); URL - $URL; Directory - ${WEBROOT}/${PROJECT_NAME};"| tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG" 2>&1;
+}
+
 function doCheckout(){
     set -f
     rm  -Rf "${WEBROOT}/${PROJECT_NAME}";
     set +f
-    echo -n "$(date +%D.%k:%M:%S.%N ) "| tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG" 2>&1;
+    writeGeneralLogInfo
     $SVN co $URL --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force "${WEBROOT}/${PROJECT_NAME}" >> "$ACTIONS_LOG" 2>&1;
     result=$?
     cat ${ACTIONS_LOG} | tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG";
@@ -43,7 +47,7 @@ function doCheckout(){
 }
 
 function updateProject(){
-    echo -n "$(date +%D.%k:%M:%S.%N ) "| tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG" 2>&1;
+    writeGeneralLogInfo
     $SVN revert -R  "${WEBROOT}/${PROJECT_NAME}" > "${VCS_LOG_DIR}/deploy.log.log";
     $SVN up "${WEBROOT}/${PROJECT_NAME}" --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force  >> "$ACTIONS_LOG" 2>&1;
     result=$?;
@@ -75,7 +79,7 @@ function getLastRemoteCommit(){
 }
 
 function vcsChangeUrl(){
-    echo -n "$(date +%D.%k:%M:%S.%N ) "| tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG" 2>&1;
+    writeGeneralLogInfo
     $SVN switch --relocate --username $LOGIN --password $PASSWORD --no-auth-cache --non-interactive --trust-server-cert --force  "$OLDURL" "$URL" "${WEBROOT}/${PROJECT_NAME}/" >> $ACTIONS_LOG 2>&1;
     result=$?;
     cat ${ACTIONS_LOG} | tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG";
