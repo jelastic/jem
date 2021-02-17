@@ -37,7 +37,7 @@ function doCheckout(){
         [ ! -d "${WEBROOT}/${PROJECT_NAME}/" ] && mkdir -p "${WEBROOT}/${PROJECT_NAME}/" 1>/dev/null 2>&1 ;
         updateOwnership "${WEBROOT}/${PROJECT_NAME}";
         echo "Host $(hostname) Repository $URL Directory ${WEBROOT}/${PROJECT_NAME}" >> $ACTIONS_LOG; 
-        { writeJSONResponseErr "result=>4000" "message=>An error occured during the VCS deploy on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please check the logs for more details."; die -q; };
+        { writeJSONResponseErr "result=>4000" "message=>An error occurred during the VCS deployment on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please, check the logs for more details."; die -q; };
     }
     [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
         inherit ruby-common;
@@ -54,7 +54,7 @@ function updateProject(){
     cat ${ACTIONS_LOG} | tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG";
     if [ $result -ne 0 ] ; then
         echo "Host $(hostname) Repository $URL Directory ${WEBROOT}/${PROJECT_NAME}" >> $ACTIONS_LOG;
-        { writeJSONResponseErr "result=>4000" "message=>An error occured during the VCS deploy on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please check the logs for more details."; die -q; };
+        { writeJSONResponseErr "result=>4000" "message=>An error occurred during the VCS deployment on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please, check the logs for more details."; die -q; };
     else
         [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
             inherit ruby-common;
@@ -85,7 +85,7 @@ function vcsChangeUrl(){
     cat ${ACTIONS_LOG} | tee -a "$DEPLOY_LOG" >> "$VCS_UPDATE_LOG";
     if [ $result -ne 0 ] ; then
         echo "Host $(hostname) Repository $URL Directory ${WEBROOT}/${PROJECT_NAME}" >> $ACTIONS_LOG;
-        { writeJSONResponseErr "result=>4000" "message=>An error occured during the VCS deploy on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please check the logs for more details."; die -q; };
+        { writeJSONResponseErr "result=>4000" "message=>An error occurred during the VCS deployment on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please, check the logs for more details."; die -q; };
     fi
     return $result;
 }
