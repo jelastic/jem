@@ -322,7 +322,7 @@ dump_active_ips_vms_expanded(){
    prlctl list --vmtype vm -H -i -j | \
       jq -r ".[] | select(.State == \"running\" ) | .Hardware | \
         (select(.net0 != null)| .net0), (select(.net1 != null)| .net1), (select(.net2 != null)| .net2) | \
-        select (.type == \"routed\" ) | .ips" |\
+        select (.type == \"routed\" ) | select (.ips != null ) | .ips" |\
       sed -r 's/[[:blank:]]+/\n/g' | \
       sed -nr '/^[[:blank:]]*$/!{/^0[.]0[.]0[.]0$/!{s/[/][^/]+$//; p}}' | \
       expand_ipv6 | \
