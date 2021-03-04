@@ -738,6 +738,7 @@ EOF
 defineBigInline _INSTALLUNFSDCMD <<'EOF'
 if [ -d /run/systemd/system ] ; then
     systemctl restart rpcbind
+    systemctl restart rpcbind.socket
     systemctl enable unfsd
 else
     [ -f /etc/init.d/rpcbind ] && /etc/init.d/rpcbind restart
