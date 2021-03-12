@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Jelastic, Inc.
+# Copyright 2021 Jelastic, Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -491,7 +491,7 @@ function _addNativeip() {
             if [[ $running -ne 0 ]] ; then
                 echo -e "\"${destinationPath}\"\t$i($_opts)" >> "${EXPORTS_FILE}"
             else
-                if ! vzexecRun "\"\"${destinationPath}\"\t$i($_opts)\">> $CONTAINER_EXPORTS_FILE" ; then
+                if ! vzexecRun "echo -e \"\"${destinationPath}\"\t$i($_opts)\">> $CONTAINER_EXPORTS_FILE" ; then
                     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error adding entry. Error: $(vzexecGetLastStdErr; vzexecGetLastStdOut). $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
                 fi
             fi
