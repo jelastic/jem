@@ -27,10 +27,13 @@ export PATH="/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin";
 echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
 echo ":[EXEC]      [PID: $$] $@" >> ${JEM_CALLS_LOG} 2>&1;
 
-sudo chmod 666 ${JEM_CALLS_LOG};
-sudo chmod 555 /usr/bin/jem;
-find /usr/lib/jelastic -type d -print0 | xargs -0 sudo chmod 0755;
-find /usr/lib/jelastic -type f -print0 | xargs -0 sudo chmod 0644;
+SUDO_CMD=""
+[[ "$(id -u)" != "0" ]] && SUDO_CMD="sudo"
+
+$SUDO_CMD chmod 666 $JEM_CALLS_LOG;
+$SUDO_CMD chmod 555 /usr/bin/jem;
+find /usr/lib/jelastic -type d -print0 | xargs -0 $SUDO_CMD chmod 0755;
+find /usr/lib/jelastic -type f -print0 | xargs -0 $SUDO_CMD chmod 0644;
 
 "unalias" -a;
 unset -f rm;
