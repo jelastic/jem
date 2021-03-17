@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Jelastic, Inc.
+# Copyright 2021 Jelastic, Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ declare CLUSTER="false"
 declare _SOURCE=""
 declare _DESTINATION=""
 declare _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,udp,soft,timeo=120,retrans=20,_netdev"
+declare _DEFAULT_GLUSTER_MOUNT_OPTS="-fstype=glusterfs"
 declare CONTAINER_MOUNTS_STORAGE="/etc/autofs.jelastic"
 declare _IPLIST
 declare -a UNKNOWN_ARG
@@ -48,6 +49,8 @@ declare FALSE=1
 
 FORCE_UMOUNT=$TRUE
 FORCE_MOUNT=$FALSE
+
+STORAGE_BACKEND="nfs" # nfs | gluster
 
 MOUNTPROG="/usr/sbin/automount"
 MOUNTPROG_APK="/sbin/mount.nfs"
@@ -160,7 +163,7 @@ function onModLoadCallback() {
 function _hasActiveMounts() {
     #-hosts is /net/host
     #dir:path -> /path/*
-    _cmd='[ -f /etc/auto.master ] && sed -re "/^#/d" -e "s/dir:(.*)/+ \1\/*/g" -e "/\s/!d" -e "s/.+\s(.*)/\1/g" -e "s/-hosts/\/net\/host/g" /etc/auto.master'
+    _cmd='[ -f /etc/auto.master ] && sed -re "/^#/d" -e "s/dir:(.*)/+ \1\/*/g" -e "/\s/!d" -e "s/.*\s(\/.*).*/\1/g" -e "s/--timeout=.*//g"  -e "s/.*\s-hosts/\/net\/host/g" /etc/auto.master'
     vzexecRun "$_cmd"
     autoFSMaps=($(vzexecGetLastStdOut))
     if [ -n "$autoFSMaps" ] ; then
@@ -325,7 +328,7 @@ function processnfs() {
         echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. " >> ${JEM_CALLS_LOG}
 
         if vzexecRun "[[ ! -e \"$MOUNTPROG_APK\" ]]" ; then
-            if ! dosetupUtils ${_CTID} ; then
+            if ! dosetupUtils ; then
                 echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Error installing utils $(gatherCTInfo) " >> ${JEM_CALLS_LOG}
                 return 2
             fi
@@ -341,7 +344,7 @@ function processnfs() {
 
     else
         if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)" 2>&1; then
-            dosetupUtils ${_CTID} || return 2
+            dosetupUtils || return 2
         fi
 
         autofsdest="$($SED -e 's/\s/\\ /g' <<< $_DESTINATION)"
@@ -420,6 +423,85 @@ function processnfs() {
     fi
     [[ -z "$msg" ]] && echo "successfuly mounted" || echo $msg
     [[ "$res" -gt 0 ]] && return 1;
+    return 0
+}
+
+function processgluster() {
+    CONTAINER_MOUNTS_STORAGE='/etc/autofs.gluster'
+    #check if client available
+    if ! vzexecRun "command -v mount.glusterfs &>/dev/null" ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID glusterfs helper not found. Installing..." >> ${JEM_CALLS_LOG}
+
+        STORAGE_BACKEND="gluster"
+        dosetupUtils || return 1
+    fi
+
+    local sourceMountUnEsc=$(sed -re 's/\\(\/|\(|\)|\]|\[|\\)/\1/g' <<< "$sourceMount")
+    local destinationEsc=$(sed -re 's/\s/\\\\040/g' <<< "$_DESTINATION" )
+    local running
+
+    [[ ! -z "$CTID" ]] && {
+        MOUNTS_STORAGE="${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}"
+    }
+
+    isContainerRunning $CTID ; running=$?
+    if [[ $running -ne 0 ]] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> $JEM_CALLS_LOG
+        $VZCTL mount $CTID > /dev/null 2>&1
+    fi
+
+    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
+    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
+    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+    OS=$(detectOS "$issue_string")
+    OS_ver=$(getOSVersion "$issue_string")
+    OS_ver=${OS_ver%%.*}
+
+    if [[ "x$OS" == "xalpine" ]] ; then
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. Glusterfs is not supported for it" >> $JEM_CALLS_LOG
+        writeJSONResponseErr "result=>4207" "message=>Can not setup gluster native client"
+        return 2
+    fi
+
+    if ! grep -q "$CONTAINER_MOUNTS_STORAGE" "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)" 2>&1; then
+            dosetupUtils || return 2
+    fi
+
+    autofsdest="$(sed -e 's/\s/\\ /g' <<< $_DESTINATION)"
+    mntEntry="$autofsdest $_DEFAULT_GLUSTER_MOUNT_OPTS $sourceIP:/$(sed -re 's/\\\$/$/g' <<< "$sourceMountUnEsc")"
+    cmdRegisterMount="echo -e \"$mntEntry\" >> $MOUNTS_STORAGE"
+
+    if ! preparePath "$_DESTINATION" "$CTID" ; then
+        echo "Can not create path $_DESTINATION"
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Can not create path $_DESTINATION. $(gatherCTInfo)" >> $JEM_CALLS_LOG
+        return 1
+    fi
+
+    if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : registering $sourceIP:$sourceMount in $CTID" >> $JEM_CALLS_LOG
+        out=$(echo -e $mntEntry >> $MOUNTS_STORAGE)
+        if [[ ! -z "$out" ]] ; then
+            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : $out" >> $JEM_CALLS_LOG
+        fi
+    fi
+
+    if [[ $running -eq 0 ]] ; then
+        if _hasActiveMounts ; then
+            vzexecRun "$_ENABLEAUTOFSCMD"
+            if [[ "x$SAVE_CONFIG" == "xfalse" ]] ; then
+                _restartAutoFS
+            else
+                _reloadAutoFS
+            fi
+        else
+            vzexecRun "$_DISABLEAUTOFSCMD"
+        fi
+    else
+        log "unmounting"
+        $VZCTL umount $CTID > /dev/null 2>&1
+    fi
+
+    echo "successfuly mounted"
     return 0
 }
 
@@ -514,9 +596,9 @@ function doRemount() {
         done
         return 0
     fi
-    
+
     isContainerRunning ${CTID} ; running=$?
-    
+
     if [[ $running -eq 0 ]] ; then
         if _hasActiveMounts ; then
             vzexecRun "$_ENABLEAUTOFSCMD"
@@ -525,7 +607,7 @@ function doRemount() {
             vzexecRun "$_DISABLEAUTOFSCMD"
         fi
     fi
-    
+
     return 0;
 }
 
@@ -545,6 +627,10 @@ function dosetupUtils() {
 
     #JE-25896
     if [[ "x$OS" == "xalpine" ]] ; then
+        if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
+            writeJSONResponseErr "result=>4112" "message=>NFS: Alpine Linux is not supported"
+            return 1
+        fi
         installCmd=$(installPackageCmd $OS install nfs-utils)
         vzexecRun "$installCmd"
 
@@ -560,6 +646,9 @@ function dosetupUtils() {
         return 0
     fi
 
+    [[ "$STORAGE_BACKEND" == "nfs" ]] && _packages="autofs nfs-utils"
+    [[ "$STORAGE_BACKEND" == "gluster" ]] && _packages="autofs glusterfs-fuse"
+
     if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
         vzexecRun "apt update; curl -sLO http://repository.jelastic.com/pub/autofs_5.1.6-1j_amd64.deb"
         if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "8" ]; then
@@ -569,24 +658,37 @@ function dosetupUtils() {
             vzexecRun "$(installPackageCmd $OS install ./autofs_5.1.6-1j_amd64.deb)"
         fi
         vzexecRun "rm -f autofs_5.1.6-1j_amd64.deb"
-        installCmd="$(installPackageCmd $OS install nfs-common)"
-        checkCmd=$(checkPackageCmd $OS autofs nfs-common)
+        if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
+            installCmd="$(installPackageCmd $OS install glusterfs-client)"
+            checkCmd=$(checkPackageCmd $OS autofs glusterfs-client)
+        else
+            installCmd="$(installPackageCmd $OS install nfs-common)"
+            checkCmd=$(checkPackageCmd $OS autofs nfs-common)
+        fi
     elif [ "x$OS" == "xcentos" ] ; then
         if [ "$OS_ver" -eq "8" ]; then
-           installCmd=$(installPackageCmd $OS install http://repository.jelastic.com/pub/autofs-5.1.6-1j.el8.x86_64.rpm nfs-utils)
+            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el8.x86_64.rpm"
         fi
         if [ "$OS_ver" -eq "7" ]; then
-           installCmd=$(installPackageCmd $OS install http://repository.jelastic.com/pub/autofs-5.1.6-1j.el7.x86_64.rpm nfs-utils)
+            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el7.x86_64.rpm"
         fi
         if [ "$OS_ver" -eq "6" ]; then
-           installCmd=$(installPackageCmd $OS install http://repository.jelastic.com/pub/autofs-5.1.6-1j.el6.x86_64.rpm nfs-utils)
+            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el6.x86_64.rpm"
         fi
-        checkCmd=$(checkPackageCmd $OS autofs nfs-utils)
+
+        if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
+            installCmd=$(installPackageCmd $OS install $_autofspkg glusterfs-fuse)
+            checkCmd=$(checkPackageCmd $OS $_autofspkg glusterfs-fuse)
+        else
+            installCmd=$(installPackageCmd $OS install $_autofspkg nfs-utils)
+            checkCmd=$(checkPackageCmd $OS $_autofspkg nfs-utils)
+        fi
     else
-        installCmd=$(installPackageCmd $OS install autofs nfs-utils)
-        checkCmd=$(checkPackageCmd $OS autofs nfs-utils)
+        installCmd=$(installPackageCmd $OS install $_packages)
+        checkCmd=$(checkPackageCmd $OS $_packages)
     fi
     vzexecRun "$installCmd"
+    echo "$(vzexecGetLastStdOut)" >> ${ACTIONS_LOG}
 
     vzexecRun "eval $checkCmd"
     stdout=$(vzexecGetLastStdOut)
@@ -595,7 +697,7 @@ function dosetupUtils() {
         return 1
     fi
 
-    if [ -e "$(vzctPath $VZ_CTID_ROOT /etc/rc.d/init.d/autofs)" ]; then  
+    if [ -e "$(vzctPath $VZ_CTID_ROOT /etc/rc.d/init.d/autofs)" ]; then
         $GREP killproc -A2 "$(vzctPath $VZ_CTID_ROOT /etc/rc.d/init.d/autofs)" | $GREP -q 'sleep 1' || $SED -i '/killproc/{N;s/$/\n\t\tsleep 1;/}' "$(vzctPath $VZ_CTID_ROOT /etc/rc.d/init.d/autofs)"
     fi
 
@@ -609,7 +711,11 @@ function dosetupUtils() {
         $SED -i -re '/automount/d' "$(vzctPath $VZ_CTID_ROOT /etc/nsswitch.conf)"
         echo -e "\nautomount:  files" >> "$(vzctPath $VZ_CTID_ROOT /etc/nsswitch.conf)"
     fi
-    echo '/- /etc/autofs.jelastic' >> "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)"
+    if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
+        echo '/- /etc/autofs.gluster --timeout=3600' >> "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)"
+    else
+        echo '/- /etc/autofs.jelastic' >> "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)"
+    fi
     vzexecRun "$_DISABLEAUTOFSCMD"
     return 0
 }
@@ -652,14 +758,13 @@ function doMount() {
         [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -ci -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
     else
         vzexecRun " [ -e \"/etc/autofs.conf\" ] && sed -ci -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
-        if ! vzexecRun " [ -f \"$CONTAINER_MOUNTS_STORAGE\" ] || { touch \"$CONTAINER_MOUNTS_STORAGE\" 2>/dev/null; false; }" ; then
-            dosetupUtils $_CTID
-        fi
     fi
 
     # parse connection string
     _SOURCE="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< "$_SOURCE")"
-    eval "$(echo "${_SOURCE}" | $SED -rne "s/(([Rr][Oo]|[Rr][Ww]):?([Ll][Oo][Cc][Aa][Ll]|[Nn][Ff][Ss]3?4?|[Ww][Ee][Bb][Dd][Aa][Vv]):?(\/){0,2})?([^:]+):?(.*)/atype=\2\nmtype='\3'\nsourceIP='\5'\nsourceMount='\6';/g;p" | $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
+    availProtos="[Ll][Oo][Cc][Aa][Ll]|[Nn][Ff][Ss]3?4?|[Ww][Ee][Bb][Dd][Aa][Vv]|[Gg][Ll][Uu][Ss][Tt][Ee][Rr]"
+    availModes="[Rr][Oo]|[Rr][Ww]"
+    eval "$(echo "${_SOURCE}" | $SED -rne "s/(($availModes):?($availProtos):?(\/){0,2})?([^:]+):?(.*)/atype=\2\nmtype='\3'\nsourceIP='\5'\nsourceMount='\6';/g;p" | $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
     mtype=${mtype,,}
     atype=${atype,,}
     atype=$($SED -re 's/;//g' <<< $atype)
@@ -745,9 +850,10 @@ function doUmount() {
                 if [[ "x$OS" == "xalpine" ]] ; then
                     local dpath="\s+$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+(nfs|none)\s+";
                 else
-                    local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\ /g' <<< "${shares[$i]}"))\s+-fstype=nfs.*";
+                    local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\ /g' <<< "${shares[$i]}"))\s+-fstype=(nfs|glusterfs).*";
                 fi
                 out=$($SED -i -re /"${dpath}"/d ${MOUNTS_STORAGE} 2>&1)
+                out=$($SED -i -re /"${dpath}"/d "${VZ_CTID_ROOT}/etc/autofs.gluster" 2>&1)
                 [[ ! -z "${out}" ]] && log "${out}";
                 retfunc="writeJSONResponseOut result=>0"
             else
@@ -769,7 +875,7 @@ function doUmount() {
             vzexecRun "$_DISABLEAUTOFSCMD"
         fi
     fi
-    
+
     $retfunc "message=>$msg";
     return 0;
 }
@@ -857,24 +963,24 @@ function describeUmountOptions() {
 }
 
 defineBigInline _DISABLEAUTOFSCMD <<'EOF'
-    if pgrep automount >/dev/null ; then 
+    if pgrep automount >/dev/null ; then
         if [ -d /run/systemd/system ] ; then
-            systemctl disable autofs; 
-            systemctl stop autofs; 
-        elif command -V initctl >/dev/null 2>&1 ; then 
-            if command -V update-rc.d >/dev/null 2>&1 ; then 
-                update-rc.d autofs disable ; 
-            else 
-                chkconfig autofs off; 
-                service autofs stop ; 
+            systemctl disable autofs;
+            systemctl stop autofs;
+        elif command -V initctl >/dev/null 2>&1 ; then
+            if command -V update-rc.d >/dev/null 2>&1 ; then
+                update-rc.d autofs disable ;
+            else
+                chkconfig autofs off;
+                service autofs stop ;
             fi;
         fi;
     else
         if [ -d /run/systemd/system ] ; then
-            systemctl disable autofs; 
-        elif command -V initctl >/dev/null 2>&1 ; then 
+            systemctl disable autofs;
+        elif command -V initctl >/dev/null 2>&1 ; then
             update-rc.d autofs disable ;
-        else 
+        else
             chkconfig autofs off;
         fi
     fi
@@ -882,23 +988,23 @@ EOF
 
 defineBigInline _ENABLEAUTOFSCMD <<'EOF'
     if [ -d /run/systemd/system ] ; then
-        systemctl enable autofs; 
-        if ! pgrep automount >/dev/null ; then 
-            systemctl start autofs; 
+        systemctl enable autofs;
+        if ! pgrep automount >/dev/null ; then
+            systemctl start autofs;
         fi
-    elif command -V initctl >/dev/null 2>&1 ; then 
-        if command -V update-rc.d >/dev/null 2>&1 ; then 
-            update-rc.d autofs enable ; 
+    elif command -V initctl >/dev/null 2>&1 ; then
+        if command -V update-rc.d >/dev/null 2>&1 ; then
+            update-rc.d autofs enable ;
         else
             chkconfig autofs on;
         fi
-        if ! pgrep automount >/dev/null ; then 
+        if ! pgrep automount >/dev/null ; then
             service autofs start ;
         fi
-    else 
-        chkconfig autofs on; 
-        if ! pgrep automount >/dev/null ; then 
-            service autofs start ; 
+    else
+        chkconfig autofs on;
+        if ! pgrep automount >/dev/null ; then
+            service autofs start ;
         fi
     fi;
 EOF

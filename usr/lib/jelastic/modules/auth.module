@@ -36,6 +36,7 @@ CONTAINER_EXPORTS_FILE="${EXPORTS_PATH}${EXPORTS_EXT}"
 NFS_CONFIG_DIR="/etc"
 DEFAULTEXPORTOPT="async,rw,no_subtree_check,no_root_squash"
 NFS_BACKEND="Native"
+STORAGE_BACKEND="nfs" # nfs | gluster
 _NFS_VERSION=3
 MOUNTPROG="/sbin/unfsd"
 MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-server.tar.gz"
@@ -52,35 +53,35 @@ function onModLoadCallback() {
     log "Preload callback";
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -o t:,l:,p:,c:,r: -l list:,type:,path:,ctid:,readonly: -- params "$@" 2>/dev/null` oldifs;
+    local temp=`getopt -o t:,l:,p:,c:,r: -l list:,type:,path:,ctid:,readonly:,version: -- params "$@" 2>/dev/null` oldifs;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
     while true ; do
         case "$1" in
             -t | --type)
-                shift;
+                shift
                 ATYPE=${1,,}
-                shift;
+                shift
                 ;;
             -l | --list )
-                shift;
-                oldifs=$IFS;
-                IFS=';';
-                IPLIST=(${1});
-                IFS=${oldifs};
-                shift;
+                shift
+                oldifs=$IFS
+                IFS=';'
+                IPLIST=(${1})
+                IFS=${oldifs}
+                shift
                 ;;
             -p | --path )
-                shift;
+                shift
                 DESTINATION=${1}
-                shift;
+                shift
                 ;;
             -c | --ctid )
-                shift;
+                shift
                 CTID=$1
                 vzexecSetCTID $CTID
-                shift;
+                shift
                 ;;
             --version )
                 shift
@@ -91,11 +92,15 @@ function onModLoadCallback() {
                     NFS4 )
                         _NFS_VERSION=4
                         ;;
+                    GLUSTER )
+                        STORAGE_BACKEND="gluster"
+                        ;;
                 esac
+                shift
                 ;;
             --)
-                shift;
-                break;
+                shift
+                break
                 ;;
         esac;
     done;
@@ -224,6 +229,13 @@ function gatherCTInfo() {
 }
 
 function _adjustFirewall() {
+    if isFunction "_adjust${STORAGE_BACKEND^^}Firewall" ; then
+        "_adjust${STORAGE_BACKEND^^}Firewall" "$@"
+    fi
+}
+
+function _adjustNFSFirewall() {
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _adjustNFSFirewall started" >> $JEM_CALLS_LOG
     isContainerRunning ${CTID} || return $FALSE;
 
     vzexecRun "jem firewall isEnabled"
@@ -316,7 +328,7 @@ function validateExports() {
 function _checkConfigs() {
     local UNFSDBIN='/sbin/unfsd'
     local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
-    
+
     vzexecRun "[[ ! -e '/etc/exports' ]]" && return 1
     validateExports "$(vzctPath $VZ_CTID_ROOT /etc/exports)" || return 1
 
@@ -337,7 +349,7 @@ function _nfsReexport() {
     local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
     log "ReExporting shares"
     _checkConfigs || {
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1
     }
     _adjustFirewall
@@ -350,7 +362,7 @@ function _nfsReexport() {
                 local err=$(vzexecGetLastStdErr)
                 [[ -z "${err// }" ]] && return $TRUE
 
-                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. exports:$(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. exports:$(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
                 return 1
             fi
         fi
@@ -366,9 +378,11 @@ function _nfsReexport() {
 }
 
 function doRestart() {
-    if ! _nfsReexport ; then
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not verify client configuration"
-        return 1
+    if [[ "x$STORAGE_BACKEND" == "xnfs" ]] ; then
+        if ! _nfsReexport ; then
+            writeJSONResponseErr "result=>4113" "message=>NFS: Can not verify client configuration"
+            return 1
+        fi
     fi
     writeJSONResponseOut "result=>0" "message=>Success"
     return 0
@@ -380,11 +394,16 @@ function _addNativeip() {
         return;
     fi
 
-    eval "$($SED -re "/^r[ow]:.*/{s/^((ro|rw):)?(\/.*)/accessMode='\2'\ndestinationPath='\3'/g;ta};s/^(\/.*)/destinationPath='\1'/g;ta;s/(.*)/errValue='\1'/;q1;:a;q0;" <<< "$DESTINATION" |  $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
+    eval "$($SED -re "/^r[ow]:.*/{s/^((ro|rw):)?(\/?.*)/accessMode='\2'\ndestinationPath='\3'/g;ta};s/^(\/.*)/destinationPath='\1'/g;ta;s/(.*)/errValue='\1'/;q1;:a;q0;" <<< "$DESTINATION" |  $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
     [[ -z "$destinationPath" ]] && {
         writeJSONResponseErr "result=>4066" "message=>Wrong param. DESTINATION required" ;
         return 1;
     }
+
+    if [[ "x$STORAGE_BACKEND" == "xgluster" ]] ; then
+        _addGlusterShare || return 1
+        return 0
+    fi
 
     local aCurrentIPs=()
     local running
@@ -491,7 +510,7 @@ function _addNativeip() {
             if [[ $running -ne 0 ]] ; then
                 echo -e "\"${destinationPath}\"\t$i($_opts)" >> "${EXPORTS_FILE}"
             else
-                if ! vzexecRun "echo -e \"\"${destinationPath}\"\t$i($_opts)\">> $CONTAINER_EXPORTS_FILE" ; then
+                if ! vzexecRun "\"\"${destinationPath}\"\t$i($_opts)\">> $CONTAINER_EXPORTS_FILE" ; then
                     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error adding entry. Error: $(vzexecGetLastStdErr; vzexecGetLastStdOut). $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
                 fi
             fi
@@ -566,10 +585,64 @@ function _addNativeip() {
     return $?
 }
 
+function _addGlusterShare() {
+    if ! vzexecRun "command -v gluster &>/dev/null" ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID gluster command not found " >> ${JEM_CALLS_LOG}
+        writeJSONResponseErr "result=>4208" "message=>GlusterFS cluster is not available"
+        return 1
+    fi
+
+    local volumeName=$(sed 's/\///g' <<< $destinationPath)
+    if ! vzexecRun "gluster volume list | grep $volumeName" ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID gluster volume $volumeName not found " >> ${JEM_CALLS_LOG}
+        writeJSONResponseErr "result=>4209" "message=>Volume $volumeName is not found"
+        return 1
+    fi
+
+    vzexecRun "gluster volume get data auth.allow 2>/dev/null | tail -n 1 | tr -s ' ' | cut -d ' ' -f2 | tr ',' ' '"
+    local aCurrentIPs=($(vzexecGetLastStdOut))
+    #explicit remove '*' from a list of allowed IPs
+    local aNewIPs=("${aCurrentIPs[@]/*}")
+    local setNewList=0
+
+    for i in "${IPLIST[@]}" ; do
+        isValidIP $i || continue
+
+        if [[ -z $(indexOf "${aCurrentIPs[*]}" "$i") ]] ; then
+            aNewIPs=("${aNewIPs[@]}" "$i")
+            setNewList=1
+        fi
+    done
+
+    #explicit add localhost if not presnt
+    if [[ -z $(indexOf "${aCurrentIPs[*]}" "127.0.0.1") ]] ; then
+        aNewIPs=("${aNewIPs[@]}" "127.0.0.1")
+        setNewList=1
+    fi
+
+    if [[ $setNewList -eq 1 ]] ; then
+        _ipstr=${aNewIPs[@]}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID setting $volumeName auth.allow to ${_ipstr// /,}" >> ${JEM_CALLS_LOG}
+        vzexecRun "gluster volume set data auth.allow ${_ipstr// /,}" || return 1
+    else
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID auth.allow not changed" >> ${JEM_CALLS_LOG}
+    fi
+
+    writeJSONResponseOut "result=>0" "message=>Client configuration has been changed" "version=>GLUSTER"
+    return 0
+}
+
 function _removeNativeip() {
     if [[ -z "${IPLIST[*]}" ]] ; then
         log "REMOVE: Empty ip list. Nothing to do. Exiting";
         return;
+    fi
+
+    [[ "${DESTINATION:0:1}" != '/' ]] && STORAGE_BACKEND="gluster"
+
+    if [[ "x$STORAGE_BACKEND" == "xgluster" ]] ; then
+        _removeGlusterShare || return 1
+        return 0
     fi
 
     isContainerRunning ${CTID} ; running=$?
@@ -579,7 +652,7 @@ function _removeNativeip() {
 
     _checkConfigs || {
         echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _checkConfigs failed. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
-        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration" 
+        writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
         return $FALSE
     }
 
@@ -622,10 +695,57 @@ function _removeNativeip() {
     return $?
 }
 
+function _removeGlusterShare() {
+    if ! vzexecRun "command -v gluster &>/dev/null" ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID gluster command not found " >> $JEM_CALLS_LOG
+        writeJSONResponseErr "result=>4208" "message=>GlusterFS cluster is not available"
+        return 1
+    fi
+
+    local volumeName=$(sed 's/\///g' <<< $DESTINATION)
+    if ! vzexecRun "gluster volume list | grep $volumeName" ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID gluster volume $volumeName not found " >> $JEM_CALLS_LOG
+        writeJSONResponseErr "result=>4209" "message=>Volume $volumeName is not found"
+        return 1
+    fi
+
+    vzexecRun "gluster volume get data auth.allow 2>/dev/null | tail -n 1 | tr -s ' ' | cut -d ' ' -f2 | tr ',' ' '"
+    local aCurrentIPs=($(vzexecGetLastStdOut))
+    local aNewIPs=(${aCurrentIPs[@]})
+
+    for i in "${IPLIST[@]}" ; do
+        isValidIP $i || continue
+
+        if [[ ! -z $(indexOf "${aCurrentIPs[*]}" "$i") ]] ; then
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i from auth.allow " >> $JEM_CALLS_LOG
+            aNewIPs=("${aNewIPs[@]/$i}")
+            setNewList=1
+        fi
+    done
+
+    if [[ $setNewList -eq 1 ]] ; then
+        _ipstr=${aNewIPs[@]}
+        #do not remove localhost
+        [[ -z "$_ipstr" ]] && _ipstr="127.0.0.1"
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID setting $volumeName auth.allow to ${_ipstr// /,}" >> $JEM_CALLS_LOG
+        vzexecRun "gluster volume set data auth.allow ${_ipstr// /,}" || return 1
+    else
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID auth.allow not changed" >> $JEM_CALLS_LOG
+    fi
+
+    writeJSONResponseOut "result=>0" "message=>Client configuration has been changed" "version=>GLUSTER"
+    return 0
+}
 
 function _cleanNativeip() {
     if [[ -z "${IPLIST[*]}" ]] ; then
         log "ADD: Empty ip list. Cleaning all";
+
+
+        if [[ "x$STORAGE_BACKEND" == "xgluster" ]] ; then
+            _cleanGlusterAuth || return 1
+            return 0
+        fi
 
         isContainerRunning ${CTID} ; running=$?
         if [[ $running -ne 0 ]] ; then
@@ -642,6 +762,15 @@ function _cleanNativeip() {
         return;
     fi
     return 0
+}
+
+function _cleanGlusterAuth() {
+    if ! vzexecRun "command -v gluster &>/dev/null" ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID gluster command not found " >> ${JEM_CALLS_LOG}
+        return 1
+    fi
+    vzexecRun "gluster volume set data auth.allow 127.0.0.1"
+    vzexecRun "gluster volume reset data auth.reject"
 }
 
 function _cleanip() {
@@ -690,34 +819,6 @@ function doClean() {
     _clean${NFS_BACKEND}${ATYPE};
     return $?
 }
-
-defineBigInline SHARETEMPLATE <<'EOF'
-EXPORT
-{
-        Export_Id = $ID;
-        Path = $SHAREPATH;
-        Pseudo = $PSEUDO;
-        Access_Type = $ACCESSMODE;
-        Squash = All;
-        SecType = None;
-        Anonymous_Uid = 65535;
-        Anonymous_Gid = 65535;
-        FSAL {
-                Name = VFS;
-        }
-}
-EOF
-
-defineBigInline CLIENTSECTION <<'EOF'
-        CLIENT { Clients = $IP; }
-EOF
-
-defineBigInline GENERICCONF <<'EOF'
-NFS_CORE_PARAM {
-        NFS_Protocols = 3,4;
-}
-EOF
-
 
 defineBigInline SystemDUnit << 'EOF'
 [Unit]
