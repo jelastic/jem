@@ -58,3 +58,28 @@ function ExtendPerm(){
         return 0;
     fi
 }
+
+function fixModeBits(){
+    [[ "$UID" == '0' ]] || return 0
+
+    local mode item permissions
+    items_755=( '/etc' '/etc/jelastic' '/etc/logrotate.d' '/etc/rc.d' '/etc/rc.d/init.d' '/etc/security' '/etc/sudoers.d' '/etc/sysconfig' \
+        '/etc/systemd' '/etc/systemd/system' '/etc/vsftpd' '/usr' '/usr/lib/systemd' '/usr/local' '/usr/local/bin' '/usr/local/sbin' '/var/' '/var/lib' )
+    items_555=('/boot/' '/usr/lib')
+    items_644=('/etc/security/limits.conf' '/etc/mail/access.db' '/etc/mail/domaintable.db' '/etc/mail/mailertable.db' '/etc/mail/virtusertable.db')
+    items_600=('/var/spool/anacron/cron.daily' '/var/spool/anacron/cron.monthly' '/var/spool/anacron/cron.weekly' )
+
+    permissions=('755' '555' '644' '600')
+
+    for mode in ${permissions[*]}; do
+        for item in $(eval echo \${items_$mode[@]}); do
+            [ -e "$item" ] && chmod $mode $item
+        done
+    done
+    [ -e /usr/bin/ping ] && setcap 'cap_net_admin,cap_net_raw+p' /usr/bin/ping
+    [ -e /usr/sbin/clockdiff ] && setcap 'cap_net_raw+p' /usr/sbin/clockdiff
+    [ -e /usr/bin/newgidmap ] && setcap 'cap_setgid+ep' /usr/bin/newgidmap
+    [ -e /usr/bin/newuidmap ] && setcap 'cap_setuid+ep' /usr/bin/newuidmap
+    [ -e /usr/sbin/suexec ] && setcap 'cap_setgid,cap_setuid+ep' /usr/sbin/suexec
+    return 0;
+}
