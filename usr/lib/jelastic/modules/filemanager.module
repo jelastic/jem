@@ -96,7 +96,8 @@ function dirRead(){
 }
 
 function doExtendPerm(){
-    $GREP -qE "^jelastic:" /etc/passwd && ExtendPerm && fixModeBits;
+    $GREP -qE "^jelastic:" /etc/passwd && ExtendPerm ;
+    fixModeBits;
     return 0;
 }
 
