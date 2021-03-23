@@ -352,6 +352,7 @@ function _getTimeout() {
 
 function doAction() {
     local action="${1##--}" modfile="" subaction="${2##--}" ;
+    local _subaction="$subaction";
     [[ -z ${action} ]] && die "Usage: doAction <action> <args>";
     shift; shift;
 
@@ -409,7 +410,11 @@ function doAction() {
             } || {
                 isFunction "do${subaction}" || subaction=$(sed 's/\([a-zA-Z0-9]\)\([a-zA-Z0-9]*\)/\u\1\2/g' <<< ${subaction});
                 isFunction "do${subaction}" || subaction=$(declare -F | grep -iom 1 "${subaction}");
-                [[ -z ${subaction} ]] && die -q "Action ${subaction} unknown";
+                [[ -z ${subaction} ]] && {
+                    local message="Action ${_subaction} unknown";
+                    >&2 echo "$message";
+                    die -q "$message";
+                }
                 # [[ "$@" == "help" ]] && { "showActionHelp" "$subaction"; return 0; }
                 [[ "$@" == "help" ]] && { isFunction "showActionHelp" && "showActionHelp" "$subaction"; return 0; }
                 sourceOverride;

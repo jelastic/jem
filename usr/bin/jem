@@ -70,7 +70,11 @@ function _manageFindModule() {
         done
 
         modfile="${modpath}/${modname}.module"
-        [[ -r ${modfile} ]] || die -q "Can't load module ${modname}";
+        [[ -r ${modfile} ]] || {
+            local message="Can't load module ${modname}"
+            >&2 echo "$message"
+            die -q "$message";
+        }
         echo ${modfile}
 }
 
@@ -101,8 +105,8 @@ if [[ -n ${action} ]] ; then
     else
         doAction "${action}" "$@"
     fi
-#else
-#        [[ $? -gt 5000 ]] && _manageDoHelp;
+else
+    _manageDoUsage;
 fi
 
 result=$?
