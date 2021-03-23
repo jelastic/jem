@@ -30,6 +30,9 @@ function doUsage() {
     showUsageMessage;
 }
 
+describeApiCall(){
+    echo -n "[API_DOMAIN]/path <curl parameters>"
+}
 
 doApiCall(){
   getInfraAddresses infraAddr;
