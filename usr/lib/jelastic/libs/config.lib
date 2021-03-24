@@ -16,7 +16,6 @@
 
 [ -n "${CONFIGLIB_VERSION:-}" ] && return 0;
 CONFIGLIB_VERSION="0.1";
-$PROGRAM 'awk';
 
 function __storeConfigHeader() {
     local configfile=${1};
@@ -84,7 +83,7 @@ function loadConfig() {
 function loadINISection() {
     local inifile=${1} section=${2} ini
     grep -q -E "^\[$section]" $inifile || return
-    ini="$( $AWK -F= \
+    ini="$( awk -F= \
     '{
         st = index($0,"=");
         if (length($1)!=0) {
