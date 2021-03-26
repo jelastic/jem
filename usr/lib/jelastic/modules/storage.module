@@ -678,11 +678,10 @@ function dosetupUtils() {
 
         if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
             installCmd=$(installPackageCmd $OS install $_autofspkg glusterfs-fuse)
-            checkCmd=$(checkPackageCmd $OS $_autofspkg glusterfs-fuse)
         else
             installCmd=$(installPackageCmd $OS install $_autofspkg nfs-utils)
-            checkCmd=$(checkPackageCmd $OS $_autofspkg nfs-utils)
         fi
+        checkCmd=$(checkPackageCmd $OS $_packages)
     else
         installCmd=$(installPackageCmd $OS install $_packages)
         checkCmd=$(checkPackageCmd $OS $_packages)
