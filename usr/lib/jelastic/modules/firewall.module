@@ -317,7 +317,7 @@ function doStart() {
         $IP6TABLES -F;
         $IP6TABLES -t nat -F 2>/dev/null;
     fi
-    _setDefaultPolicy;
+    _setDefaultPolicy
 
     #exports
     set -f
@@ -399,6 +399,7 @@ function doStart() {
     #Add reject only if there was no problem while loading rules
     if [[ "$_loadRes" -gt 0 ]] ; then
         echo "Not saving rules due to errors above" >>$JEM_CALLS_LOG
+        _setDefaultPolicy "ACCEPT"
         return 2
     fi
 
@@ -465,7 +466,7 @@ function doStop() {
     $IPTABLES -X -t nat;
     $IPTABLES -F;
     $IPTABLES -F -t nat;
-    _setDefaultPolicy "ACCEPT";
+    _setDefaultPolicy "ACCEPT"
     return 0;
 }
 
