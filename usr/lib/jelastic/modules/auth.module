@@ -282,7 +282,11 @@ function _adjustNFSFirewall() {
         set +f
     else
         #firewall is enabled, so call reconfiguration method
-        vzexecRun "jem firewall FWReconfigure"
+        if ! vzexecRun "jem firewall FWReconfigure" ; then
+            writeJSONResponseErr "result=>4068" "message=>Firewall rules are not set properly"
+        else
+            writeJSONResponseOut "result=>0" "message=>Firewall rules set"
+        fi
     fi
 }
 
