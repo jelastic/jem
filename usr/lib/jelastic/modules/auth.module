@@ -845,6 +845,7 @@ if [ -d /run/systemd/system ] ; then
     systemctl restart rpcbind
     systemctl restart rpcbind.socket
     systemctl enable unfsd
+    systemctl start unfsd
 else
     [ -f /etc/init.d/rpcbind ] && /etc/init.d/rpcbind restart
     sed -i "s/\/usr\/sbin\/unfsd/\/sbin\/unfsd/g" /etc/init.d/unfsd.jelastic
