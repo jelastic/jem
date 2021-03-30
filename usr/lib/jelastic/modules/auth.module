@@ -356,7 +356,7 @@ function _nfsReexport() {
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _nfsReexport: Can not add client configuration. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1
     }
-    _adjustFirewall
+    _adjustFirewall >> ${JEM_CALLS_LOG}
 
     isContainerRunning ${CTID} && {
         local computetype="$( [ -e "$_metainf" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "$_metainf")"
@@ -494,7 +494,7 @@ function _addNativeip() {
             fi
 
             if vzexecRun "[[ ! -d \"$destinationPath\" ]] && [ ! -L \"$destinationPath\" ]" ; then
-                if [[ $_createPath -eq 1 ]] && [[ $_isFUSE -eq 1 ]] ; then
+                if [[ $_createPath -eq 1 ]] && [[ $_isFUSE -eq 0 ]] ; then
                     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - creating directory $destinationPath" >> ${JEM_CALLS_LOG}
                     if ! vzexecRun "mkdir -p \"$destinationPath\" && chmod 0777 \"$destinationPath\"" ; then
                         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - Error creating directory: $(vzexecGetLastStdErr; vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG}
