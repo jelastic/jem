@@ -594,7 +594,10 @@ function doFWEnable() {
     fi
 
     resultMsg=$(vzctl exec2 $CTID "jem firewall Enable"); result=$?
-    [[ "${result}" ]] || writeJSONResponseErr "result=>${result}" "message=>${resultMsg}"
+    if [[ "${result}" -gt 0 ]] then
+        writeJSONResponseErr "result=>${result}" "message=>${resultMsg}"
+        return 1
+    fi
 
     FWSetMsg=$(dofwset $@)
     eval $($SED -re 's/.*"result":"([0-9]+)".*"message":"([^"]+)".*/fwset_result="\1";fwset_msg="\2"/g' <<< $FWSetMsg)
