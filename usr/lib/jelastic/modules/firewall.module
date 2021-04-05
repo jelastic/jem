@@ -594,7 +594,7 @@ function doFWEnable() {
     fi
 
     resultMsg=$(vzctl exec2 $CTID "jem firewall Enable"); result=$?
-    if [[ "${result}" -gt 0 ]] then
+    if [[ "${result}" -gt 0 ]] ; then
         writeJSONResponseErr "result=>${result}" "message=>${resultMsg}"
         return 1
     fi
