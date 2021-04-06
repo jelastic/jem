@@ -175,14 +175,8 @@ function onModLoadCallback() {
     log "Preload callback";
     local __closedports __openports
 
-    #load ports lists from storage
     OPENPORTS=($(loadConfig "${SAVEFILE}" OPENPORTS))
     CLOSEDPORTS=($(loadConfig "${SAVEFILE}" CLOSEDPORTS))
-
-    _isPublicIPv4 && PublicIP=$__TRUE || publicIP=$__FALSE;
-    FTPPort=$($NETSTAT -tnlp | $SED -n -re '/ftp/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}');
-    NFSPort=$($RPCINFO 127.0.0.1 -p 2>/dev/null | $SED -n -re '/nfs/{s/\s+(\S+\s+)+([0-9]+)\s+nfs.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
-    RPCPort=$($RPCINFO 127.0.0.1 -p 2>/dev/null | $SED -n -re '/(portmapper|nlockmgr|mountd)/{s/\s+(\S+\s+)+([0-9]+)\s+.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
 
     ## TODO: remove "params" garbarge option
     local temp=`getopt -l ctid:,rules:,cp:,op:,rp: -- params "$@" 2>/dev/null` oldifs;
@@ -247,6 +241,30 @@ function onModLoadCallback() {
 
     #do we started "inside"
     if [[ "$CTID" -eq 0 ]] ; then
+
+        ACTIONS_LOG="$JEM_CALLS_LOG"
+
+        _isPublicIPv4 && PublicIP=$__TRUE || publicIP=$__FALSE
+
+        #do not perform any operration if container not started
+        if [ -d /run/systemd/system ] ; then
+            count=10
+            while [[ $count -gt 0 ]] ; do
+                out=$(systemctl is-system-running)
+                if [[ "x$out" == "xstarting" ]] ; then
+                    count=$((count-1))
+                    sleep 1
+                else
+                    count=0
+                fi
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction - waiting start $count" >> $JEM_CALLS_LOG
+            done
+        fi
+
+        FTPPort=$($NETSTAT -tnlp | $SED -n -re '/ftp/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}');
+        NFSPort=$($RPCINFO 127.0.0.1 -p 2>/dev/null | $SED -n -re '/nfs/{s/\s+(\S+\s+)+([0-9]+)\s+nfs.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
+        RPCPort=$($RPCINFO 127.0.0.1 -p 2>/dev/null | $SED -n -re '/(portmapper|nlockmgr|mountd)/{s/\s+(\S+\s+)+([0-9]+)\s+.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
+
         local issue_file=/etc/issue
         local release_files=/etc/*-release
         issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
