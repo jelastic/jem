@@ -653,6 +653,7 @@ function _removeNativeip() {
     isContainerRunning ${CTID} ; running=$?
     if [[ $running -ne 0 ]] ; then
         $VZCTL mount $CTID > /dev/null 2>&1
+        EXPORTS_FILE="$(vzctPath $VZ_CTID_ROOT $CONTAINER_EXPORTS_FILE)"
     fi
 
     _checkConfigs || {
