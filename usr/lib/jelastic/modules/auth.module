@@ -422,6 +422,7 @@ function _addNativeip() {
     isContainerRunning ${CTID} ; running=$?
     if [[ $running -ne 0 ]] ; then
         $VZCTL mount $CTID > /dev/null 2>&1
+        EXPORTS_FILE="$(vzctPath $VZ_CTID_ROOT $CONTAINER_EXPORTS_FILE)"
     else
         if ! vzexecRun "which rpcbind showmount" ; then
             dosetupUtils $CTID || return 1
@@ -668,7 +669,7 @@ function _removeNativeip() {
            for i in "${IPLIST[@]}" ; do
                 isValidIP $i || continue
                 echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i | $err " >> ${JEM_CALLS_LOG}
-                if ! vzexecRun "sed -i -re \"/\"?$DESTINATION\"?\s+${i//./\\.}/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}\" $CONTAINER_EXPORTS_FILE" ; then
+                if ! vzexecRun "sed -i -re \"/\\\"?$DESTINATION\\\"?\s+${i//./\\.}/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}\" $CONTAINER_EXPORTS_FILE" ; then
                     echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID error removing $i " >> ${JEM_CALLS_LOG}
                 fi
                 vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $i -j ACCEPT; $IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $i -j ACCEPT"
