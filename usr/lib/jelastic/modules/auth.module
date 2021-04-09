@@ -495,7 +495,7 @@ function _addNativeip() {
             fi
 
             if vzexecRun "[[ ! -d \"$destinationPath\" ]] && [ ! -L \"$destinationPath\" ]" ; then
-                if [[ $_createPath -eq 1 ]] && [[ $_isFUSE -eq 1 ]] ; then
+                if [[ $_createPath -eq 1 ]] ; then
                     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - creating directory $destinationPath" >> ${JEM_CALLS_LOG}
                     if ! vzexecRun "mkdir -p \"$destinationPath\" && chmod 0777 \"$destinationPath\"" ; then
                         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - Error creating directory: $(vzexecGetLastStdErr; vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG}
