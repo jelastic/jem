@@ -262,8 +262,8 @@ function onModLoadCallback() {
         #JE-56437 {{{
         if [ "x$OS" == "xubuntu" ] ; then
             [ -d "$JELASTIC_RULES_DIR" ] || mkdir -p "$JELASTIC_RULES_DIR"
-            [ -e '/etc/iptables/rules.v4' ] && [ ! -L "$CUSTOM_RULES_FILE" ] && ln -s '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE
-            [ -e '/etc/iptables/rules.v6' ] && [ ! -L "$CUSTOM_6RULES_FILE" ] && ln -s '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE
+            [ -e '/etc/iptables/rules.v4' ] && [ ! -L "$CUSTOM_RULES_FILE" ] && rm -f $CUSTOM_RULES_FILE 2>> $JEM_CALLS_LOG && ln -s '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE
+            [ -e '/etc/iptables/rules.v6' ] && [ ! -L "$CUSTOM_6RULES_FILE" ] && rm -f $CUSTOM_6RULES_FILE 2>> $JEM_CALLS_LOG && ln -s '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE
         fi
         #}}}
 
@@ -284,8 +284,8 @@ function onModLoadCallback() {
         OS=$(detectOS "$issue_string")
         if [ "x$OS" == "xubuntu" ] ; then
             [ -d "$(vzctPath $VZ_CTID_ROOT $JELASTIC_RULES_DIR)" ] || mkdir -p "${VZ_CTID_ROOT}${JELASTIC_RULES_DIR}"
-            vzexecRun "[ -e '/etc/iptables/rules.v4' ] && [ ! -L "$CUSTOM_RULES_FILE" ] && ln -s '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE"
-            vzexecRun "[ -e '/etc/iptables/rules.v6' ] && [ ! -L "$CUSTOM_6RULES_FILE" ] && ln -s '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE"
+            vzexecRun "[ -e '/etc/iptables/rules.v4' ] && [ ! -L "$CUSTOM_RULES_FILE" ] && rm -f $CUSTOM_RULES_FILE && ln -s '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE"
+            vzexecRun "[ -e '/etc/iptables/rules.v6' ] && [ ! -L "$CUSTOM_6RULES_FILE" ] && rm -f $CUSTOM_6RULES_FILE && ln -s '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE"
         fi
         #}}}
     fi
