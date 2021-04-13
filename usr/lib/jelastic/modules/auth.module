@@ -272,6 +272,7 @@ function _adjustFirewall() {
     else
         #firewall is enabled, so call reconfiguration method
         vzexecRun "jem firewall FWReconfigure"
+        return $?
     fi
 }
 
@@ -741,8 +742,14 @@ function _cleanip() {
 }
 
 function doAdjustFirewall() {
-    _adjustFirewall
-    return 0;
+    if ! _adjustFirewall ; then
+        PUBLISH_ERROR=1
+        writeJSONResponseErr "result=>4068" "message=>Firewall reconfiguration error"
+        return 1
+    else
+        writeJSONResponseOut "result=>0" "message=>Firewall reconfigured successfully"
+        return 0
+    fi
 }
 
 function doAdd() {
