@@ -34,8 +34,10 @@ $PROGRAM 'sort';
 $PROGRAM 'sed';
 $PROGRAM 'grep';
 $PROGRAM 'awk';
-$PROGRAM 'iptables-restore';
+$PROGRAM 'iptables-restore'
+$PROGRAM 'iptables-save'
 $PROGRAM 'ip6tables-restore'
+$PROGRAM 'ip6tables-save'
 $PROGRAM 'vzctl'
 
 SAVEFILE='/var/lib/jelastic/firewall'
@@ -46,6 +48,9 @@ JELASTIC_4RULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic'
 JELASTIC_4NATRULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic-nat'
 JELASTIC_6RULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic'
 JELASTIC_6NATRULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic-nat'
+
+BACKUP_IPV4='/etc/jelastic/iptables4.backup'
+BACKUP_IPV6='/etc/jelastic/iptables6.backup'
 
 declare PublicIP;
 declare FTPPort;
@@ -155,7 +160,7 @@ function processRule4File() {
     [ -f "$1" ] || return 0
     echo "CUSTOM RULES FILE $1 CONTENT"  >> $JEM_CALLS_LOG
     cat "$1" >> $JEM_CALLS_LOG
-    $IPTABLES_RESTORE -n < "$1" 2>>$ACTIONS_LOG
+    $IPTABLES_RESTORE $2 -n < "$1" 2>>$ACTIONS_LOG
     return $?
 }
 
@@ -163,7 +168,7 @@ function processRule6File() {
     [ -f "$1" ] || return 0
     echo "CUSTOM RULES FILE $1 CONTENT "  >> $JEM_CALLS_LOG
     cat "$1" >> $JEM_CALLS_LOG
-    $IP6TABLES_RESTORE -n < "$1" 2>>$ACTIONS_LOG
+    $IP6TABLES_RESTORE $2 -n < "$1" 2>>$ACTIONS_LOG
     return $?
 }
 
@@ -323,10 +328,37 @@ function doStart() {
     declare -a ports;
     log "Starting firewall";
 
+    #making backup of current rules
+    [ ! -d "/etc/jelastic" ] && mkdir -p "/etc/jelastic" 2>>$JEM_CALLS_LOG
+    $IPTABLES_SAVE > $BACKUP_IPV4 2>>$JEM_CALLS_LOG
+    $IP6TABLES_SAVE > $BACKUP_IPV6 2>>$JEM_CALLS_LOG
+
+
     local cartridge_config="/opt/repo/jelastic/jelastic.conf";
     [ -f "$cartridge_config"  ] && Firewall_Enabled=$($GREP Firewall_Enabled "$cartridge_config" | $AWK -F "=" '{ print $2 }')
     [ ! -z "${Firewall_Enabled}" ] && FIREWALL_ENABLED=${Firewall_Enabled};  ### Override for cartridges
     [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
+
+    _rule4Files=($CUSTOM_RULES_FILE $JELASTIC_4RULES_FILE $JELASTIC_4NATRULES_FILE)
+    _rule6Files=($CUSTOM_6RULES_FILE $JELASTIC_6RULES_FILE $JELASTIC_6NATRULES_FILE)
+
+    #test rule files
+    _testRes=0
+    for j in $(seq 4 2 6) ; do
+        eval "_ruleFiles=(\${_rule${j}Files[*]})"
+        eval "_processRuleFile=processRule${j}File"
+        for i in $(seq 0 $((${#_ruleFiles[*]}-1)) ) ; do
+            $_testRuleFile ${_ruleFiles[$i]} "-t"
+            _res=$?
+            [[ "$_res" -ne 0 ]] && echo "Test contents of ${_ruleFiles[$i]} filed" >>$JEM_CALLS_LOG
+            _testRes=$((_testRes+_res))
+        done
+    done
+    if [[ $_testRes -gt 0 ]] ; then
+        echo "Current iptables rules not modified due to errors in new rule-files" >>$JEM_CALLS_LOG
+        return 2
+    fi
+
 
     $IPTABLES -F;
     $IPTABLES -t nat -F;
@@ -388,9 +420,6 @@ function doStart() {
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
         [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" >>$JEM_CALLS_LOG 2>&1;
     }
-
-    _rule4Files=($CUSTOM_RULES_FILE $JELASTIC_4RULES_FILE $JELASTIC_4NATRULES_FILE)
-    _rule6Files=($CUSTOM_6RULES_FILE $JELASTIC_6RULES_FILE $JELASTIC_6NATRULES_FILE)
 
     _loadRes=0
     for j in $(seq 4 2 6) ; do
@@ -546,7 +575,7 @@ function describeFWReconfigureOptions() {
 
 
 function doFWReconfigure() {
-    _isFWEnabled && doStart;
+    _isFWEnabled && doStart
 }
 
 function describeEnable() {

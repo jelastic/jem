@@ -20,6 +20,7 @@
 OUTPUTLIB_VERSION="0.1";
 $PROGRAM 'sed';
 include log;
+PUBLISH_ERROR=0
 
 ACTIONS_LOG="/var/log/actions$$.log";
 
@@ -56,6 +57,7 @@ function cleanActionsLog() {
 function writeJSONResponseOut(){
     local args="\"$1\"";
     args="$args,\"execTime=>$SECONDS\""
+    [[ "$PUBLISH_ERROR" -eq 1 ]] && args="$args,\"publishError=>true\""
     shift;
     while (( "$#" )); do
         args="$args,\"$1\"";

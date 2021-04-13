@@ -282,11 +282,7 @@ function _adjustNFSFirewall() {
         set +f
     else
         #firewall is enabled, so call reconfiguration method
-        if ! vzexecRun "jem firewall FWReconfigure" ; then
-            writeJSONResponseErr "result=>4068" "message=>Firewall rules are not set properly"
-        else
-            writeJSONResponseOut "result=>0" "message=>Firewall rules set"
-        fi
+        vzexecRun "jem firewall FWReconfigure"
     fi
 }
 
@@ -784,8 +780,14 @@ function _cleanip() {
 }
 
 function doAdjustFirewall() {
-    _adjustFirewall
-    return 0;
+    if ! _adjustFirewall ; then
+        PUBLISH_ERROR=1
+        writeJSONResponseErr "result=>4068" "message=>Firewall reconfiguration error"
+        return 1
+    else
+        writeJSONResponseOut "result=>0" "message=>Firewall reconfigured successfully"
+        return 0
+    fi
 }
 
 function doAdd() {
