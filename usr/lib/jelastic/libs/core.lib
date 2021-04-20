@@ -361,7 +361,7 @@ function doAction() {
     [[ ${MANAGE_BINARY_NAME##*/} != ${MANAGE_PROGRAM_NAME} ]] && {
         MANAGE_COMMAND="${MANAGE_BINARY_NAME##*/}";
     }
-    declare -x result;
+    declare -x result
 
     #default timeout for all actions is 1hr
     actiontimeout=3600
