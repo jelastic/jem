@@ -858,10 +858,10 @@ function doSet() {
     for e in ${clist[@]}; do
         echo "el=$e"
         if [[ $e =~ $re ]] ; then
-            volName=${BASH_REMATCH[1]}
-            ipa=${BASH_REMATCH[2]}
+            volName=${BASH_REMATCH[3]}
+            ipa=${BASH_REMATCH[1]}
 
-            if [[ ! " ${volumes[@]} " =~ " cp$volName " ]]; then
+            if [[ ! " ${volumes[@]} " =~ " clp$volName " ]]; then
                 volumes+=("clp$volName")
                 eval "clp${volName}=()"
             fi
