@@ -41,6 +41,8 @@ _NFS_VERSION=3
 MOUNTPROG="/sbin/unfsd"
 MOUNTPACKAGE="/var/lib/jelastic/packages/jelastic-nfs-server.tar.gz"
 METAINFOFILE="/etc/jelastic/metainf.conf"
+CLIENTSPATH="/etc/jelastic/clients"
+CLIENTS=""
 
 $PROGRAM "tar"
 VZ_TYPE=0
@@ -53,7 +55,7 @@ function onModLoadCallback() {
     log "Preload callback";
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -o t:,l:,p:,c:,r: -l list:,type:,path:,ctid:,readonly:,version: -- params "$@" 2>/dev/null` oldifs;
+    local temp=`getopt -o t:,l:,p:,c:,r: -l list:,clients:,type:,path:,ctid:,readonly:,version: -- params "$@" 2>/dev/null` oldifs;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
@@ -82,6 +84,10 @@ function onModLoadCallback() {
                 CTID=$1
                 vzexecSetCTID $CTID
                 shift
+                ;;
+            --clients )
+                shift
+                CLIENTS="$1"
                 ;;
             --version )
                 shift
@@ -116,6 +122,8 @@ function onModLoadCallback() {
             [ ! -n "$res" ] && eval "$res"
         fi
 
+
+        vzexecRun "[ ! -d $CLIENTSPATH ] && mkdir -p $CLIENTSPATH"
         VZ_TYPE=$(set +f; cat /etc/*release /etc/issue | grep -i "virtuozzo\|parallels" | awk '{ for (i=1; i<NF; i++ ) {if ($i ~ "release" ) print $(i+1) }}' | awk -F'.' '{print $1}' | head -n 1)
     }
 }
@@ -587,6 +595,12 @@ function _addNativeip() {
 }
 
 function _addGlusterShare() {
+    if ! isContainerRunning $CTID ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID Container is not running. Skipping with OK " >> ${JEM_CALLS_LOG}
+        writeJSONResponseOut "result=>0" "message=>Operation was skipped due container is stopped" "version=>GLUSTER"
+        return 0
+    fi
+
     if ! vzexecRun "command -v gluster &>/dev/null" ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID gluster command not found " >> ${JEM_CALLS_LOG}
         writeJSONResponseErr "result=>4208" "message=>GlusterFS cluster is not available"
@@ -625,6 +639,7 @@ function _addGlusterShare() {
         _ipstr=${aNewIPs[@]}
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID setting $volumeName auth.allow to ${_ipstr// /,}" >> ${JEM_CALLS_LOG}
         vzexecRun "gluster volume set $volumeName auth.allow ${_ipstr// /,}" || return 1
+        vzexecRun "[[ -d $CLIENTSPATH ]] && echo \"$_ipstr\" >> $CLIENTSPATH/$volumeName"
     else
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID auth.allow not changed" >> ${JEM_CALLS_LOG}
     fi
@@ -698,6 +713,12 @@ function _removeNativeip() {
 }
 
 function _removeGlusterShare() {
+    if ! isContainerRunning $CTID ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID Container is not running. Skipping with OK " >> ${JEM_CALLS_LOG}
+        writeJSONResponseOut "result=>0" "message=>Operation was skipped due container is stopped" "version=>GLUSTER"
+        return 0
+    fi
+
     if ! vzexecRun "command -v gluster &>/dev/null" ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID gluster command not found " >> $JEM_CALLS_LOG
         writeJSONResponseErr "result=>4208" "message=>GlusterFS cluster is not available"
@@ -721,6 +742,7 @@ function _removeGlusterShare() {
         if [[ ! -z $(indexOf "${aCurrentIPs[*]}" "$i") ]] ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i from auth.allow " >> $JEM_CALLS_LOG
             aNewIPs=("${aNewIPs[@]/$i}")
+            vzexecRun "[ -e $CLIENTSPATH/$volumeName ] && sed -i -re s/$i//g -e s/  / /g $CLIENTSPATH/$volumeName"
             setNewList=1
         fi
     done
@@ -826,6 +848,63 @@ function doList() {
 function doClean() {
     _clean${NFS_BACKEND}${ATYPE};
     return $?
+}
+
+function doSet() {
+    OIFS=$IFS;IFS=";" clist=($CLIENTS);IFS=$OIFS
+    volumes=()
+
+    re='(.*):(.*):(.*)'
+    for e in ${clist[@]}; do
+        echo "el=$e"
+        if [[ $e =~ $re ]] ; then
+            volName=${BASH_REMATCH[1]}
+            ipa=${BASH_REMATCH[2]}
+
+            if [[ ! " ${volumes[@]} " =~ " cp$volName " ]]; then
+                volumes+=("clp$volName")
+                eval "clp${volName}=()"
+            fi
+            eval "clp${volName}+=($ipa)"
+        fi
+    done
+
+    if ! vzexecRun "gluster volume list" ; then
+        writeJSONResponseErr "result=>4208" "message=>GlusterFS cluster is not available"
+        return 1
+    fi
+    cVols=($vzexecGetLastStdOut)
+
+    for v in ${cVols[@]} ; do
+        if ! vzexecRun "gluster volume get $v auth.allow 2>/dev/null | tail -n 1 | tr -s ' ' | cut -d ' ' -f2 | tr ',' ' '" ; then
+            writeJSONResponseErr "result=>4210" "message=>Can not get volume auth list for $v"
+            return 1
+        fi
+        eval "clc$v=($(vzexecGetLastStdOut))"
+        vzexecRun "[ -e $CLIENTSPATH/$v ] && cat $CLIENTSPATH/$v"
+        eval "clf$v=($(vzexecGetLastStdOut))"
+
+        aList=clc$v[@]
+        bList=clf$v[@]
+        pList=clp$v[@]
+        rList=()
+
+        FVol=" ${!bList} "
+        for i in "${!aList}" ; do
+            [[ $FVol =~ " $i " ]]  || rList+=($i)
+        done
+
+        rList+=(${!pList})
+        rList=$(tr ' ' '\n' <<< "${rList[@]}" | sort -u | tr '\n' ' ')
+
+        if ! vzexecRun "gluster volume set $v auth.allow ${rList// /,}" ; then
+            writeJSONResponseErr "result=>4210" "message=>Can not set volume auth list for $v"
+            return 1
+        fi
+    done
+
+    writeJSONResponseOut "result=>0" "message=>Clients set successfully"
+    return 0
 }
 
 defineBigInline SystemDUnit << 'EOF'
