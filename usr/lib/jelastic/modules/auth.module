@@ -88,6 +88,7 @@ function onModLoadCallback() {
             --clients )
                 shift
                 CLIENTS="$1"
+                shift
                 ;;
             --version )
                 shift
