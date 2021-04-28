@@ -857,7 +857,6 @@ function doSet() {
 
     re='(.*):(.*):(.*)'
     for e in ${clist[@]}; do
-        echo "el=$e"
         if [[ $e =~ $re ]] ; then
             volName=${BASH_REMATCH[3]}
             ipa=${BASH_REMATCH[1]}
