@@ -212,7 +212,6 @@ function preparePath() {
     local tpath=${1:?"Path required"}
     local hn=${2}
     if [[ ! -z "${hn}" ]] ; then
-        tpath="${VZ_CTID_ROOT}${tpath}"
         tpath=$($SED -re 's/\$/\\$/g' -e 's/(`)/\\\1/g' <<< "${tpath}")
     fi
 
@@ -850,8 +849,8 @@ function doUmount() {
                 else
                     local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\ /g' <<< "${shares[$i]}"))\s+-fstype=(nfs|glusterfs).*";
                 fi
-                out=$($SED -i -re /"${dpath}"/d ${MOUNTS_STORAGE} 2>&1)
-                out=$($SED -i -re /"${dpath}"/d "${VZ_CTID_ROOT}/etc/autofs.gluster" 2>&1)
+                out=$( [[ -e "$MOUNTS_STORAGE" ]] && $SED -i -re /"${dpath}"/d "$MOUNTS_STORAGE" 2>&1 )
+                out=$( [[ -e "${VZ_CTID_ROOT}/etc/autofs.gluster" ]] && $SED -i -re /"${dpath}"/d "${VZ_CTID_ROOT}/etc/autofs.gluster" 2>&1 )
                 [[ ! -z "${out}" ]] && log "${out}";
                 retfunc="writeJSONResponseOut result=>0"
             else
