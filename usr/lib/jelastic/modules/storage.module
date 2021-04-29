@@ -722,10 +722,13 @@ function gatherCTInfo() {
         echo "Container $CTID is not running"
     }
 
-    _ctAutoFSFile="$(vzexecRun " [ -e \"/etc/autofs.conf\" ] && cat $MOUNTS_STORAGE || echo \"/etc/autofs.conf not found\""; vzexecGetLastStdOut)"
+    local _autoFSCfg
+    [[ -n "$CONTAINER_MOUNTS_STORAGE" ]] && _autoFSCfg=$CONTAINER_MOUNTS_STORAGE || _autoFSCfg=${MOUNTS_STORAGE##"$VZ_CTID_ROOT"}
+
+    _ctAutoFSFile="$(vzexecRun " [ -e \"$_autoFSCfg\" ] && cat \"$_autoFSCfg\" || echo \"$_autoFSCfg not found\""; vzexecGetLastStdOut)"
     _ctFstab="$(vzexecRun " [ -e \"/etc/fstab\" ] && cat /etc/fstab || echo \"/etc/fstab not found\""; vzexecGetLastStdOut)"
     _ctIptablesRules="$(vzexecRun "iptables -S"; vzexecGetLastStdOut)"
-    _ctIpInfo="$(vzexecRun "ip a l; ip r l; cat /etc/resolvconf" ; vzexecGetLastStdOut)"
+    _ctIpInfo="$(vzexecRun "ip a l; ip r l; [ -e /etc/resolv.conf ] && cat /etc/resolv.conf || echo /etc/resolv.conf" ; vzexecGetLastStdOut)"
 
     echo -e "\n`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID \n=====\nContainer $CTID Info:\nautofs:\n$_ctAutoFSFile\nfstab:\n$_ctFstab\nip info:\n$_ctIpInfo\niptables:\n$_ctIptablesRules\n=====\n"
 }
