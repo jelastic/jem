@@ -324,11 +324,11 @@ function processnfs() {
     OS_ver=${OS_ver%%.*}
 
     if [[ "x$OS" == "xalpine" ]] ; then
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. " >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. " >> ${JEM_CALLS_LOG}
 
         if vzexecRun "[[ ! -e \"$MOUNTPROG_APK\" ]]" ; then
             if ! dosetupUtils ; then
-                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Error installing utils $(gatherCTInfo) " >> ${JEM_CALLS_LOG}
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Error installing utils $(gatherCTInfo) " >> ${JEM_CALLS_LOG}
                 return 2
             fi
         fi
@@ -353,7 +353,7 @@ function processnfs() {
 
     if [[ $running -eq 0 ]] ; then
         if ! checkMount $sourceIP "$sourceMountUnEsc" ; then
-            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Destination NFS server is not reachable. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Destination NFS server is not reachable. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
             echo "Destination NFS server is not reachable. Server IP: $(vzctl exec2 ${CTID} host ${sourceIP} 2>/dev/null), Client IP: $($AWK '/[ \t]*'${CTID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo )"
             return 1
         fi
@@ -361,15 +361,15 @@ function processnfs() {
 
     if ! preparePath "${_DESTINATION}" "${_CTID}" ; then
         echo "Can not create path ${_DESTINATION}"
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Can not create path ${_DESTINATION}. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Can not create path ${_DESTINATION}. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1
     fi
 
     if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : registering ${sourceIP}:${sourceMount} in ${_CTID}" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : registering ${sourceIP}:${sourceMount} in ${_CTID}" >> ${JEM_CALLS_LOG}
         out=$(echo -e $mntEntry >> ${MOUNTS_STORAGE})
         if [[ ! -z "${out}" ]] ; then
-            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : $out" >> ${JEM_CALLS_LOG}
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : $out" >> ${JEM_CALLS_LOG}
         fi
     fi
 
@@ -394,7 +394,7 @@ function processnfs() {
                     fi
                     log $out
                     msg="${msg}. Server IP is: $(host ${sourceIP}), RPC connection: $(timeout 1 bash -c "cat < /dev/null > /dev/tcp/${sourceIP}/111" 2>/dev/null; echo $?)"
-                    echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Error mounting share. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Error mounting share. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
                     res=4111
                 else
                     res=0
@@ -456,7 +456,7 @@ function processgluster() {
     OS_ver=${OS_ver%%.*}
 
     if [[ "x$OS" == "xalpine" ]] ; then
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. Glusterfs is not supported for it" >> $JEM_CALLS_LOG
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. Glusterfs is not supported for it" >> $JEM_CALLS_LOG
         writeJSONResponseErr "result=>4207" "message=>Can not setup gluster native client"
         return 2
     fi
@@ -471,15 +471,15 @@ function processgluster() {
 
     if ! preparePath "$_DESTINATION" "$CTID" ; then
         echo "Can not create path $_DESTINATION"
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Can not create path $_DESTINATION. $(gatherCTInfo)" >> $JEM_CALLS_LOG
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Can not create path $_DESTINATION. $(gatherCTInfo)" >> $JEM_CALLS_LOG
         return 1
     fi
 
     if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : registering $sourceIP:$sourceMount in $CTID" >> $JEM_CALLS_LOG
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : registering $sourceIP:$sourceMount in $CTID" >> $JEM_CALLS_LOG
         out=$(echo -e $mntEntry >> $MOUNTS_STORAGE)
         if [[ ! -z "$out" ]] ; then
-            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : $out" >> $JEM_CALLS_LOG
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : $out" >> $JEM_CALLS_LOG
         fi
     fi
 
@@ -509,14 +509,14 @@ function processlocal() {
     local mntEntry="${sourceMount}\t${_DESTINATION}\tnone\trw,bind\t0\t0"
 
     if [ -z "$_CTID" ] ; then
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : there is no CTID. Local mounts available only via hardnode call $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : there is no CTID. Local mounts available only via hardnode call $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         echo "CTID required"
         return 1;
     fi
 
     isContainerRunning ${CTID} ; running=$?
     [[ $running -ne 0 ]] && {
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Container $CTID is not running. Mounting" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Container $CTID is not running. Mounting" >> ${JEM_CALLS_LOG}
         $VZCTL mount $CTID > /dev/null 2>&1
     }
 
@@ -528,12 +528,12 @@ function processlocal() {
 
     if [[ ${#aCurrentMounts[@]} -gt 0 ]] ; then
         if indexOf "${aCurrentMounts[*]}" "${sourceMount}" >/dev/null; then
-            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : ${sourceMount} already mounted" >> ${JEM_CALLS_LOG}
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : ${sourceMount} already mounted" >> ${JEM_CALLS_LOG}
             echo "already mounted"
             return 0;
         fi
     else
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : cannot get fstab entries" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : cannot get fstab entries" >> ${JEM_CALLS_LOG}
     fi
 
     if ! preparePath "${_DESTINATION}" 1 ; then
@@ -554,7 +554,7 @@ function processlocal() {
     fi
 
     if [[ "$_MOVEDATA" -gt 0 ]] ; then
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : moving data from $hnDstPath to $hnSrcPath" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : moving data from $hnDstPath to $hnSrcPath" >> ${JEM_CALLS_LOG}
         $RSYNC -aP --force "${hnDstPath}/" "${hnSrcPath}/" >> $ACTIONS_LOG 2>&1
         rm -fr "${hnDstPath}/*" >> $ACTIONS_LOG 2>&1
     fi
@@ -568,7 +568,7 @@ function processlocal() {
     fi
     res=$?
     if [[ $res -gt 0 ]]; then
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : error mounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : error mounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1;
     fi
     return 0;
@@ -857,7 +857,7 @@ function doUmount() {
                 [[ ! -z "${out}" ]] && log "${out}";
                 retfunc="writeJSONResponseOut result=>0"
             else
-                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : error umounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : error umounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
                 retfunc="writeJSONResponseErr result=>99"
             fi
         else

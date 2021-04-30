@@ -583,12 +583,12 @@ function _addNativeip() {
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: timeout has elapsed" >> ${JEM_CALLS_LOG};
             lasterr=$(vzexecGetLastErrCode)
             if [[ "$lasterr" -ne 0 ]] ; then
-                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID showmount fails. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID showmount fails. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
                 writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
             fi
             return $lasterr
         else
-            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID Error adding export entry. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID Error adding export entry. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
             writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
         fi
     fi
@@ -669,7 +669,7 @@ function _removeNativeip() {
     fi
 
     _checkConfigs || {
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _checkConfigs failed. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID _checkConfigs failed. $(gatherCTInfo) | $err " >> ${JEM_CALLS_LOG}
         writeJSONResponseErr "result=>4113" "message=>NFS: Can not add client configuration"
         return $FALSE
     }
@@ -681,9 +681,9 @@ function _removeNativeip() {
         if [ ! -z "$IPT" ] ; then
            for i in "${IPLIST[@]}" ; do
                 isValidIP $i || continue
-                echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i | $err " >> ${JEM_CALLS_LOG}
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i | $err " >> ${JEM_CALLS_LOG}
                 if ! vzexecRun "sed -i -re \"/\\\"?$DESTINATION\\\"?\s+${i//./\\.}/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}\" $CONTAINER_EXPORTS_FILE" ; then
-                    echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID error removing $i " >> ${JEM_CALLS_LOG}
+                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID error removing $i " >> ${JEM_CALLS_LOG}
                 fi
                 vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $i -j ACCEPT; $IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $i -j ACCEPT"
             done
@@ -697,7 +697,7 @@ function _removeNativeip() {
     else
         for i in "${IPLIST[@]}" ; do
             isValidIP $i || continue
-            echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i | $err " >> ${JEM_CALLS_LOG}
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i | $err " >> ${JEM_CALLS_LOG}
             $SED -i -re "/\"?$DESTINATION\"?\s+/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
         done
     fi
