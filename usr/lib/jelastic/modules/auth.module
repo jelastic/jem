@@ -415,8 +415,8 @@ function _addNativeip() {
         _version=4
         _UUID=$(cat /proc/sys/kernel/random/uuid)
         if isContainerRunning ${CTID} ; then
+            _createPath=1
             if vzexecRun "grep -q \" $destinationPath fuse\" /proc/mounts" ; then
-                _createPath=0
                 _isFUSE=1
             elif vzexecRun "fuse_avail=\$(grep \"fuse\" /proc/mounts | awk '{print \$2}'); [ -n \"\$fuse_avail\" ] &&  grep -q \$fuse_avail <<< \"$destinationPath\"" ; then
                 vzexecRun "[ ! -e \"${destinationPath}\" ]" && _createPath=1 || _createPath=0
@@ -472,7 +472,7 @@ function _addNativeip() {
             fi
 
             if vzexecRun "[[ ! -d \"$destinationPath\" ]] && [ ! -L \"$destinationPath\" ]" ; then
-                if [[ $_createPath -eq 1 ]] && [[ $_isFUSE -eq 1 ]] ; then
+                if [[ $_createPath -eq 1 ]] ; then
                     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - creating directory $destinationPath" >> ${JEM_CALLS_LOG}
                     if ! vzexecRun "mkdir -p \"$destinationPath\" && chmod 0777 \"$destinationPath\"" ; then
                         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - Error creating directory: $(vzexecGetLastStdErr; vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG}
@@ -745,7 +745,9 @@ EOF
 defineBigInline _INSTALLUNFSDCMD <<'EOF'
 if [ -d /run/systemd/system ] ; then
     systemctl restart rpcbind
+    systemctl restart rpcbind.socket
     systemctl enable unfsd
+    systemctl start unfsd
 else
     [ -f /etc/init.d/rpcbind ] && /etc/init.d/rpcbind restart
     sed -i "s/\/usr\/sbin\/unfsd/\/sbin\/unfsd/g" /etc/init.d/unfsd.jelastic
