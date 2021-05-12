@@ -458,8 +458,8 @@ function _addNativeip() {
     [ "$VZ_TYPE" -eq 6 ] && _version=3
 
     if [ -e "${EXPORTS_FILE}" ] ; then
-        dPath="\"$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< $destinationPath)\"\s+"
-        if [[ $running -ne 0 ]] ; then
+        dPath="\\\"?$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< $destinationPath)\\\"?\s+"
+        if [[ $running -eq 0 ]] ; then
             if vzexecRun "grep -E \"$dPath\" \"$CONTAINER_EXPORTS_FILE\"" ; then
                 aCurrentIPs=($(vzexecGetLastStdOut | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])(\/[0-9]{2})?'))
             fi
@@ -520,7 +520,7 @@ function _addNativeip() {
             if [[ $running -ne 0 ]] ; then
                 echo -e "\"${destinationPath}\"\t$i($_opts)" >> "${EXPORTS_FILE}"
             else
-                if ! vzexecRun "echo -e \"\"${destinationPath}\"\t$i($_opts)\">> $CONTAINER_EXPORTS_FILE" ; then
+                if ! vzexecRun "echo -e \"\\\"${destinationPath}\\\"\t$i($_opts)\">> $CONTAINER_EXPORTS_FILE" ; then
                     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error adding entry. Error: $(vzexecGetLastStdErr; vzexecGetLastStdOut). $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
                 fi
             fi
