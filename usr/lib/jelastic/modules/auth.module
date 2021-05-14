@@ -605,15 +605,16 @@ function _removeNativeip() {
             vzexecRun "jem firewall FWReconfigure"
         fi
     else
+        EXPORTS_FILE="$(vzctPath $VZ_CTID_ROOT $CONTAINER_EXPORTS_FILE)"
         for i in "${IPLIST[@]}" ; do
             isValidIP $i || continue
             echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i | $err " >> ${JEM_CALLS_LOG}
-            $SED -i -re "/\"?$DESTINATION\"?\s+/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" "${EXPORTS_FILE}"
+            $SED -i -re "/\"?$DESTINATION\"?\s+/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}" $EXPORTS_FILE
         done
     fi
 
     # clean up the exports file
-    $SED -i -re '/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/!d' "${EXPORTS_FILE}"
+    $SED -i -re '/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/!d' $EXPORTS_FILE
 
     if [[ $running -ne 0 ]] ; then
         $VZCTL umount $CTID > /dev/null 2>&1
