@@ -330,11 +330,7 @@ function doStart() {
         eval "_ruleFiles=(\${_rule${j}Files[*]})"
         eval "_processRuleFile=processRule${j}File"
         for i in $(seq 0 $((${#_ruleFiles[*]}-1)) ) ; do
-<<<<<<< HEAD
             $_processRuleFile  ${_ruleFiles[$i]} "-t"
-=======
-            $_testRuleFile ${_ruleFiles[$i]} "-t"
->>>>>>> a233221 (JE-58045: [Firewall] - test rule files and backup before applying changes)
             _res=$?
             [[ "$_res" -ne 0 ]] && echo "Test contents of ${_ruleFiles[$i]} filed" >>$JEM_CALLS_LOG
             _testRes=$((_testRes+_res))
