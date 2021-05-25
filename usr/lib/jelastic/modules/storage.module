@@ -14,9 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
-inherit os output vzexec virtuozzo;
+inherit os output vzexec virtuozzo tests;
 include log;
 
 DESCRIPTION="Manipulate storage mounts inside specified container";
@@ -24,6 +22,7 @@ VERSION="1"
 DEFAULT_ACTION="Usage";
 
 $PROGRAM "vzctl"
+$PROGRAM "prlctl"
 $PROGRAM "vzlist"
 $PROGRAM "awk"
 $PROGRAM "ifconfig"
@@ -33,6 +32,7 @@ $PROGRAM "tar"
 
 declare -i _CTID=""
 declare -i CTID=""
+declare VEID=""
 declare -i _MOVEDATA=0
 declare CLUSTER="false"
 declare _SOURCE=""
@@ -63,6 +63,7 @@ DEFAULT_AUTOFS_TIMEOUT=300
 JELASTIC_AUTOFS_TIMEOUT=3
 
 EXEC="/bin/bash -c "
+SED_COPY_OPTION='--copy'
 
 function doUsage() {
     showUsageMessage
@@ -72,7 +73,7 @@ function onModLoadCallback() {
     log "Preload callback";
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -o c:,s:,d:,u:,g:,l:,m: -l ctid:,source:,destination:,ip:,uid:,gid:,movedata:,saveconfig:,force:,cluster: -- "$@" 2>/dev/null`;
+    local temp=`getopt -o c:,s:,d:,u:,g:,l:,m: -l ctid:,source:,destination:,ip:,uid:,gid:,movedata:,saveconfig:,force:,cluster:,uuid:,vtype: -- "$@" 2>/dev/null`;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
@@ -93,8 +94,17 @@ function onModLoadCallback() {
                 shift;
                 _CTID=$1
                 CTID=$1
-                EXEC="$VZCTL exec2 ${_CTID}"
-                vzexecSetCTID ${_CTID}
+                shift;
+                ;;
+            --uuid)
+                shift;
+                _UUID=$1
+                UUID=$1
+                shift;
+                ;;
+            --vtype)
+                shift;
+                VTYPE=$1
                 shift;
                 ;;
             --cluster)
@@ -141,36 +151,68 @@ function onModLoadCallback() {
                 ;;
         esac;
     done;
-    [ -n "$CTID" ] && { vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; }
+        
+    if [[ "$VTYPE" == VM ]]; then
+        EXEC="$PRLCTL exec ${UUID}"
+        vzexecSetENVID ${UUID}
+        VEID=${UUID}
+        isVMexist $UUID || { writeJSONResponseErr "result=>4003" "message=>uuid $UUID not found"; die -q; };
+    else
+        EXEC="$VZCTL exec2 ${CTID}"
+        vzexecSetCTID ${CTID}
+        VEID=${CTID}
+        vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; };
+    fi
 
-    [ -n "$CTID" ] && {
+    [[ -n "$CTID" && "$VTYPE" != VM ]] && {
         VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
-        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
-        if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
-            res=$(vzexecGetLastStdOut)
+        VE_ROOT=$(vzlist -Ho root $CTID )
+        if VEExecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
+            res=$(VEexecGetLastStdOut)
             [ -n "$res" ] && eval "$res"
         fi
     }
+    
+    [[ -n "$UUID" && "$VTYPE" == VM ]] && {
+        VE_ROOT="/vz/tmp/${UUID}"
+    }
 
     for arg do UNKNOWN_ARG+=("$arg") ; done
-    [[ ! -z "${CTID}" ]] && {
-        MOUNTS_STORAGE="${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}"
+    [[ ! -z "${VEID}" ]] && {
+        MOUNTS_STORAGE="${VE_ROOT}${CONTAINER_MOUNTS_STORAGE}"
     }
     log "${UNKNOWN_ARG[*]}"
     return 0
+}
+
+function getOS(){
+    isVERunning ${VEID} && {
+        VEExecRun "set +f; cat /etc/*-release /etc/issue 2>/dev/null"
+        issue_string="$(VEexecGetLastStdOut)"
+    } || {
+        local issue_file="$(vzctPath $VE_ROOT /etc/issue )"
+        local release_files="$(vzctPath $VE_ROOT /etc/)/*-release"
+        issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+    }
+    OS=$(detectOS "$issue_string")
+    OS_ver=$(getOSVersion "$issue_string")
+    OS_ver=${OS_ver%%.*}
+    if [[ "OS" == "ubuntu" ]]; then
+        SED_COPY_OPTION=''
+    fi
 }
 
 function _hasActiveMounts() {
     #-hosts is /net/host
     #dir:path -> /path/*
     _cmd='[ -f /etc/auto.master ] && sed -re "/^#/d" -e "s/dir:(.*)/+ \1\/*/g" -e "/\s/!d" -e "s/.*\s(\/.*).*/\1/g" -e "s/--timeout=.*//g"  -e "s/.*\s-hosts/\/net\/host/g" /etc/auto.master'
-    vzexecRun "$_cmd"
-    autoFSMaps=($(vzexecGetLastStdOut))
+    VEExecRun "$_cmd"
+    autoFSMaps=($(VEexecGetLastStdOut))
     if [ -n "$autoFSMaps" ] ; then
         for f in ${autoFSMaps[*]} ; do
             #skipping also cdrom. it is not available in jelastic vzcontainers
-            vzexecRun "[ -f \"$f\" ] && sed -re '/^#/d' -e '/^$/d' -e '/\/dev\/cdrom/d' $f"
-            [ -n "$(vzexecGetLastStdOut)" ] && return 0
+            VEExecRun "[ -f \"$f\" ] && sed -re '/^#/d' -e '/^$/d' -e '/\/dev\/cdrom/d' $f"
+            [ -n "$(VEexecGetLastStdOut)" ] && return 0
         done
     fi
     return 1
@@ -178,34 +220,25 @@ function _hasActiveMounts() {
 
 function _reloadAutoFS() {
     local _cmd="systemctl reload autofs || service autofs reload"
-    vzexecRun "$_cmd" && return 0
+    VEExecRun "$_cmd" && return 0
 
     _cmd="pgrep automount >/dev/null && kill -s SIGHUP $(pidof -s automount)"
-    vzexecRun "$_cmd"
+    VEExecRun "$_cmd"
     return $?
 }
 
 function _restartAutoFS() {
     local _cmd="systemctl restart autofs || service autofs restart"
-    vzexecRun "$_cmd"
+    VEExecRun "$_cmd"
     return $?
 }
 
-function _isVirtuozzoInstalled() {
-    local vzmainconfig="/etc/sysconfig/vz";
-    if [ -f "${vzmainconfig}" ] ; then
-        $GREP -qE "VIRTUOZZO=[\s|\"|']*yes[\s|\"|']*" /etc/sysconfig/vz ; return $?;
-    fi
-    return 1
-}
-
 function getTargetIPs() {
-    local lctid=$1
-    if [ -z ${lctid} ] ; then
-        $IFCONFIG | $AWK '/inet addr/{print substr($2,6)}'
-    else
-        $AWK '/[ \t]*'${lctid}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo
-    fi
+    isUUID $VEID && {
+        VEExecRunInteractive "ip -o addr" | awk '!/^[0-9]*: ?lo|link\/ether/ {split($4,a,"/"); print a[1]}'
+    } || {
+        $AWK '/[ \t]*'${VEID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo
+    }
 }
 
 function preparePath() {
@@ -218,8 +251,8 @@ function preparePath() {
     local cmd="[[ -d '$($SED -re "s/'/\\\'\'/g" <<< "${tpath}")' ]] || { mkdir -p \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\" 2>/dev/null && chmod 0777 \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\";}";
     if [[ -z "${hn}" ]] ; then
         log "${cmd}"
-        vzexecRun "${cmd}"
-        return $(vzexecGetLastErrCode)
+        VEExecRun "${cmd}"
+        return $(VEexecGetLastErrCode)
     fi
     log "${cmd}"
     /bin/bash -c "$cmd"
@@ -229,24 +262,19 @@ function preparePath() {
 function remountPath() {
     local share=${1}
     local remountCmd="umount -l ${share} ; mount ${share}"
-    out=$($EXEC "$remountCmd" 2>&1)
+    out=$(VEExecRunInteractive "$remountCmd" 2>&1)
     if [[ -z "${out}" ]] ; then
        log "$out"
     fi
     return $?
 }
 
-function migrateConfig() {
-    $SED -nre '/nfs(3|4)?/p' "$VZ_CTID_ROOT/etc/fstab" | awk "{print \$2\" ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} \"\$1}" >> "${MOUNTS_STORAGE}"
-    $SED -i -re '/nfs(3|4)?/d' "$VZ_CTID_ROOT/etc/fstab"
-}
-
 function checkMount() {
-    #skip check if CTID is empty
-    [[ -z "${CTID}" ]] && return 0
+    #skip check if VEID is empty
+    [[ -z "${VEID}" ]] && return 0
 
     if [ -z "$JELASTIC_CHECK_MOUNT" ]; then
-        if ! vzexecRun "rpcinfo -p $1 | grep -q mountd" ; then
+        if ! VEExecRun "rpcinfo -p $1 | grep -q mountd" ; then
             log "mountd procedures not found on RPC server. Checking remote share will be disabled"
             JELASTIC_CHECK_MOUNT=0
         fi
@@ -255,23 +283,23 @@ function checkMount() {
 
     case "$JELASTIC_CHECK_MOUNT" in
        false|0)
-            log "remote server checking disabled for CTID $CTID"
+            log "remote server checking disabled for VEID $VEID"
             return 0
             ;;
         true|1)
-            log "remote server checking enabled for CTID $CTID"
+            log "remote server checking enabled for VEID $VEID"
             ;;
     esac
 
     retries=5
     cmdShowmount='showmount -e '$1' | grep "'$2'"'
 
-    localCIPs=($(getTargetIPs $CTID))
+    localCIPs=($(getTargetIPs))
 
     while [[ $retries -gt 0 ]] ; do
         #get IPs from remote storage
-        vzexecRun $cmdShowmount
-        sharedIPs=($(awk '{split($2,a,",") ; if (a[1] != $0) { for (k in a) { if (a[k] != "") { print a[k] } } } else {print $2}}' <<< "$(vzexecGetLastStdOut)"))
+        VEExecRun $cmdShowmount
+        sharedIPs=($(awk '{split($2,a,",") ; if (a[1] != $0) { for (k in a) { if (a[k] != "") { print a[k] } } } else {print $2}}' <<< "$(VEexecGetLastStdOut)"))
 
         #is local IP in remote network range
         for lIP in ${localCIPs[@]} ; do
@@ -285,11 +313,11 @@ function checkMount() {
         retries=$((retries-1))
     done
 
-    if [[ "$(vzexecGetLastErrCode)" -gt 0 ]]; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: StdErr: $(vzexecGetLastStdErr) StdOut": $(vzexecGetLastStdOut) >> ${JEM_CALLS_LOG};
+    if [[ "$(VEexecGetLastErrCode)" -gt 0 ]]; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID: StdErr: $(VEexecGetLastStdErr) StdOut": $(VEexecGetLastStdOut) >> ${JEM_CALLS_LOG};
     fi
 
-    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID: timeout has elapsed" >> ${JEM_CALLS_LOG};
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID: timeout has elapsed" >> ${JEM_CALLS_LOG};
     return 1
 }
 
@@ -310,66 +338,68 @@ function processnfs() {
     local destinationEsc=$($SED -re 's/\s/\\\\040/g' <<< "${_DESTINATION}" )
     local running
 
-    isContainerRunning ${CTID} ; running=$?
+    isVERunning ${VEID} ; running=$?
     if [[ $running -ne 0 ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> ${JEM_CALLS_LOG}
-        $VZCTL mount $CTID > /dev/null 2>&1
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - VE is not running." >> ${JEM_CALLS_LOG}
+        mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 || { writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID" ;
+                log "Cannot mount VE:$VEID";
+                return 99; }
     fi
-
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
-
+    getOS;
     if [[ "x$OS" == "xalpine" ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. " >> ${JEM_CALLS_LOG}
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Alpine Linux detected. " >> ${JEM_CALLS_LOG}
 
-        if vzexecRun "[[ ! -e \"$MOUNTPROG_APK\" ]]" ; then
+        if VEExecRun "[[ ! -e \"$MOUNTPROG_APK\" ]]" ; then
             if ! dosetupUtils ; then
-                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Error installing utils $(gatherCTInfo) " >> ${JEM_CALLS_LOG}
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Error installing utils $(gatherCTInfo) " >> ${JEM_CALLS_LOG}
                 return 2
             fi
         fi
 
         [[ ! -z "${CTID}" ]] && {
-            MOUNTS_STORAGE="$(vzctPath $VZ_CTID_ROOT /etc/fstab)"
+            MOUNTS_STORAGE="$(vzctPath $VE_ROOT /etc/fstab)"
         }
 
         _DEFAULT_NFS_MOUNT_OPTS="$($SED -re 's/-fstype=nfs,//g' <<< $_DEFAULT_NFS_MOUNT_OPTS)"
         mntEntry="${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")\t${destinationEsc}\tnfs\t${_DEFAULT_NFS_MOUNT_OPTS}\t0\t0"
-        cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE};"
+        #cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE};"
 
     else
-        if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)" 2>&1; then
-            dosetupUtils || return 2
+        if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" <<<"$(VEExecRunInteractive cat /etc/auto.master 2>/dev/null)" 2>&1; then
+            dosetupUtils || {
+                return 2
+            }
         fi
 
         autofsdest="$($SED -e 's/\s/\\ /g' <<< $_DESTINATION)"
         mntEntry="$autofsdest ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
-        cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
+        #cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
     fi
 
     if [[ $running -eq 0 ]] ; then
         if ! checkMount $sourceIP "$sourceMountUnEsc" ; then
-            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Destination NFS server is not reachable. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
-            echo "Destination NFS server is not reachable. Server IP: $(vzctl exec2 ${CTID} host ${sourceIP} 2>/dev/null), Client IP: $($AWK '/[ \t]*'${CTID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo )"
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Destination NFS server is not reachable. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+            echo "Destination NFS server is not reachable. Server IP: $(VEExecRunInteractive host ${sourceIP} 2>/dev/null), Client IP: $($AWK '/[ \t]*'${VEID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo )"
             return 1
         fi
     fi
 
-    if ! preparePath "${_DESTINATION}" "${_CTID}" ; then
+    if ! preparePath "${_DESTINATION}" "${VEID}" ; then
         echo "Can not create path ${_DESTINATION}"
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Can not create path ${_DESTINATION}. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Can not create path ${_DESTINATION}. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1
     fi
 
     if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : registering ${sourceIP}:${sourceMount} in ${_CTID}" >> ${JEM_CALLS_LOG}
-        out=$(echo -e $mntEntry >> ${MOUNTS_STORAGE})
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : registering ${sourceIP}:${sourceMount} in ${VEID}" >> ${JEM_CALLS_LOG}
+        if ! [[ $running == 0 && "$VTYPE" == VM ]]; then
+            out=$(echo -e $mntEntry >> ${MOUNTS_STORAGE})
+        else
+            VEExecRun "echo -e $mntEntry >> ${MOUNTS_STORAGE##"$VE_ROOT"}"
+            out=$(vzexecGetLastStdOut)
+        fi
         if [[ ! -z "${out}" ]] ; then
-            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : $out" >> ${JEM_CALLS_LOG}
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : $out" >> ${JEM_CALLS_LOG}
         fi
     fi
 
@@ -379,13 +409,13 @@ function processnfs() {
     if [[ "x$OS" == "xalpine" ]] ; then
         if [[ $running -eq 0 ]] ; then
             mntcmd="mount \"$($SED -re 's/("\*|\$|\?|\|\^|`|'\'')/\\\1/g' <<< "${_DESTINATION}")\""
-            vzexecRun "${mntcmd}"
-            res="$(vzexecGetLastErrCode)"
-            msg="$(vzexecGetLastStdErr)"
+            VEExecRun "${mntcmd}"
+            res="$(VEexecGetLastErrCode)"
+            msg="$(VEexecGetLastStdErr)"
             if [[ $res -gt "0" ]] && [[ $FORCE_MOUNT -eq $FALSE ]] ; then
                 local mntEntryCheck="${sourceIP}:$($SED -re 's/(\$|\[|\]|\*|\(|\)|\?|\||\^)/\\\1/g' -e 's/\\\\\$/$/g' <<< ${sourceMount})/? on $($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\||\^|`)/\\\1/g' <<< ${destinationEsc})"
-                vzexecRun "mount | $GREP -P \"$mntEntryCheck\""
-                res=$(vzexecGetLastErrCode)
+                VEExecRun "mount | $GREP -P \"$mntEntryCheck\""
+                res=$(VEexecGetLastErrCode)
                 if [[ $res -ne $TRUE ]] ; then
                     #remove the /etc/fstab entry
                     cmdUnregisterMount="/$(echo -e $mntEntry | $SED -r -e 's/\t/\\\s+/g;' -e 's/\//\\\//g' -e 's/\./\\./g' -e 's/(\[|\]|\*|\(|\)|\$|\?|\||\^)/\\\1/g')/d"
@@ -394,7 +424,7 @@ function processnfs() {
                     fi
                     log $out
                     msg="${msg}. Server IP is: $(host ${sourceIP}), RPC connection: $(timeout 1 bash -c "cat < /dev/null > /dev/tcp/${sourceIP}/111" 2>/dev/null; echo $?)"
-                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Error mounting share. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+                    echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Error mounting share. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
                     res=4111
                 else
                     res=0
@@ -407,19 +437,20 @@ function processnfs() {
 
     if [[ $running -eq 0 ]] ; then
         if _hasActiveMounts ; then
-            vzexecRun "$_ENABLEAUTOFSCMD"
+            
+            VEExecRun "$_ENABLEAUTOFSCMD"
             if [[ "x$SAVE_CONFIG" == "xfalse" ]] ; then
                 _restartAutoFS
             else
                 _reloadAutoFS
             fi
         else
-            vzexecRun "$_DISABLEAUTOFSCMD"
+            VEExecRun "$_DISABLEAUTOFSCMD"
         fi
     else
         log "unmounting"
-        $VZCTL umount $CTID > /dev/null 2>&1
-    fi
+        umountVE ${VEID} "$VE_ROOT" >> ${JEM_CALLS_LOG} 2>&1
+    fi 
     [[ -z "$msg" ]] && echo "successfuly mounted" || echo $msg
     [[ "$res" -gt 0 ]] && return 1;
     return 0
@@ -429,8 +460,8 @@ function processgluster() {
     CONTAINER_MOUNTS_STORAGE='/etc/autofs.gluster'
     STORAGE_BACKEND="gluster"
     #check if client available
-    if ! vzexecRun "command -v mount.glusterfs &>/dev/null" ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID glusterfs helper not found. Installing..." >> ${JEM_CALLS_LOG}
+    if ! VEExecRun "command -v mount.glusterfs &>/dev/null" ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID glusterfs helper not found. Installing..." >> ${JEM_CALLS_LOG}
         dosetupUtils || return 1
     fi
 
@@ -438,65 +469,67 @@ function processgluster() {
     local destinationEsc=$(sed -re 's/\s/\\\\040/g' <<< "$_DESTINATION" )
     local running
 
-    [[ ! -z "$CTID" ]] && {
-        MOUNTS_STORAGE="${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}"
+    [[ ! -z "$VEID" ]] && {
+        MOUNTS_STORAGE="${VE_ROOT}${CONTAINER_MOUNTS_STORAGE}"
     }
 
-    isContainerRunning $CTID ; running=$?
     if [[ $running -ne 0 ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> $JEM_CALLS_LOG
-        $VZCTL mount $CTID > /dev/null 2>&1
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - VE is not running." >> ${JEM_CALLS_LOG}
+        mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 || { writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID" ;
+                log "Cannot mount VE:$VEID";
+                return 99; }
     fi
 
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    getOS;
 
     if [[ "x$OS" == "xalpine" ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. Glusterfs is not supported for it" >> $JEM_CALLS_LOG
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Alpine Linux detected. Glusterfs is not supported for it" >> $JEM_CALLS_LOG
         writeJSONResponseErr "result=>4207" "message=>Can not setup gluster native client"
         return 2
     fi
 
-    if ! grep -q "$CONTAINER_MOUNTS_STORAGE" "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)" 2>&1; then
-            dosetupUtils || return 2
+    if ! VEExecRun "command -v mount.glusterfs &>/dev/null" ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID glusterfs helper not found. Installing..." >> ${JEM_CALLS_LOG}
+        dosetupUtils || return 1
     fi
-
+    
     autofsdest="$(sed -e 's/\s/\\ /g' <<< $_DESTINATION)"
     mntEntry="$autofsdest $_DEFAULT_GLUSTER_MOUNT_OPTS $sourceIP:/$(sed -re 's/\\\$/$/g' <<< "$sourceMountUnEsc")"
-    cmdRegisterMount="echo -e \"$mntEntry\" >> $MOUNTS_STORAGE"
+    #cmdRegisterMount="echo -e \"$mntEntry\" >> $MOUNTS_STORAGE"
 
-    if ! preparePath "$_DESTINATION" "$CTID" ; then
+    if ! preparePath "$_DESTINATION" "$VEID" ; then
         echo "Can not create path $_DESTINATION"
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Can not create path $_DESTINATION. $(gatherCTInfo)" >> $JEM_CALLS_LOG
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Can not create path $_DESTINATION. $(gatherCTInfo)" >> $JEM_CALLS_LOG
         return 1
     fi
 
     if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : registering $sourceIP:$sourceMount in $CTID" >> $JEM_CALLS_LOG
-        out=$(echo -e $mntEntry >> $MOUNTS_STORAGE)
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : registering $sourceIP:$sourceMount in $VEID" >> $JEM_CALLS_LOG
+        if ! [[ $running == 0 && "$VTYPE" == VM ]]; then
+            out=$(echo -e $mntEntry >> $MOUNTS_STORAGE)
+        else
+            VEExecRun "echo -e $mntEntry >> ${MOUNTS_STORAGE##"$VE_ROOT"}"
+            out="$(VEexecGetLastStdOut)";
+        fi
         if [[ ! -z "$out" ]] ; then
-            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : $out" >> $JEM_CALLS_LOG
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : $out" >> $JEM_CALLS_LOG
         fi
     fi
 
     if [[ $running -eq 0 ]] ; then
         if _hasActiveMounts ; then
-            vzexecRun "$_ENABLEAUTOFSCMD"
+            VEExecRun "$_ENABLEAUTOFSCMD"
             if [[ "x$SAVE_CONFIG" == "xfalse" ]] ; then
                 _restartAutoFS
             else
                 _reloadAutoFS
             fi
         else
-            vzexecRun "$_DISABLEAUTOFSCMD"
+            VEExecRun "$_DISABLEAUTOFSCMD"
         fi
     else
         log "unmounting"
-        $VZCTL umount $CTID > /dev/null 2>&1
+        umountVE ${VEID} "$VE_ROOT" >> ${JEM_CALLS_LOG} 2>&1
     fi
 
     echo "successfuly mounted"
@@ -505,35 +538,47 @@ function processgluster() {
 
 function processlocal() {
     CONTAINER_MOUNTS_STORAGE="/etc/fstab"
-    log "source: $sourceMount destination: ${_DESTINATION} ctid: ${_CTID}"
+    log "source: $sourceMount destination: ${_DESTINATION} veid: ${VEID}"
     local mntEntry="${sourceMount}\t${_DESTINATION}\tnone\trw,bind\t0\t0"
 
-    if [ -z "$_CTID" ] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : there is no CTID. Local mounts available only via hardnode call $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
-        echo "CTID required"
+    if [ -z "$VEID" ] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : there is no VEID. Local mounts available only via hardnode call $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+        echo "VEID required"
         return 1;
     fi
 
-    isContainerRunning ${CTID} ; running=$?
-    [[ $running -ne 0 ]] && {
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Container $CTID is not running. Mounting" >> ${JEM_CALLS_LOG}
-        $VZCTL mount $CTID > /dev/null 2>&1
-    }
+    isVERunning ${VEID} ; running=$?
+    if [[ $running -ne 0 ]] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - VE is not running." >> ${JEM_CALLS_LOG}
+        mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 || { writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID" ;
+                log "Cannot mount VE:$VEID";
+                return 99; }
+    fi
 
     OIFS=${IFS};IFS=$'\n'
-    local aCurrentMounts=($($SED -nre "/none/{/bind/{s/\s*(\S+).*/\1/;p}}" "$(vzctPath $VZ_CTID_ROOT $CONTAINER_MOUNTS_STORAGE)"))
+    if [[ $running == 0 && "$VTYPE" == VM ]]; then
+        local aCurrentMounts=($($SED -nre "/none/{/bind/{s/\s*(\S+).*/\1/;p}}" <<<"$(VEExecRunInteractive cat $CONTAINER_MOUNTS_STORAGE)"))
+    else
+        local aCurrentMounts=($($SED -nre "/none/{/bind/{s/\s*(\S+).*/\1/;p}}" "$(vzctPath $VE_ROOT $CONTAINER_MOUNTS_STORAGE)"))
+    fi
+    
+    
     IFS=${OIFS}
 
     log "${aCurrentMounts[@]}"
 
     if [[ ${#aCurrentMounts[@]} -gt 0 ]] ; then
         if indexOf "${aCurrentMounts[*]}" "${sourceMount}" >/dev/null; then
-            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : ${sourceMount} already mounted" >> ${JEM_CALLS_LOG}
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : ${sourceMount} already mounted" >> ${JEM_CALLS_LOG}
             echo "already mounted"
+            if [[ $running -ne 0 ]] ; then
+                log "unmounting"
+                umountVE ${VEID} "$VE_ROOT" >> ${JEM_CALLS_LOG} 2>&1
+            fi
             return 0;
         fi
     else
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : cannot get fstab entries" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : cannot get fstab entries" >> ${JEM_CALLS_LOG}
     fi
 
     if ! preparePath "${_DESTINATION}" 1 ; then
@@ -548,45 +593,54 @@ function processlocal() {
     hnSrcPath=${sourceMount}
     hnDstPath=${_DESTINATION}
 
-    if [[ "$_CTID" -gt 0 ]] ; then
-        hnDstPath="${VZ_CTID_ROOT}${hnDstPath}"
-        hnSrcPath="${VZ_CTID_ROOT}${hnSrcPath}"
-    fi
-
     if [[ "$_MOVEDATA" -gt 0 ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : moving data from $hnDstPath to $hnSrcPath" >> ${JEM_CALLS_LOG}
-        $RSYNC -aP --force "${hnDstPath}/" "${hnSrcPath}/" >> $ACTIONS_LOG 2>&1
-        rm -fr "${hnDstPath}/*" >> $ACTIONS_LOG 2>&1
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : moving data from $hnDstPath to $hnSrcPath" >> ${JEM_CALLS_LOG}
+        if ! [[ $running == 0 && "$VTYPE" == VM ]]; then
+            if [[ "$VEID" != 0 ]] ; then
+                hnDstPath="${VE_ROOT}${hnDstPath}"
+                hnSrcPath="${VE_ROOT}${hnSrcPath}"
+            fi
+            $RSYNC -aP --force "${hnDstPath}/" "${hnSrcPath}/" >> $ACTIONS_LOG 2>&1
+            rm -fr "${hnDstPath}/*" >> $ACTIONS_LOG 2>&1
+        else
+            VEExecRun "rsync -aP --force \"${hnDstPath}/\" \"${hnSrcPath}/\" 2>&1"
+            VEexecGetLastStdOut >> $ACTIONS_LOG
+            VEExecRun "rm -fr \"${hnDstPath}/*\" 2>&1"
+            VEexecGetLastStdOut >> $ACTIONS_LOG
+        fi
     fi
 
-    echo -e $mntEntry >> "${VZ_CTID_ROOT}${CONTAINER_MOUNTS_STORAGE}"
+    if ! [[ $running == 0 && "$VTYPE" == VM ]]; then
+        echo -e $mntEntry >> "${VE_ROOT}${CONTAINER_MOUNTS_STORAGE}"
+    else
+        VEExecRun "echo -e $mntEntry >> \"${CONTAINER_MOUNTS_STORAGE}\""
+    fi
     echo $mntEntry
     if [[ $running -eq 0 ]] ; then
-        vzexecRun "mount \"$($SED -re 's/("\*|\$|\?|\|\^|`|'\'')/\\\1/g' <<< "${_DESTINATION}")\""
+        VEExecRun "mount \"$($SED -re 's/("\*|\$|\?|\|\^|`|'\'')/\\\1/g' <<< "${_DESTINATION}")\""
     else
-        $VZCTL umount $CTID > /dev/null 2>&1
+        umountVE ${VEID} "$VE_ROOT" >> ${JEM_CALLS_LOG} 2>&1
     fi
     res=$?
     if [[ $res -gt 0 ]]; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : error mounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : error mounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1;
+    fi
+    if [[ $running -ne 0 ]] ; then
+        log "unmounting"
+        umountVE ${VEID} "$VE_ROOT" >> ${JEM_CALLS_LOG} 2>&1
     fi
     return 0;
 }
 
 function doRemount() {
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    getOS;
 
     if [[ "x$OS" == "xalpine" ]] ; then
         log "OS is ALPINE"
         local shares=(${_DESTINATION})
         [[ -z ${_DESTINATION} ]] && {
-            [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="$(vzctPath $VZ_CTID_ROOT /etc/fstab)"
+            [[ ! -z "${VEID}" ]] && MOUNTS_STORAGE="$(vzctPath $VE_ROOT /etc/fstab)"
             shares=($($SED -nre "/\snfs(3|4)?\s/{s/\s*(\S+)\s*(\S+).*/\2/;p}" "$MOUNTS_STORAGE" ))
         }
         for share in ${shares[*]} ; do
@@ -595,33 +649,27 @@ function doRemount() {
         return 0
     fi
 
-    isContainerRunning ${CTID} ; running=$?
+    isVERunning ${VEID} ; running=$?
 
     if [[ $running -eq 0 ]] ; then
         if _hasActiveMounts ; then
-            vzexecRun "$_ENABLEAUTOFSCMD"
+            VEExecRun "$_ENABLEAUTOFSCMD"
             _reloadAutoFS
         else
-            vzexecRun "$_DISABLEAUTOFSCMD"
+            VEExecRun "$_DISABLEAUTOFSCMD"
         fi
     fi
-
+ 
     return 0;
 }
 
 function dosetupUtils() {
-    if ! isContainerRunning $CTID ; then
+    if ! isVERunning ${VEID} ; then
         writeJSONResponseErr "result=>4110" "message=>Can not execute command. Container is not running"
         return 1
     fi
 
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    getOS;
 
     #JE-25896
     if [[ "x$OS" == "xalpine" ]] ; then
@@ -630,17 +678,17 @@ function dosetupUtils() {
             return 1
         fi
         installCmd=$(installPackageCmd $OS install nfs-utils)
-        vzexecRun "$installCmd"
+        VEExecRun "$installCmd"
 
         checkCmd=$(checkPackageCmd $OS nfs-utils)
-        vzexecRun "eval $checkCmd"
-        stdout=$(vzexecGetLastStdOut)
+        VEExecRun "eval $checkCmd"
+        stdout=$(VEexecGetLastStdOut)
         if [[ -n "$stdout" ]] ; then
             writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $stdout"
             return 1
         fi
 
-        vzexecRun "rc-update add netmount default"
+        VEExecRun "rc-update add netmount default"
         return 0
     fi
 
@@ -648,14 +696,14 @@ function dosetupUtils() {
     [[ "$STORAGE_BACKEND" == "gluster" ]] && _packages="autofs glusterfs-fuse"
 
     if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
-        vzexecRun "apt update; curl -sLO http://repository.jelastic.com/pub/autofs_5.1.6-1j_amd64.deb"
+        VEExecRun "apt update; curl -sLO http://repository.jelastic.com/pub/autofs_5.1.6-1j_amd64.deb"
         if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "8" ]; then
-            vzexecRun "$(installPackageCmd $OS install autofs)"
-            vzexecRun "DEBIAN_FRONTEND=noninteractive dpkg -i ./autofs_5.1.6-1j_amd64.deb"
+            VEExecRun "$(installPackageCmd $OS install autofs)"
+            VEExecRun "DEBIAN_FRONTEND=noninteractive dpkg -i ./autofs_5.1.6-1j_amd64.deb"
         else
-            vzexecRun "$(installPackageCmd $OS install ./autofs_5.1.6-1j_amd64.deb)"
+            VEExecRun "$(installPackageCmd $OS install ./autofs_5.1.6-1j_amd64.deb)"
         fi
-        vzexecRun "rm -f autofs_5.1.6-1j_amd64.deb"
+        VEExecRun "rm -f autofs_5.1.6-1j_amd64.deb"
         if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
             installCmd="$(installPackageCmd $OS install glusterfs-client)"
             checkCmd=$(checkPackageCmd $OS autofs glusterfs-client)
@@ -675,7 +723,7 @@ function dosetupUtils() {
         fi
 
         if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
-            installCmd=$(installPackageCmd $OS install $_autofspkg glusterfs-fuse)
+            installCmd=$(installPackageCmd $OS install $_autofspkg glusterfs-fuse) 
         else
             installCmd=$(installPackageCmd $OS install $_autofspkg nfs-utils)
         fi
@@ -684,53 +732,61 @@ function dosetupUtils() {
         installCmd=$(installPackageCmd $OS install $_packages)
         checkCmd=$(checkPackageCmd $OS $_packages)
     fi
-    vzexecRun "$installCmd"
-    echo "$(vzexecGetLastStdOut)" >> ${ACTIONS_LOG}
+    VEExecRun "$installCmd"
+    echo "$(VEexecGetLastStdOut)" >> ${ACTIONS_LOG}
 
-    vzexecRun "eval $checkCmd"
-    stdout=$(vzexecGetLastStdOut)
+    VEExecRun "eval $checkCmd"
+    stdout=$(VEexecGetLastStdOut)
     if [[ -n "$stdout" ]] ; then
         writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $stdout"
         return 1
     fi
 
-    if [ -e "$(vzctPath $VZ_CTID_ROOT /etc/rc.d/init.d/autofs)" ]; then
-        $GREP killproc -A2 "$(vzctPath $VZ_CTID_ROOT /etc/rc.d/init.d/autofs)" | $GREP -q 'sleep 1' || $SED -i '/killproc/{N;s/$/\n\t\tsleep 1;/}' "$(vzctPath $VZ_CTID_ROOT /etc/rc.d/init.d/autofs)"
+    VEExecRun '[ -e /etc/rc.d/init.d/autofs ]'
+    if [[ "$(VEexecGetLastErrCode)" == 0 ]]; then
+        VEExecRunInteractive "grep killproc -A2 /etc/rc.d/init.d/autofs" | $GREP -q 'sleep 1' || \
+            VEExecRunInteractive "sed -i '/killproc/{N;s/$/\n\t\tsleep 1;/}' /etc/rc.d/init.d/autofs"
     fi
 
-    [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -ci -e "s/^timeout = .*/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
+    VEExecRun '[ -e /etc/autofs.conf ]'
+    if [[ "$(VEexecGetLastErrCode)" == 0 ]]; then
+        VEExecRunInteractive "sed -i $SED_COPY_OPTION -e \"s/^timeout = .*/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" /etc/autofs.conf"
+    fi
 
     if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "7" ] ; then
-        [ -e "$(vzctPath $VZ_CTID_ROOT /etc/init.d/autofs)" ] && $SED -i -re 's/PROG=automount/PROG=automount\n_SYSTEMCTL_SKIP_REDIRECT="true"/' "$(vzctPath $VZ_CTID_ROOT /etc/init.d/autofs)"
+        VEExecRun '[ -e /etc/init.d/autofs) ]'
+        if [[ "$(VEexecGetLastErrCode)" == 0 ]]; then
+            VEExecRunInteractive "sed -i -re 's/PROG=automount/PROG=automount\n_SYSTEMCTL_SKIP_REDIRECT=\"true\"/' /etc/init.d/autofs"
+        fi
     fi
 
     if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "7" ] ; then
-        $SED -i -re '/automount/d' "$(vzctPath $VZ_CTID_ROOT /etc/nsswitch.conf)"
-        echo -e "\nautomount:  files" >> "$(vzctPath $VZ_CTID_ROOT /etc/nsswitch.conf)"
+        VEExecRun "sed -i -re '/automount/d' /etc/nsswitch.conf"
+        VEExecRun 'echo -e "\nautomount:  files" >> /etc/nsswitch.conf'
     fi
     if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
-        echo '/- /etc/autofs.gluster --timeout=3600' >> "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)"
+        VEExecRun "echo '/- /etc/autofs.gluster --timeout=3600' >> /etc/auto.master"
     else
-        echo '/- /etc/autofs.jelastic' >> "$(vzctPath $VZ_CTID_ROOT /etc/auto.master)"
+        VEExecRun "echo '/- /etc/autofs.jelastic' >> /etc/auto.master"
     fi
-    vzexecRun "$_DISABLEAUTOFSCMD"
+    VEExecRun "$_DISABLEAUTOFSCMD"
     return 0
 }
 
 function gatherCTInfo() {
-    isContainerRunning $CTID || {
-        echo "Container $CTID is not running"
+    isVERunning $VEID || {
+        echo "VE $VEID is not running"
     }
 
     local _autoFSCfg
-    [[ -n "$CONTAINER_MOUNTS_STORAGE" ]] && _autoFSCfg=$CONTAINER_MOUNTS_STORAGE || _autoFSCfg=${MOUNTS_STORAGE##"$VZ_CTID_ROOT"}
+    [[ -n "$CONTAINER_MOUNTS_STORAGE" ]] && _autoFSCfg=$CONTAINER_MOUNTS_STORAGE || _autoFSCfg=${MOUNTS_STORAGE##"$VE_ROOT"}
 
-    _ctAutoFSFile="$(vzexecRun " [ -e \"$_autoFSCfg\" ] && cat \"$_autoFSCfg\" || echo \"$_autoFSCfg not found\""; vzexecGetLastStdOut)"
-    _ctFstab="$(vzexecRun " [ -e \"/etc/fstab\" ] && cat /etc/fstab || echo \"/etc/fstab not found\""; vzexecGetLastStdOut)"
-    _ctIptablesRules="$(vzexecRun "iptables -S"; vzexecGetLastStdOut)"
-    _ctIpInfo="$(vzexecRun "ip a l; ip r l; [ -e /etc/resolv.conf ] && cat /etc/resolv.conf || echo /etc/resolv.conf" ; vzexecGetLastStdOut)"
+    _ctAutoFSFile="$(VEExecRun " [ -e \"$_autoFSCfg\" ] && cat \"$_autoFSCfg\" || echo \"$_autoFSCfg not found\""; VEexecGetLastStdOut)"
+    _ctFstab="$(VEExecRun " [ -e \"/etc/fstab\" ] && cat /etc/fstab || echo \"/etc/fstab not found\""; VEexecGetLastStdOut)"
+    _ctIptablesRules="$(VEExecRun "iptables -S"; VEexecGetLastStdOut)"
+    _ctIpInfo="$(VEExecRun "ip a l; ip r l; [ -e /etc/resolv.conf ] && cat /etc/resolv.conf || echo /etc/resolv.conf" ; VEexecGetLastStdOut)"
 
-    echo -e "\n`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID \n=====\nContainer $CTID Info:\nautofs:\n$_ctAutoFSFile\nfstab:\n$_ctFstab\nip info:\n$_ctIpInfo\niptables:\n$_ctIptablesRules\n=====\n"
+    echo -e "\n`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID \n=====\nContainer $VEID Info:\nautofs:\n$_ctAutoFSFile\nfstab:\n$_ctFstab\nip info:\n$_ctIpInfo\niptables:\n$_ctIptablesRules\n=====\n"
 }
 
 function doMount() {
@@ -751,24 +807,29 @@ function doMount() {
     }
 
     local mtype sourceIP sourceMount
-    isContainerRunning ${CTID} ; running=$?
+    isVERunning ${VEID} ; running=$?
+    
     if [[ $running -ne 0 ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> ${JEM_CALLS_LOG}
-        $VZCTL mount $CTID > /dev/null 2>&1
-        [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -ci -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - VE is not running." >> ${JEM_CALLS_LOG}
+        mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 || { writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID" ;
+                log "Cannot mount VE:$VEID";
+                return 99; }
+        [ -e "$(vzctPath $VE_ROOT /etc/autofs.conf)" ] && $SED -ci -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VE_ROOT /etc/autofs.conf)"
     else
-        vzexecRun " [ -e \"/etc/autofs.conf\" ] && sed -ci -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
+        VEExecRun " [ -e \"/etc/autofs.conf\" ] && sed -i $SED_COPY_OPTION -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
     fi
-
+    
     # parse connection string
     _SOURCE="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< "$_SOURCE")"
     availProtos="[Ll][Oo][Cc][Aa][Ll]|[Nn][Ff][Ss]3?4?|[Ww][Ee][Bb][Dd][Aa][Vv]|[Gg][Ll][Uu][Ss][Tt][Ee][Rr]"
     availModes="[Rr][Oo]|[Rr][Ww]"
-    eval "$(echo "${_SOURCE}" | $SED -rne "s/(($availModes):?($availProtos):?(\/){0,2})?([^:]+):?(.*)/atype=\2\nmtype='\3'\nsourceIP='\5'\nsourceMount='\6';/g;p" | $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
+    eval "$(echo "${_SOURCE}" | \
+        $SED -rne "s/(($availModes):?($availProtos):?(\/){0,2})?([^:]+):?(.*)/atype=\2\nmtype='\3'\nsourceIP='\5'\nsourceMount='\6';/g;p" | \
+            $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
     mtype=${mtype,,}
     atype=${atype,,}
     atype=$($SED -re 's/;//g' <<< $atype)
-    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - protocol=${mtype} source=${sourceIP} sourceMount=${sourceMount}" >> ${JEM_CALLS_LOG}
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - protocol=${mtype} source=${sourceIP} sourceMount=${sourceMount}" >> ${JEM_CALLS_LOG}
     [[ -z "${mtype}" ]] && mtype="nfs"
 
     # for local mounts (bind)
@@ -783,7 +844,10 @@ function doMount() {
     _DEFAULT_NFS_MOUNT_OPTS="${_DEFAULT_NFS_MOUNT_OPTS},${atype}"
     msg=$(process${mtype} "${sourceIP}" "${sourceMount}"); res=$?
     result="$res"
-    [[ "$res" -gt 0 ]] && result="4111"
+    if [[ $running -ne 0 ]] ; then
+        umountVE ${VEID} "$VE_ROOT" >> ${JEM_CALLS_LOG} 2>&1
+    fi
+    [[ "$res" -gt 0 ]] && result="4111";
     [[ "$res" -eq 2 ]] && return 1
     writeJSONResponseOut "result=>$result" "message=>${msg}" ;
     return 0
@@ -798,15 +862,15 @@ function doUmount() {
     local running
     local -a shares
 
-    isContainerRunning ${CTID} ; running=$?
-    [[ $running -ne 0 ]] && $VZCTL mount $CTID > /dev/null 2>&1
+    isVERunning ${VEID}; running=$?
+    if [[ $running -ne 0 ]] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - VE is not running." >> ${JEM_CALLS_LOG}
+        mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 || { writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID" ;
+                log "Cannot mount VE:$VEID";
+                return 99; }
+    fi
 
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    getOS;
 
     for i in $(seq 0 $((${#UNKNOWN_ARG[@]}-1))); do
         if [ ! -z "${UNKNOWN_ARG[$i]}" ] ; then
@@ -820,24 +884,27 @@ function doUmount() {
 
     if [[ "x$OS" == "xalpine" ]] ; then
         log "OS is ALPINE"
-        [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="$(vzctPath $VZ_CTID_ROOT /etc/fstab)"
+        [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="$(vzctPath $VE_ROOT /etc/fstab)"
     fi
 
     OIFS=$IFS; IFS=$'\n'
     for i in $(seq 0 $((${#shares[*]}-1)) ) ; do
         IFS=$OIFS
         if [[ $running -eq 0 ]] ; then
-            if ! vzexecRun "umount '${shares[$i]}';" ; then
+            if ! VEExecRun "umount '${shares[$i]}';" ; then
                 log "Performing lazy umount"
-                if ! vzexecRun "umount -l '${shares[$i]}';" ; then
-                    msg="$(vzexecGetLastStdErr)";
+                if ! VEExecRun "umount -l '${shares[$i]}';" ; then
+                    msg="$(VEexecGetLastStdErr)";
                 else
-                    msg="$(vzexecGetLastStdOut)";
+                    msg="$(VEexecGetLastStdOut)";
                 fi
             fi
-            rescode=$(vzexecGetLastErrCode)
+            rescode=$(VEexecGetLastErrCode)
         else
-            $VZCTL mount $CTID > /dev/null 2>&1
+            #Already mounted
+            #mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 || { writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID" ;
+            #    log "Cannot mount VE:$VEID";
+            #    return 99; }
             rescode=0
         fi
 
@@ -852,12 +919,19 @@ function doUmount() {
                 else
                     local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\ /g' <<< "${shares[$i]}"))\s+-fstype=(nfs|glusterfs).*";
                 fi
-                out=$( [[ -e "$MOUNTS_STORAGE" ]] && $SED -i -re /"${dpath}"/d "$MOUNTS_STORAGE" 2>&1 )
-                out=$( [[ -e "${VZ_CTID_ROOT}/etc/autofs.gluster" ]] && $SED -i -re /"${dpath}"/d "${VZ_CTID_ROOT}/etc/autofs.gluster" 2>&1 )
+                if ! [[ $running == 0 && "$VTYPE" == VM ]]; then
+                    out=$( [[ -e "$MOUNTS_STORAGE" ]] && $SED -i -re /"${dpath}"/d "$MOUNTS_STORAGE" 2>&1 )
+                    out=$( [[ -e "${VE_ROOT}/etc/autofs.gluster" ]] && $SED -i -re /"${dpath}"/d "${VE_ROOT}/etc/autofs.gluster" 2>&1 )
+                else
+                    VEExecRun "[[ -e \"$CONTAINER_MOUNTS_STORAGE\" ]] && sed -i -re /\"${dpath}\"/d \"$CONTAINER_MOUNTS_STORAGE\" 2>&1"
+                    out="$(VEexecGetLastStdOut)";
+                    VEExecRun "[[ -e \"/etc/autofs.gluster\" ]] && sed -i -re /\"${dpath}\"/d \"/etc/autofs.gluster\" 2>&1"
+                    out="$out $(VEexecGetLastStdOut)";
+                fi
                 [[ ! -z "${out}" ]] && log "${out}";
                 retfunc="writeJSONResponseOut result=>0"
             else
-                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : error umounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : error umounting share $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
                 retfunc="writeJSONResponseErr result=>99"
             fi
         else
@@ -866,13 +940,13 @@ function doUmount() {
     done
 
     if [[ $running -ne 0 ]] ; then
-        $VZCTL umount $CTID > /dev/null 2>&1
+        umountVE ${VEID} "$VE_ROOT" >> ${JEM_CALLS_LOG} 2>&1
     else
         if _hasActiveMounts ; then
-            vzexecRun "$_ENABLEAUTOFSCMD"
+            VEExecRun "$_ENABLEAUTOFSCMD"
             _reloadAutoFS
         else
-            vzexecRun "$_DISABLEAUTOFSCMD"
+            VEExecRun "$_DISABLEAUTOFSCMD"
         fi
     fi
 
@@ -893,18 +967,17 @@ function doExport() {
         return 1;
     }
 
-    vzexecSetCTID $_CTID;
-    if ! vzexecRun "jem auth add -t ip -l ${_IPLIST};" ; then
-        writeJSONResponseErr "result=>4030" "message=>$(vzexecGetLastStdErr)";
-        return $(vzexecGetLastErrCode);
+    if ! VEExecRun "jem auth add -t ip -l ${_IPLIST};" ; then
+        writeJSONResponseErr "result=>4030" "message=>$(VEexecGetLastStdErr)";
+        return $(VEexecGetLastErrCode);
     fi
-    if ! vzexecRun "mkdir -p '${_SOURCE}'; chmod 0777 '${_SOURCE}';" ; then
-        writeJSONResponseErr "result=>4030" "message=>$(vzexecGetLastStdErr)";
-        return $(vzexecGetLastErrCode);
+    if ! VEExecRun "mkdir -p '${_SOURCE}'; chmod 0777 '${_SOURCE}';" ; then
+        writeJSONResponseErr "result=>4030" "message=>$(VEexecGetLastStdErr)";
+        return $(VEexecGetLastErrCode);
     fi
-    if ! vzexecRun "exportfs -ra;" ; then
-        writeJSONResponseErr "result=>4030" "message=>$(vzexecGetLastStdErr)";
-        return $(vzexecGetLastErrCode);
+    if ! VEExecRun "exportfs -ra;" ; then
+        writeJSONResponseErr "result=>4030" "message=>$(VEexecGetLastStdErr)";
+        return $(VEexecGetLastErrCode);
     fi
     writeJSONResponseOut "result=>0" "message=>success";
     return 0;
@@ -940,13 +1013,17 @@ function describeMount() {
 }
 
 function describeMountParameters() {
-    echo "-o|--ctid <ctid> -s|--source <spath> -d|--destination <dpath>";
+    echo "-o|--ctid <ctid> --uuid <UUID> --vtype <vtype> -s||--source <spath> -d|--destination <dpath>";
 }
 
 function describeMountOptions() {
     echo "-o|--ctid: container ID";
+    echo "--uuid: VM uuid";
+    echo "--vtype: VE type: VM or CT";
     echo "-s|--source: source path";
     echo "-d|--destination: destination path";
+    
+    
 }
 
 function describeUmount() {
@@ -954,11 +1031,13 @@ function describeUmount() {
 }
 
 function describeUmountParameters() {
-    echo "-o|--ctid <ctid> -d|--destination  <dpath>";
+    echo "-o|--ctid <ctid> --uuid <UUID> --vtype <vtype> -d|--destination  <dpath>";
 }
 
 function describeUmountOptions() {
     echo "-o|--ctid: container ID ";
+    echo "--uuid: VM uuid";
+    echo "--vtype: VE type: VM or CT";
     echo "-d|--destination: destination path";
 }
 
@@ -1008,4 +1087,3 @@ defineBigInline _ENABLEAUTOFSCMD <<'EOF'
         fi
     fi;
 EOF
-
