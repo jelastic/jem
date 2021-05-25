@@ -79,13 +79,32 @@ function prlExecRun() {
     _tmperr=$(mktemp -u --tmpdir=/tmp)
 
     [[ "$VERBOSE" -gt 0 ]] && echo -e "`date +%D.%k:%M:%S.%N`: prlexec command start ($__CTID) (PID: $$): $*" >> ${JEM_CALLS_LOG}
-
-    __STDOUT=$( set -f ; $__EXEC $__ENVID $@ 2>$_tmperr; );
+    __STDOUT=$( set -f ; $__EXEC $__ENVID "$*" 2>$_tmperr; );
     __ERRCODE=$?
     __STDERR=$(<$_tmperr)
     rm -f $_tmperr
     [[ "$VERBOSE" -gt 0 ]] && echo -e "`date +%D.%k:%M:%S.%N`: prlexec command done ($__CTID) (PID: $$): $*\n`date +%D.%k:%M:%S.%N`: prlexec stdout ($__CTID):${__STDOUT}\n`date +%D.%k:%M:%S.%N`: prlexec stderr ($__CTID):${__STDERR}" >> ${JEM_CALLS_LOG}
     return $__ERRCODE
+}
+
+function VEExecRun() {
+    if isUUID "$VEID"; then
+        prlExecRun "$@"
+        return $?
+    else
+        vzexecRun "$@"
+        return $?
+    fi
+}
+
+function VEExecRunInteractive() {
+    if isUUID "$VEID"; then
+        $__EXEC $__ENVID "$@"
+        return $?
+    else
+        $__EXEC $__CTID "$@"
+        return $?
+    fi
 }
 
 #All needed defined variables should be passed
@@ -108,11 +127,23 @@ function vzexecGetLastStdErr() {
     echo "${__STDERR}"
 }
 
+function VEexecGetLastStdErr() {
+    echo "${__STDERR}"
+}
+
 function vzexecGetLastStdOut() {
     echo "${__STDOUT}"
 }
 
+function VEexecGetLastStdOut() {
+    echo "${__STDOUT}"
+}
+
 function vzexecGetLastErrCode() {
+    echo $__ERRCODE
+}
+
+function VEexecGetLastErrCode() {
     echo $__ERRCODE
 }
 
