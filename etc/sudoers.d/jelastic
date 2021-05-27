@@ -43,7 +43,7 @@ Cmnd_Alias NSCD_SERVICE = /usr/bin/systemctl * nscd, /usr/sbin/nscd *, /usr/bin/
 Cmnd_Alias UNFS = /etc/init.d/rpcbind *, /sbin/service rpcbind *, /bin/mount *, /etc/init.d/unfsd.jelastic *, /sbin/service unfsd.jelastic *, /usr/sbin/exportfs *
 
 Cmnd_Alias AUTOFS = /etc/init.d/autofs *, /sbin/service autofs *
-Cmnd_Alias KEYTOOL = /usr/bin/keytool *
+Cmnd_Alias KEYTOOL = /usr/bin/keytool *, /usr/java/latest/bin/keytool *
 
 %ssh-access ALL = NOPASSWD: TOMCAT, TOMCAT_SERVICE, JETTY, JETTY_SERVICE,  MONGO, MONGO_SERVICE, COUCHDB, COUCHDB_SERVICE, MEMCACHED, MEMCACHED_SERVICE, MYSQL, MYSQL_SERVICE, POSTGRESQL, POSTGRESQL_SERVICE, NGINX, NGINX_SERVICE, HTTPD, HTTPD_SERVICE, PHP_FPM, PHP_FPM_SERVICE, GLASSFISH_DOMAIN1, GLASSFISH_DOMAIN1_SERVICE, CARTRIDGE, CARTRIDGE_SERVICE, CUSTOM_IMPR, UNFS, JEM, NSCD_SERVICE, AUTOFS, KEYTOOL
 
