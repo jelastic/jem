@@ -154,13 +154,13 @@ function mountVM(){
     local UUID=$1
     isVERunning ${UUID} && return 255
     local MOUNTPOINT=${2:-/vz/tmp/${UUID}}
-    local PRIVATE=$(prlctl list ${UUID} -Ho private)
+    local PRIVATE=$(prlctl list 3cf8cf2c-64ec-44a4-abf5-384777475396 -Ho private)
     local HDDS=( $(find "$PRIVATE" -name 'harddisk*.hdd' 2>/dev/null) )
     (( ${#HDDS[@]} == 1 )) || return 255
     local HDD=${HDDS[0]}
     mkdir -p "$MOUNTPOINT"
     mountpoint -q "$MOUNTPOINT" && umount "$MOUNTPOINT"
-    guestmount -a $HDD -i --rw "$MOUNTPOINT" >> ${JEM_CALLS_LOG} 2>&1;
+    guestmount -a $HDD -i --rw "$MOUNTPOINT" 2>&1
     return $?
 }
 
