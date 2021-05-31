@@ -358,9 +358,8 @@ function doStart() {
 
     if [ "x$OS" == "xubuntu" ] ; then
         #fix ubuntu with broken links
-        # remove link and then copy contents of links file to "custom rules" location.
-        [ -e '/etc/iptables/rules.v4' ] && [ -L "$CUSTOM_RULES_FILE" ] && rm -f $CUSTOM_RULES_FILE 2>> $JEM_CALLS_LOG && cp '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE
-        [ -e '/etc/iptables/rules.v6' ] && [ -L "$CUSTOM_6RULES_FILE" ] && rm -f $CUSTOM_6RULES_FILE 2>> $JEM_CALLS_LOG && cp '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE
+        [ -e '/etc/iptables/rules.v4' ] && [ -L "$CUSTOM_RULES_FILE" ] && cp -H $CUSTOM_RULES_FILE{,.bkp} 2>> $JEM_CALLS_LOG && rm -f $CUSTOM_RULES_FILE 2>> $JEM_CALLS_LOG
+        [ -e '/etc/iptables/rules.v6' ] && [ -L "$CUSTOM_6RULES_FILE" ] && cp -H $CUSTOM_6RULES_FILE{,.bkp} 2>> $JEM_CALLS_LOG && rm -f $CUSTOM_6RULES_FILE 2>> $JEM_CALLS_LOG
     fi
 
     $IPTABLES -F;
