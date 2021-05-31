@@ -64,6 +64,9 @@ declare -a CLOSEDPORTS;
 declare -r ERR_NO_METADATA=4080;
 CTID=0
 
+OS=""
+OS_ver=""
+
 function _getbalancerRedirPorts() { return 0; }
 function _getapache_phpRedirPorts { return 0; }
 function _getnginx_phpRedirPorts { return 0; }
@@ -172,6 +175,16 @@ function processRule6File() {
     return $?
 }
 
+function saveCurrentRules() {
+    if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
+        [ -x /etc/init.d/netfilter-persistent ] && /etc/init.d/netfilter-persistent save &>> $JEM_CALLS_LOG
+    else
+        /sbin/service iptables save &>> $JEM_CALLS_LOG
+        /sbin/service ip6tables save &>> $JEM_CALLS_LOG
+    fi
+    echo "iptables rules saved" >>$JEM_CALLS_LOG
+}
+
 function doUsage() {
     showUsageMessage
 }
@@ -244,9 +257,22 @@ function onModLoadCallback() {
         esac
     done
 
+    local _prefix=""
+    if [[ "$CTID" -gt 0 ]] ; then
+        VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
+        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+        _prefix="/$VZ_CTID_ROOT"
+    fi
+
+    local issue_file=$_prefix/etc/issue
+    local release_files=$_prefix/etc/*-release
+    local issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+    OS=$(detectOS "$issue_string")
+    OS_ver=$(getOSVersion "$issue_string")
+    OS_ver=${OS_ver%%.*}
+
     #do we started "inside"
     if [[ "$CTID" -eq 0 ]] ; then
-
         ACTIONS_LOG="$JEM_CALLS_LOG"
 
         _isPublicIPv4 && PublicIP=$__TRUE || publicIP=$__FALSE
@@ -270,43 +296,14 @@ function onModLoadCallback() {
         NFSPort=$($RPCINFO 127.0.0.1 -p 2>/dev/null | $SED -n -re '/nfs/{s/\s+(\S+\s+)+([0-9]+)\s+nfs.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
         RPCPort=$($RPCINFO 127.0.0.1 -p 2>/dev/null | $SED -n -re '/(portmapper|nlockmgr|mountd)/{s/\s+(\S+\s+)+([0-9]+)\s+.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
 
-        local issue_file=/etc/issue
-        local release_files=/etc/*-release
-        issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-        OS=$(detectOS "$issue_string")
-        OS_ver=$(getOSVersion "$issue_string")
-        OS_ver=${OS_ver%%.*}
-
-        #JE-56437 {{{
-        if [ "x$OS" == "xubuntu" ] ; then
-            [ -d "$JELASTIC_RULES_DIR" ] || mkdir -p "$JELASTIC_RULES_DIR"
-            [ -e '/etc/iptables/rules.v4' ] && [ ! -L "$CUSTOM_RULES_FILE" ] && rm -f $CUSTOM_RULES_FILE 2>> $JEM_CALLS_LOG && ln -s '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE
-            [ -e '/etc/iptables/rules.v6' ] && [ ! -L "$CUSTOM_6RULES_FILE" ] && rm -f $CUSTOM_6RULES_FILE 2>> $JEM_CALLS_LOG && ln -s '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE
-        fi
-        #}}}
-
         if [ "x$OS" == "xcentos" -a "$OS_ver" -ge "7" ] ; then
             IPTABLES="$IPTABLES -w"
             IP6TABLES="$IP6TABLES -w"
             IPTABLES_RESTORE="$IPTABLES_RESTORE -w"
             IP6TABLES_RESTORE="$IP6TABLES_RESTORE -w"
         fi
-    else
-        VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
-        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
-
-        #JE-56437 {{{
-        local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-        local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-        issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-        OS=$(detectOS "$issue_string")
-        if [ "x$OS" == "xubuntu" ] ; then
-            [ -d "$(vzctPath $VZ_CTID_ROOT $JELASTIC_RULES_DIR)" ] || mkdir -p "${VZ_CTID_ROOT}${JELASTIC_RULES_DIR}"
-            vzexecRun "[ -e '/etc/iptables/rules.v4' ] && [ ! -L "$CUSTOM_RULES_FILE" ] && rm -f $CUSTOM_RULES_FILE && ln -s '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE"
-            vzexecRun "[ -e '/etc/iptables/rules.v6' ] && [ ! -L "$CUSTOM_6RULES_FILE" ] && rm -f $CUSTOM_6RULES_FILE && ln -s '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE"
-        fi
-        #}}}
     fi
+
     return 0
 }
 
@@ -359,6 +356,12 @@ function doStart() {
         return 2
     fi
 
+    if [ "x$OS" == "xubuntu" ] ; then
+        #fix ubuntu with broken links
+        # remove link and then copy contents of links file to "custom rules" location.
+        [ -e '/etc/iptables/rules.v4' ] && [ -L "$CUSTOM_RULES_FILE" ] && rm -f $CUSTOM_RULES_FILE 2>> $JEM_CALLS_LOG && cp '/etc/iptables/rules.v4' $CUSTOM_RULES_FILE
+        [ -e '/etc/iptables/rules.v6' ] && [ -L "$CUSTOM_6RULES_FILE" ] && rm -f $CUSTOM_6RULES_FILE 2>> $JEM_CALLS_LOG && cp '/etc/iptables/rules.v6' $CUSTOM_6RULES_FILE
+    fi
 
     $IPTABLES -F;
     $IPTABLES -t nat -F;
@@ -452,23 +455,8 @@ function doStart() {
 
     checkRule "INPUT" "-j REJECT --reject-with icmp-host-prohibited" || $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited
 
-    log "saving rules"
-    local issue_file="/etc/issue"
-    local release_files="/etc/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null)
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    saveCurrentRules
 
-    # patch iptables-persistent plugins
-    # VZ containers has no modprobe support
-    if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
-        [ -x /etc/init.d/netfilter-persistent ] && /etc/init.d/netfilter-persistent save &>> $JEM_CALLS_LOG
-    else
-        /sbin/service iptables save 2>/dev/null | $GRAB_OUTPUT
-        /sbin/service ip6tables save &> /dev/null
-    fi
-    echo "iptables rules saved" >>$JEM_CALLS_LOG
     return 0
 }
 
@@ -602,15 +590,6 @@ function doEnable() {
         $SED -i -re '/^$/d' ${META_FILE}
     fi
 
-    prefix=""
-    [[ $CTID -gt 0 ]] && prefix="/vz/root/$CTID"
-    local issue_file="$prefix/etc/issue"
-    local release_files="$prefix/etc/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null)
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
-
     # patch iptables-persistent plugins
     # VZ containers has no modprobe support
     if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
@@ -662,10 +641,11 @@ function doDisable() {
     if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
         $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=0/g" ${META_FILE};
     fi
-    echo "Firewall disabled";
-    _setDefaultPolicy "ACCEPT";
-    $IPTABLES -F ; service iptables save &> /dev/null;
-    $IP6TABLES -F ; service ip6tables save &> /dev/null;
+    echo "Firewall disabled"
+    _setDefaultPolicy "ACCEPT"
+    $IPTABLES -F ; service iptables save &>>$JEM_CALLS_LOG
+    $IP6TABLES -F ; service ip6tables save &>>$JEM_CALLS_LOG
+    saveCurrentRules
     writeJSONResponseOut "result=>0" "message=>Firewall has been disabled"
     return 0;
 }
@@ -696,8 +676,9 @@ function doPanic() {
     $IPTABLES -X -t nat;
     $IPTABLES -F;
     $IPTABLES -F -t nat;
-    _setDefaultPolicy "DROP";
-    return 0;
+    _setDefaultPolicy "DROP"
+    saveCurrentRules
+    return 0
 }
 
 
