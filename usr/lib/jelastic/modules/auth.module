@@ -55,7 +55,7 @@ function onModLoadCallback() {
     log "Preload callback";
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -o t:,l:,p:,c:,r: -l list:,clients:,type:,path:,ctid:,uuid:,vtype:,readonly:,version: -- params "$@" 2>/dev/null` oldifs;
+    local temp=`getopt -o t:,l:,p:,c:,r: -l list:,clients:,type:,path:,ctid:,readonly:,version: -- params "$@" 2>/dev/null` oldifs;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
@@ -84,17 +84,6 @@ function onModLoadCallback() {
                 CTID=$1
                 vzexecSetCTID $CTID
                 shift
-                ;;
-            --uuid)
-                shift;
-                _UUID=$1
-                UUID=$1
-                shift;
-                ;;
-            --vtype)
-                shift;
-                VTYPE=$1
-                shift;
                 ;;
             --clients )
                 shift
