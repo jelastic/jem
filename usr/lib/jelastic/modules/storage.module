@@ -197,7 +197,7 @@ function getOS(){
     OS=$(detectOS "$issue_string")
     OS_ver=$(getOSVersion "$issue_string")
     OS_ver=${OS_ver%%.*}
-    if [[ "OS" == "ubuntu" ]]; then
+    if [[ "$OS" == "ubuntu" ]]; then
         SED_COPY_OPTION=''
     fi
 }
