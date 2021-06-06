@@ -273,7 +273,12 @@ function onModLoadCallback() {
 
     #do we started "inside"
     if [[ "$CTID" -eq 0 ]] ; then
-        ACTIONS_LOG="$JEM_CALLS_LOG"
+
+	if [[ "$UID" == '0' ]]; then
+    	    ACTIONS_LOG="/var/log/actions$$.log";
+	else
+    	    ACTIONS_LOG="/tmp/actions$$.log";
+	fi
 
         _isPublicIPv4 && PublicIP=$__TRUE || publicIP=$__FALSE
 
