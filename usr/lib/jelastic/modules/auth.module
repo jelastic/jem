@@ -637,7 +637,7 @@ function _addGlusterShare() {
     fi
 
     if [[ $setNewList -eq 1 ]] ; then
-        _ipstr=${aNewIPs[@]}
+        _ipstr="${aNewIPs[@]} ${aCurrentIPs[@]}"
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID setting $volumeName auth.allow to ${_ipstr// /,}" >> ${JEM_CALLS_LOG}
         vzexecRun "gluster volume set $volumeName auth.allow ${_ipstr// /,}" || return 1
         vzexecRun "[[ -d $CLIENTSPATH ]] && echo \"$_ipstr\" >> $CLIENTSPATH/$volumeName"
