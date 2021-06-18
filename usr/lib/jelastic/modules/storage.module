@@ -163,7 +163,7 @@ function onModLoadCallback() {
 function _hasActiveMounts() {
     #-hosts is /net/host
     #dir:path -> /path/*
-    _cmd='[ -f /etc/auto.master ] && sed -re "/^#/d" -e "s/dir:(.*)/+ \1\/*/g" -e "/\s/!d" -e "s/.*\s(\/.*).*/\1/g" -e "s/--timeout=.*//g"  -e "s/.*\s-hosts/\/net\/host/g" /etc/auto.master'
+    _cmd='[ -f /etc/auto.master ] && sed -re "/^#/d" -e "s/dir:(.*)/+ \1\/*/g" -e "/\s/!d" -e "s/-hosts/\/net\/host/g" /etc/auto.master | awk "{print $2}"'
     vzexecRun "$_cmd"
     autoFSMaps=($(vzexecGetLastStdOut))
     if [ -n "$autoFSMaps" ] ; then
