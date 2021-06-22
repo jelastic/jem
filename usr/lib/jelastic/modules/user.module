@@ -20,6 +20,7 @@ inherit default config os envinfo;
 inherit ${gw_boost_lib_inherit};
 inherit extendperm;
 inherit vzexec;
+inherit virtuozzo;
 
 DESCRIPTION="Manipulate ssh keys, users";
 VERSION="1"
