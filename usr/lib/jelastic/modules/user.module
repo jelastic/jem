@@ -194,6 +194,18 @@ function preAddCallback(){
             writeJSONResponseErr "result=>4105" "message=>Container not found"
             die -q
         }
+
+        # Call user add only for running container
+        local waitCT=30
+        while [ isContainerRunning ${CTID} ]
+        do
+            waitCT=$((waitCT-1))
+            sleep 0.5
+            if [[ $waitCT == 0 ]]; then
+                writeJSONResponseErr "result=>4110" "message=>Can not execute command. Container is not running" ;
+                die -q;
+            fi
+        done
         prefix=$($VZLIST $_CTID -Ho root)
         [[ -z "${prefix}" ]] && {
             writeJSONResponseErr "result=>4105" "message=>Container root dir not found"
