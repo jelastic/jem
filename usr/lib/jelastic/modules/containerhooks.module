@@ -23,6 +23,7 @@ DEFAULT_ACTION="usage"
 
 CURRENT_TAG=""
 TARGET_TAG=""
+VZ_CTID_ROOT=""
 
 function dousage() {
     showUsageMessage;
@@ -32,7 +33,7 @@ function dousage() {
 function onModLoadCallback() {
     log "Preload callback"
     local shortopts="c:,t:"
-    local longopts="currentTag:,targetTag:"
+    local longopts="ctid:,currentTag:,targetTag:"
 
     local temp=`getopt -o $shortopts -l $longopts -- "$@" 2>/dev/null`
     [[ $? != 0 ]] && die -q "Terminating..."
@@ -50,32 +51,40 @@ function onModLoadCallback() {
                 TARGET_TAG=$1
                 shift
                 ;;
+            --ctid )
+                shift;
+                CTID=$1;
+                vzexecSetCTID $CTID
+                shift;
+                ;;
             --)
                 shift
                 break
                 ;;
         esac
     done
+    [[ ! -z "$CTID" ]] && VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+
     for arg do UNKNOWN_ARG+=("$arg") ; done
 }
 
 function apache_phpPreUpdate() {
     #save additional php.ini and put it to redeploy.conf
-    if [ -f "/etc/php.ini" ] ; then
-        cp -f "/etc/php.ini{,_redeploy}"
-        [ -f "/etc/jelastic/redeploy.conf" ] && echo "/etc/php.ini_redeploy" >> "/etc/jelastic/redeploy.conf"
+    if [ -f "$(vzctPath $VZ_CTID_ROOT /etc/php.ini)" ] ; then
+        cp -f "$(vzctPath $VZ_CTID_ROOT /etc/php.ini)" "$VZ_CTID_ROOT/etc/php.ini_redeploy"
+        [ -f "$(vzctPath $VZ_CTID_ROOT /etc/jelastic/redeploy.conf)" ] && echo "/etc/php.ini_redeploy" >> "$(vzctPath $VZ_CTID_ROOT /etc/jelastic/redeploy.conf)"
     fi
 }
 
 function apache_phpPostUpdate() {
-    [ -f "/etc/jelastic/redeploy.conf" ] && sed -i -re '/\/etc\/php.ini_redeploy/d' "/etc/jelastic/redeploy.conf"
+    [ -f "$(vzctPath $VZ_CTID_ROOT /etc/jelastic/redeploy.conf)" ] && sed -i -re '/\/etc\/php.ini_redeploy/d' "$(vzctPath $VZ_CTID_ROOT /etc/jelastic/redeploy.conf)"
 
-    if [ -f "/etc/php.ini_redeploy" ] ; then
+    if [ -f "$(vzctPath $VZ_CTID_ROOT /etc/php.ini_redeploy)" ] ; then
         if [ "x$CURRENT_TAG" = "x$TARGET_TAG" ] ; then
-            mv -f "/etc/php.ini_redeploy" "/etc/php.ini"
+            mv -f "$(vzctPath $VZ_CTID_ROOT /etc/php.ini_redeploy)" "$VZ_CTID_ROOT/etc/php.ini"
         else
             _suffix="$(date +%d-%m-%Y.%H:%M:%S.%N)"
-            mv -f "/etc/php.ini_redeploy" "/etc/php.ini.$_suffix"
+            mv -f "$(vzctPath $VZ_CTID_ROOT /etc/php.ini_redeploy)" "$VZ_CTID_ROOT/etc/php.ini.$_suffix"
             #add backup to redeploy.conf. Is it really neccesary?
             #echo "/etc/php.ini.$_suffix" >> "/etc/jelastic/redeploy.conf"
         fi
