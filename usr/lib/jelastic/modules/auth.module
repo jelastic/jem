@@ -743,7 +743,7 @@ function _removeGlusterShare() {
         if [[ ! -z $(indexOf "${aCurrentIPs[*]}" "$i") ]] ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i from auth.allow " >> $JEM_CALLS_LOG
             aNewIPs=("${aNewIPs[@]/$i}")
-            vzexecRun "[ -e $CLIENTSPATH/$volumeName ] && sed -i -re s/$i//g -e s/  / /g $CLIENTSPATH/$volumeName"
+            vzexecRun "[ -e $CLIENTSPATH/$volumeName ] && sed -i -re 's/$i//g' -e 's/  / /g' -e 's/^ //g' -e 's/ $//g' -e 's/\*//g' $CLIENTSPATH/$volumeName"
             setNewList=1
         fi
     done
