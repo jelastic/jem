@@ -131,6 +131,13 @@ function isContainerMounted() {
     [ "x$out" == "xmounted" -o "x$out" == "xrunning" ]
 }
 
+function isContainerMountedStopped() {
+    : ${1:?"Missing CTID param"};
+    local CTID=$1
+    out=$($VZLIST -Ho status $CTID)
+    [ "x$out" == "xmounted" ]
+}
+
 function isContainerLocked() {
     : ${1:?"Missing CTID param"}
     [ -e "/vz/lock/$1.lck" ]

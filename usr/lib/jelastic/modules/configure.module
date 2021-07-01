@@ -93,6 +93,11 @@ function doIpChanged() {
     local msg=$(checkParams ${requiredParqams[@]})
     [[ ! -z "${msg}" ]] && { writeJSONResponseErr "result=>4099" "message=>Missing param $msg" ; return 99; }
 
+    isContainerRunning $CTID || {
+        writeJSONResponseOut "result=>0" "message=>Ok"
+        return 0 
+    }
+    
     #remove line after "VZMarker"
     vzexecRun 'sed -i -re "/'$vzcomment'/{N;d}" /etc/hosts'
 

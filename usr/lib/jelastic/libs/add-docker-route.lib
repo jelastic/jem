@@ -20,10 +20,12 @@
 ADDROUTESLIB_VERSION="0.1";
 
 function delAllRoutes(){
+    [[ "$container_state" == "mounted" ]] && return 0
     vzexecRun "ip route show table main | while read -a tmp; do [ \${tmp[0]} == 'default' ] || ip route del table main \$tmp; done"
 }
 
 function delRoutesVia(){
+    [[ "$container_state" == "mounted" ]] && return 0
     vzexecRun "ip route show table main | while read -a tmp; do [ \${tmp[2]} == ${ROUTE_VIA} ] && ip route del table main \$tmp; done"
 }
 
@@ -38,7 +40,7 @@ function addDebianRoute(){
 
     [ -f "$ROUTECFG" ] && {
         $SED -i "1 a [ \"x\$IF_ADDRESS\" == \"x${ROUTE_VIA}\" ] && ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null" $ROUTECFG
-        vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null"
+        [[ "$container_state" == "mounted" ]] || vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null"
     }
     return 0;
 }
@@ -47,17 +49,17 @@ function addCentosRoute(){
     VZ_NET_DEVICE='venet0'
     ROUTECFG="/vz/root/${CTID}/etc/sysconfig/network-scripts/route-${VZ_NET_DEVICE}";
     echo "${ROUTE_NETWORK} via ${ROUTE_VIA} dev ${VZ_NET_DEVICE}" >> $ROUTECFG 2>/dev/null
-    vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null"
+    [[ "$container_state" == "mounted" ]] || vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null"
     return 0;
 }
 
 
 function addAlpineRoute(){
     ROUTECFG="/vz/root/${CTID}/etc/route.conf" ;
-    vzexecRun "rc-update 2>/dev/null | grep -q staticroute || rc-update add staticroute >/dev/null 2>&1" ;
+    [[ "$container_state" == "mounted" ]] || vzexecRun "rc-update 2>/dev/null | grep -q staticroute || rc-update add staticroute >/dev/null 2>&1" ;
 
     echo "net ${ROUTE_NETWORK} gw ${ROUTE_VIA}" >> $ROUTECFG ;
-    vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null" ;
+    [[ "$container_state" == "mounted" ]] || vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null" ;
     return 0;
 }
 
@@ -65,7 +67,7 @@ function addAlpineRoute(){
 function addSuseRoute(){
     ROUTECFG="/vz/root/${CTID}/etc/sysconfig/network/routes";
     echo "${ROUTE_NETWORK%%/*} ${ROUTE_VIA} ${ROUTE_NETWORK##*/}" >> $ROUTECFG 2>/dev/null 
-    vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null" ;
+    [[ "$container_state" == "mounted" ]] || vzexecRun "ip route add ${ROUTE_NETWORK} via ${ROUTE_VIA}  2>/dev/null" ;
     return 0;
 }
 
@@ -84,7 +86,7 @@ function delDebianRoute(){
         [ -f "$ROUTECFG" ] && {
 	       $SED -i -re "/${ROUTE_NETWORK//\//\\/}\s+via\s+${ROUTE_VIA}/d" $ROUTECFG
         }
-        vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null"
+        [[ "$container_state" == "mounted" ]] || vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null"
     fi
     return 0;
 }
@@ -102,7 +104,7 @@ function delCentosRoute(){
         [ -f "$ROUTECFG" ] && {
 	       $SED -i -re "/${ROUTE_NETWORK//\//\\/}\s+via\s+${ROUTE_VIA}/d" $ROUTECFG ;
         }
-        vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null"
+        [[ "$container_state" == "mounted" ]] || vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null"
     fi
     return 0;
 }
@@ -119,7 +121,7 @@ function delAlpineRoute(){
         [ -f "$ROUTECFG" ] && {
 	       $SED -i -re "/${ROUTE_NETWORK//\//\\/}\s+gw\s+${ROUTE_VIA}/d" $ROUTECFG ;
         }
-        vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null" ;
+        [[ "$container_state" == "mounted" ]] || vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null" ;
     fi
     return 0;
 }
@@ -136,7 +138,7 @@ function delSuseRoute(){
         [ -f "$ROUTECFG" ] && {
 	       $SED -i -re "/${ROUTE_NETWORK%%/*}\s+${ROUTE_VIA}\s+${ROUTE_NETWORK##*/}/d" $ROUTECFG ;
         }
-        vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null"
+        [[ "$container_state" == "mounted" ]] || vzexecRun "ip route del ${ROUTE_NETWORK} via ${ROUTE_VIA} 2>/dev/null"
     fi
     return 0;
 }
