@@ -198,7 +198,7 @@ function preAddCallback(){
 
         # Call user add only for running container
         local waitCT=30
-        while [ isContainerRunning ${CTID} ]
+        while [ isContainerRunning ${_CTID} ]
         do
             waitCT=$((waitCT-1))
             sleep 0.5
