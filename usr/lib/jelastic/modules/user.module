@@ -197,8 +197,9 @@ function preAddCallback(){
         }
 
         # Call user add only for running container
-        local waitCT=30
-        while [ isContainerRunning ${_CTID} ]
+        local waitCT=30 running
+        isContainerRunning ${_CTID} ; running=$?
+        while [ $running -ne 0 ]
         do
             waitCT=$((waitCT-1))
             sleep 0.5
@@ -206,6 +207,7 @@ function preAddCallback(){
                 writeJSONResponseErr "result=>4110" "message=>Can not execute command. Container is not running" ;
                 die -q;
             fi
+            isContainerRunning ${_CTID} ; running=$?
         done
         prefix=$($VZLIST $_CTID -Ho root)
         [[ -z "${prefix}" ]] && {
