@@ -63,7 +63,10 @@ function onModLoadCallback() {
                 ;;
         esac
     done
-    [[ ! -z "$CTID" ]] && VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+    if [[ ! -z "$CTID" ]] ; then
+        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+        eval $(sed -rne "/COMPUTE_TYPE=/{s/(COMPUTE_TYPE=)([a-zA-Z_\-]+).*/\1\2/g;s/-/_/g;p}" $VZ_CTID_ROOT/etc/jelastic/metainf.conf)
+    fi
 
     for arg do UNKNOWN_ARG+=("$arg") ; done
 }
