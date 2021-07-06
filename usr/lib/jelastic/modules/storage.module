@@ -657,6 +657,26 @@ function dosetupUtils() {
         fi
         vzexecRun "rm -f autofs_5.1.6-1j_amd64.deb"
         if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
+            if [ "x$OS" == "xubuntu" ] ; then
+                #Ubuntu
+                vzexecRun "add-apt-repository ppa:gluster/glusterfs-7 -y"
+            else
+                #Debian
+                if [ "$OS_ver" -eq "8" ] ; then
+                    writeJSONResponseErr "result=>4112" "message=>Gluster: GNU Debian 8 Linux is not supported"
+                    return 1
+                fi
+
+                local _code_name="bullseye" # Debian 11
+                [ "$OS_ver" -eq "9"  ] && _code_name="stretch"
+                [ "$OS_ver" -eq "10" ] && _code_name="buster"
+
+                vzexecRun "wget -O - https://download.gluster.org/pub/gluster/glusterfs/7/rsa.pub | apt-key add -"
+                vzexecRun "[ ! -d /etc/apt/sources.list.d ] && mkdir -p /etc/apt/sources.list.d"
+                vzexecRun "echo deb [arch=amd64] https://download.gluster.org/pub/gluster/glusterfs/7/LATEST/Debian/$_code_name/amd64/apt $_code_name main > /etc/apt/sources.list.d/gluster.list"
+                vzexecRun "apt install apt-transport-https -y"
+            fi
+            vzexecRun"apt-get update -y"
             installCmd="$(installPackageCmd $OS install glusterfs-client)"
             checkCmd=$(checkPackageCmd $OS autofs glusterfs-client)
         else
