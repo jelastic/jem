@@ -149,6 +149,12 @@ function populateContainerVarsCTID() {
     local _root=$(getCtRoot $1)
     local _private=$(getCtPrivate $1)
 
+    local need_umount=0
+    if ! isContainerMounted $1 ; then
+        $VZCTL mount $1 &>>/dev/null
+        need_umount=1
+    fi
+
     local issue_file="$(vzctPath $_root /etc/issue )"
     local release_files="$(vzctPath $_root /etc/)/*-release"
     local issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null)
@@ -158,6 +164,8 @@ function populateContainerVarsCTID() {
 
     local _cmd="${_v}_ROOT=$_root;${_v}_PRIVATE=$_private;${_v}_OS=$_os;${_v}_OS_VER=${_os_ver%%.*}"
     eval $_cmd
+
+    [[ $need_umount -eq 1 ]] && $VZCTL umount $1 &>>/dev/null
 
     return 0;
 }
