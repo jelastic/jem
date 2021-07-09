@@ -152,8 +152,7 @@ function onModLoadCallback() {
     [ -n "$CTID" ] && { vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; }
 
     [ -n "$CTID" ] && {
-        VZ_CTID_PRIVATE=$(vzlist -Ho private $CTID )
-        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
+        populateContainerVarsVZ $CTID;
         if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
             res=$(vzexecGetLastStdOut)
             [ -n "$res" ] && eval "$res"
@@ -324,12 +323,8 @@ function processnfs() {
         $VZCTL mount $CTID > /dev/null 2>&1
     fi
 
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    OS=$VZ_CTID_OS
+    OS_ver=$VZ_CTID_OS_VER
 
     if [[ "x$OS" == "xalpine" ]] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. " >> ${JEM_CALLS_LOG}
@@ -483,12 +478,8 @@ function processgluster() {
         $VZCTL mount $CTID > /dev/null 2>&1
     fi
 
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    OS=$VZ_CTID_OS
+    OS_ver=$VZ_CTID_OS_VER
 
     if [[ "x$OS" == "xalpine" ]] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Alpine Linux detected. Glusterfs is not supported for it" >> $JEM_CALLS_LOG
@@ -610,12 +601,8 @@ function processlocal() {
 }
 
 function doRemount() {
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    OS=$VZ_CTID_OS
+    OS_ver=$VZ_CTID_OS_VER
 
     if [[ "x$OS" == "xalpine" ]] ; then
         log "OS is ALPINE"
@@ -650,13 +637,8 @@ function dosetupUtils() {
         return 1
     fi
 
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    OS=$VZ_CTID_OS
+    OS_ver=$VZ_CTID_OS_VER
 
     #JE-25896
     if [[ "x$OS" == "xalpine" ]] ; then
@@ -810,9 +792,9 @@ function doMount() {
     if [[ $running -ne 0 ]] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> ${JEM_CALLS_LOG}
         $VZCTL mount $CTID > /dev/null 2>&1
-        [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -ci -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
+        [ -e "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)" ] && $SED -i -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_CTID_ROOT /etc/autofs.conf)"
     else
-        vzexecRun " [ -e \"/etc/autofs.conf\" ] && sed -ci -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
+        vzexecRun " [ -e \"/etc/autofs.conf\" ] && sed -i -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
     fi
 
     # parse connection string
@@ -856,12 +838,8 @@ function doUmount() {
     isContainerRunning ${CTID} ; running=$?
     [[ $running -ne 0 ]] && $VZCTL mount $CTID > /dev/null 2>&1
 
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    OS=$VZ_CTID_OS
+    OS_ver=$VZ_CTID_OS_VER
 
     for i in $(seq 0 $((${#UNKNOWN_ARG[@]}-1))); do
         if [ ! -z "${UNKNOWN_ARG[$i]}" ] ; then

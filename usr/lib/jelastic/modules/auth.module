@@ -876,7 +876,7 @@ function doSet() {
         writeJSONResponseErr "result=>4208" "message=>GlusterFS cluster is not available"
         return 1
     fi
-    cVols=($vzexecGetLastStdOut)
+    cVols=($(vzexecGetLastStdOut))
 
     for v in ${cVols[@]} ; do
         if ! vzexecRun "gluster volume get $v auth.allow 2>/dev/null | tail -n 1 | tr -s ' ' | cut -d ' ' -f2 | tr ',' ' '" ; then
