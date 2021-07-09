@@ -145,7 +145,7 @@ function isContainerLocked() {
 
 function populateContainerVarsCTID() {
     : ${1:?"Missing CTID param"}
-    vzIsContainerExists $1 || return 1
+    vzIsContainerExists $1 || return 3
     local _root=$(getCtRoot $1)
     local _private=$(getCtPrivate $1)
 
@@ -172,7 +172,7 @@ function populateContainerVarsCTID() {
 
 function populateContainerVarsVZ() {
     : ${1:?"Missing CTID param"}
-    populateContainerVarsCTID $1 || return 1
+    populateContainerVarsCTID $1 || return $?
 
     local _cmd="VZ_CTID_ROOT=\$CT$1_ROOT;VZ_CTID_PRIVATE=\$CT$1_PRIVATE;VZ_CTID_OS=\$CT$1_OS;VZ_CTID_OS_VER=\$CT$1_OS_VER"
     eval $_cmd

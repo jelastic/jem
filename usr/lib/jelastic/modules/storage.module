@@ -149,10 +149,15 @@ function onModLoadCallback() {
                 ;;
         esac;
     done;
-    [ -n "$CTID" ] && { vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; }; }
 
     [ -n "$CTID" ] && {
-        populateContainerVarsVZ $CTID;
+        populateContainerVarsVZ $CTID
+        res=$?
+        if [[ "$res" -eq 3 ]] ; then
+            writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"
+            die -q;
+        fi
+
         if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
             res=$(vzexecGetLastStdOut)
             [ -n "$res" ] && eval "$res"
