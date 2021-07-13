@@ -139,7 +139,7 @@ function onModLoadCallback() {
                 shift;
                 STORAGE_BACKEND=${1,,};
                 shift;
-                if [ "x$STORAGE_BACKEND" != "xgluster" -o "x$STORAGE_BACKEND" != "xnfs" ] ; then
+                if [ "x$STORAGE_BACKEND" != "xgluster" -a "x$STORAGE_BACKEND" != "xnfs" ] ; then
                     STORAGE_BACKEND="nfs"
                 fi
                 ;;
