@@ -643,6 +643,10 @@ function _addGlusterShare() {
         vzexecRun "gluster volume set $volumeName auth.allow ${_ipstr// /,}" || return 1
         vzexecRun "[[ -d $CLIENTSPATH ]] && echo \"$_ipstr\" | sed -r -e 's/  / /g' -e 's/^ //g' -e 's/ $//g' -e 's/\*//g' > $CLIENTSPATH/$volumeName"
     else
+        #JE-59318
+        _ipstr="${aCurrentIPs[@]}"
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID saving client list for $volumeName: ${_ipstr// /,}" >> ${JEM_CALLS_LOG}
+        vzexecRun "[[ -d $CLIENTSPATH ]] && echo \"$_ipstr\" | sed -r -e 's/  / /g' -e 's/^ //g' -e 's/ $//g' -e 's/\*//g' > $CLIENTSPATH/$volumeName"
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID auth.allow not changed" >> ${JEM_CALLS_LOG}
     fi
 
@@ -758,6 +762,10 @@ function _removeGlusterShare() {
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID setting $volumeName auth.allow to ${_ipstr// /,}" >> $JEM_CALLS_LOG
         vzexecRun "gluster volume set $volumeName auth.allow ${_ipstr// /,}" || return 1
     else
+        #JE-59318
+        _ipstr="${aCurrentIPs[@]}"
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID saving client list for $volumeName: ${_ipstr// /,}" >> ${JEM_CALLS_LOG}
+        vzexecRun "[[ -d $CLIENTSPATH ]] && echo \"$_ipstr\" | sed -r -e 's/  / /g' -e 's/^ //g' -e 's/ $//g' -e 's/\*//g' > $CLIENTSPATH/$volumeName"
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID auth.allow not changed" >> $JEM_CALLS_LOG
     fi
 
