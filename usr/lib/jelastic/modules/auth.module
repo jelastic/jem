@@ -906,6 +906,11 @@ function doSet() {
         done
 
         rList+=(${!pList})
+        #explicit add localhost if not presnt
+        if [[ -z "$(indexOf "${rList[*]}" "127.0.0.1")" ]] ; then
+            rList=("${rList[@]}" "127.0.0.1")
+        fi
+
         rList=$(tr ' ' '\n' <<< "${rList[@]}" | sort -u | tr '\n' ' ')
 
         if ! vzexecRun "gluster volume set $v auth.allow ${rList// /,}" ; then
