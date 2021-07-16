@@ -914,7 +914,7 @@ function doSet() {
         fi
 
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID saving client list for $v: ${rList// /,}" >> ${JEM_CALLS_LOG}
-        vzexecRun "[[ -d $CLIENTSPATH ]] && echo \"$rList\" | sed -r -e 's/  / /g' -e 's/^ //g' -e 's/ $//g' -e 's/\*//g' > $CLIENTSPATH/$volumeName"
+        vzexecRun "[[ -d $CLIENTSPATH ]] && echo \"$rList\" | sed -r -e 's/  / /g' -e 's/^ //g' -e 's/ $//g' -e 's/\*//g' > $CLIENTSPATH/$v"
     done
 
     writeJSONResponseOut "result=>0" "message=>Clients set successfully"
