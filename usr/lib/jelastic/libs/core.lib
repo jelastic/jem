@@ -242,7 +242,18 @@ function startJemThreadQueueManager(){
     done
     elif [ "x$action" == "xauth" ] ; then
         if [ "x$subaction" == "xadd" -o "x$subaction" == "xremove" ]; then
-            jempidfile="/var/run/jem.5283f514f.pid";
+            while [ "$1" != "" ]
+            do
+            case "$1" in
+                --ctid)
+                    TQctid=$2;
+                    break
+                ;;
+                esac
+                shift;
+            done
+            sleep 0.$(( RANDOM % 10))
+            jempidfile="/var/run/jem.5283f514f.$TQctid.pid";
         fi
     elif [ "x$action" == "xstorage" -a "x$1" != "xmount" ] ; then
             jempidfile="/var/run/jem.86a06296$$.pid";
