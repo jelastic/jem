@@ -83,7 +83,19 @@ function loadConfig() {
 function loadINISection() {
     local inifile=${1} section=${2} ini
     grep -q -E "^\[$section]" $inifile || return
-    ini="$(<$inifile)";
+    ini="$( awk -F= \
+    '{
+        st = index($0,"=");
+        if (length($1)!=0) {
+            if (st!=0) {
+                line=substr($0,st)
+                gsub("[.]","_",$1);
+                print $1 line;
+            } else {
+                print $0
+            }
+        }
+    }' $inifile  )"
     ini="${ini//[/\[}";
     ini="${ini//]/\]}";
     OIFS=${IFS};
@@ -95,14 +107,17 @@ function loadINISection() {
     ini=( ${ini[*]/#\\[/\}$'\n'config.section.} );
     ini=( ${ini[*]/%\\]/ \(} );
     ini=( ${ini[*]/=/=\( } );
+    ini=( ${ini[*]/\ =/=} );
     ini=( ${ini[*]/%/ \)} );
     ini=( ${ini[*]/%\\ \)/ \\} );
     ini=( ${ini[*]/%\( \)/\(\) \{} );
     ini=( ${ini[*]/%\} \)/\}} );
     ini[0]="";
     ini[${#ini[*]} + 1]='}';
+    ini=( $(sed -nr -e '/^/H' -e '${g; s/(\n[[:blank:]]*[^[:blank:]]+[[:blank:]]*[(][[:blank:]]*[)][[:blank:]]*[{][[:blank:]]*[\n]?[[:blank:]]*)([}])/\1\ttrue;\n\2/g; p}' <<<"${ini[*]}") )
     eval "$(echo "${ini[*]}")";
     IFS=${OIFS};
+    iniVarNames=( $(declare -f config.section.${section} | sed -rn 's/([^=])=.*/\1/p') )
     config.section.${section} 2>/dev/null
 }
 

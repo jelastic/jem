@@ -29,6 +29,7 @@ VERSION="1";
 DEFAULT_ACTION="usage";
 APPLY_PL='/var/lib/jelastic/overrides/apply.pl'
 ROUTEFIXER='/root/scripts/routefixer/routefixer.sh'
+RUN_CHECKER='/var/lib/jelastic/overrides/run_checker.lib'
 
 function dousage() {
     showUsageMessage;
@@ -42,20 +43,25 @@ function doGather(){
 
     for ((n=0; n < ${#iniVarNames[@]}; n++))
     do
-        var='';
-        log  "Module: $action Action: $subaction index: $n element: ${iniVarNames[$n]}" ;
-        fName=$( sed -re 's/_all$//' -e 's/.*_(.*)/\1/' <<< ${iniVarNames[$n]} ) ;
-        isFunction "$fName" && { 
-            var=$($fName ${iniVarNames[$n]}) ;
-            sed -i "s|${iniVarNames[$n]}\s*=.*|${iniVarNames[$n]}=${var}|" ${CONF_FILE} ;
-        } || { 
-            echo "Extra gather for $fName" >>$JEM_CALLS_LOG ; 
-            isFunction "extraGather" && {
-                extraGather "${iniVarNames[$n]}"
+        if [[ "$JELASTIC_DB_CLUSTER" != "slave" || ${iniVarNames[$n]##*_} == "all" || ${iniVarNames[$n]} == "jelastic_gate_publickey" ]]; then
+            var='';
+            log  "Module: $action Action: $subaction index: $n element: ${iniVarNames[$n]}" ;
+            fName=$( sed -re 's/_all$//' -e 's/.*_(.*)/\1/' <<< ${iniVarNames[$n]} ) ;
+            isFunction "$fName" && {
+                var=$($fName ${iniVarNames[$n]}) ;
+                sed -i "s|${iniVarNames[$n]}\s*=.*|${iniVarNames[$n]}=${var}|" ${CONF_FILE} ;
+            } || {
+                echo "Extra gather for $fName" >>$JEM_CALLS_LOG ;
+                isFunction "extraGather" && {
+                    extraGather "${iniVarNames[$n]}"
+                }
             }
-        }
+        else
+            continue
+        fi
     done
     writeJSONResponseOut "result=>0" "message=>Ok";
+
 }
 
 function doPostDiscovery(){
@@ -74,7 +80,7 @@ function doApply(){
     isFunction localdomain && { localDomain=$(localdomain); export localDomain=$localDomain; }
     isFunction localshorthostname && { localShortHostname=$(localshorthostname); export localShortHostname=$localShortHostname; }
     isFunction localnodeid && { localNodeid=$(localnodeid); export localNodeid=$localNodeid; }
-    TPL_LIST=$($FIND ${ERB_DIR} -mindepth 1 -type f  -printf '%P\n' | sort ) 
+    TPL_LIST=$($FIND ${ERB_DIR} -mindepth 1 -type f  -printf '%P\n' | sort )
     for tpl in ${TPL_LIST}
     do
         log "TPL file: $tpl";
@@ -109,4 +115,11 @@ function doSet(){
     echo no;
     fi
     
+}
+
+function doChekServiceRun(){
+    [ ! -f $RUN_CHECKER ] || {
+        . $RUN_CHECKER
+        check_run;
+    }
 }
