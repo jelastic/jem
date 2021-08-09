@@ -47,7 +47,8 @@ function unpack(){
     unset TAR_UNPACK_OPTIONS; unset UNPACK_COMMAND;
     if [[ ${package_url} =~ .zip$ ]] || [[ ${package_name} =~ .zip$ ]]
     then
-        $UNZIP -o "${package_path}/${package_name}" -d "$APPWEBROOT" 2>>$ACTIONS_LOG 1>/dev/null;
+        $UNZIP -Z -1 "${package_path}/${package_name}" | $GREP -qEw "^/$" && local skip_path="-x /"
+        $UNZIP -o "${package_path}/${package_name}" -d "$APPWEBROOT" $skip_path 2>>$ACTIONS_LOG 1>/dev/null;
         rcode=$?;
         [ "$rcode" -eq 1 ] && return 0 || return $rcode
     fi
