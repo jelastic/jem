@@ -320,12 +320,31 @@ function doUpdate(){
         J_OLD_PROJECT_NAME="${PROJECT_NAME}";
         PROJECT_NAME="${NEXT_DIR}"
         if [ -d "${WEBROOT}/${PROJECT_NAME}/.$(toLowerCase ${VCS_TYPE})" ] ; then
-            updateProject 2>>"$VCS_UPDATE_LOG" && { ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; updateOwnership ${WEBROOT}/ROOT;
+            updateProject 2>>"$VCS_UPDATE_LOG"
+            result=$?
             updateOwnership ${WEBROOT}/${PROJECT_NAME};
-            [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}"; writeProjectConfig; }
-            } || { updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeJSONResponseErr "result=>4000" "message=>An error occurred during the VCS deployment on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please, check the logs for more details."; return 1; };
+            if [[ $result == 0 ]]; then
+                ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}";
+                updateOwnership ${WEBROOT}/ROOT;
+                [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}"; writeProjectConfig; }
+            else
+                if [[ $result == 2 ]]; then
+                    writeJSONResponseErr "result=>4211" "message=>Token required";
+                else
+                    writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect";
+                fi
+                return 1;
+            fi
         else
-            doCheckout || { writeJSONResponseErr "result=>4000" "message=>An error occurred during the VCS deployment on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please, check the logs for more details."; die -q; }
+            doCheckout
+            result=$?
+            if [[ $result == 2 ]]; then
+                    writeJSONResponseErr "result=>4211" "message=>Token required";
+                    die -q;
+            elif [[ $result != 0 ]]; then
+                writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect";
+                die -q;
+            fi
             updateOwnership ${WEBROOT}/${PROJECT_NAME};
             ln -sfT "${WEBROOT}/${PROJECT_NAME}" ${WEBROOT}/ROOT && _deployLog "Switching the document root to new context directory ${PROJECT_NAME}"; updateOwnership ${WEBROOT}/ROOT;
             [ -z "${J_OLD_PROJECT_NAME}" ] || { PROJECT_NAME="${J_OLD_PROJECT_NAME}"; writeProjectConfig; }
@@ -357,12 +376,28 @@ function doUpdate(){
             rm -rf ${ROOT_DIRS} && _deployLog "Removing deprecated ROOT context directories ${ROOT_DIRS}"; cd  /;
         fi
         if [ -d "${WEBROOT}/${PROJECT_NAME}/.$(toLowerCase ${VCS_TYPE})" ] ; then
-            updateProject 2>>"$VCS_UPDATE_LOG" && {
-            updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeProjectConfig;
-            } || { updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeJSONResponseErr "result=>4000" "message=>An error occurred during the VCS deployment on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please, check the logs for more details."; return 1; };
+            updateProject 2>>"$VCS_UPDATE_LOG"
+            result=$?
+            updateOwnership ${WEBROOT}/${PROJECT_NAME};
+            if [[ $result == 0 ]]; then
+                writeProjectConfig;
+            else
+                if [[ $result == 2 ]]; then
+                    writeJSONResponseErr "result=>4211" "message=>Token required";
+                else
+                    writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect";
+                fi
+                return $result;
+            fi
         else
             [ -d "${WEBROOT}/${PROJECT_NAME}" ] && rm -Rf "${WEBROOT}/${PROJECT_NAME}/";
-            doCheckout || { writeJSONResponseErr "result=>4000" "message=>An error occurred during the VCS deployment on node $(hostname|awk -F - {'print $1'}|grep -o [0-9]*). Please, check the logs for more details."; die -q; }
+            doCheckout
+            result=$?
+            if [[ $result == 2 ]]; then
+                writeJSONResponseErr "result=>4211" "message=>Token required"; die -q;
+            elif [[ $result != 0 ]]; then
+                writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q;
+            fi
             updateOwnership ${WEBROOT}/${PROJECT_NAME}; writeProjectConfig;
         fi
     fi
