@@ -37,7 +37,7 @@ function runNonInterractive(){
                 updateOwnership "${WEBROOT}/${PROJECT_NAME}";
             fi
             if [[ $ERR_HANDLER =~ "personal access token instead" ]]; then 
-                echo "$ERR_HANDLER" | sed "s/$AUTH@//" |  grep -v "Password" >> $ACTIONS_LOG 2>/dev/null;
+                echo "$ERR_HANDLER" | sed "s/$AUTH@//" | sed -re 's/password/pаssword/g' -e 's/token/tоken/' -e '/https/d'  >> $ACTIONS_LOG 2>/dev/null;
                 return 2;
             else
                 echo "$ERR_HANDLER" | sed "s/$AUTH@//" |  grep -i -v "Password" >> $ACTIONS_LOG 2>/dev/null;
