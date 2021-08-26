@@ -98,6 +98,7 @@ function doCheckout(){
 }
 
 function updateProject(){
+    prepareUrl;
     [ -d "${WEBROOT}/${PROJECT_NAME}" ] && cd "${WEBROOT}/${PROJECT_NAME}";
     [ "x$GIT_AUTORESOLVE_CONFLICT" == "xtrue" ] && {
             echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
@@ -170,8 +171,8 @@ function vcsChangeUrl(){
     fi
     cd ${WEBROOT}/${PROJECT_NAME}/
     $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" remote set-url origin "$preparedUrl" >> "$VCS_UPDATE_LOG"  2>&1
-    $GIT fetch  >> "$VCS_UPDATE_LOG" 2>&1
-    $GIT reset --hard origin >> "$VCS_UPDATE_LOG" 2>&1
+    $GIT fetch --all >> "$VCS_UPDATE_LOG" 2>&1
+    $GIT reset --hard HEAD >> "$VCS_UPDATE_LOG" 2>&1
     result=$?;
     cd - >/dev/null 2>&1
     return $result;
