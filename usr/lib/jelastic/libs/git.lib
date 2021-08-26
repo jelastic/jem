@@ -106,6 +106,7 @@ function updateProject(){
     echo -n $(date +%D.%k:%M:%S.%N) >> "$VCS_UPDATE_LOG" 2>&1;
     runNonInterractive "$GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git pull"  > /dev/null 2>&1;
     result=$?;
+    [ $result -eq 2 ] && return $result;
     [ $result -ne 0 ] && {
         grep -q 'refusing to merge unrelated histories' <<< $ERR_HANDLER && $GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git reset --hard origin >> "$VCS_UPDATE_LOG" 2>&1 &&
         runNonInterractive "$GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git pull"  > /dev/null 2>&1;
