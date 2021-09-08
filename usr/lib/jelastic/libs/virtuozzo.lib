@@ -51,6 +51,16 @@ function isVMexist(){
     prlctl list -H $envid &>/dev/null && return 0 || return 1
 }
 
+function isVEexist(){
+    : ${1:?"Missing VEID param"};
+    local veid=$1
+    if isUUID $veid; then
+        isVMexist $veid && return 0 || return 1
+    else
+        vzIsContainerExists $veid && return 0 || return 1
+    fi
+}
+
 #
 # readFileFromCtontainer
 #
@@ -194,7 +204,7 @@ umountVE(){
     fi
 }
 
-function populateContainerVarsCTID() {
+function populateContainerVarsVEID() {
     : ${1:?"Missing CTID param"}
     vzIsContainerExists $1 || return 3
     local _root=$(getCtRoot $1)
@@ -221,11 +231,43 @@ function populateContainerVarsCTID() {
     return 0;
 }
 
-function populateContainerVarsVZ() {
-    : ${1:?"Missing CTID param"}
-    populateContainerVarsCTID $1 || return $?
+function populateVMVarsVEID() {
+    : ${1:?"Missing ENVID param"}
+    isVMexist $1 || return 3
+    local _root="/vz/tmp/$1"
+    local _private="prlctl list ${ENVID} -Ho private"
 
-    local _cmd="VZ_CTID_ROOT=\$CT$1_ROOT;VZ_CTID_PRIVATE=\$CT$1_PRIVATE;VZ_CTID_OS=\$CT$1_OS;VZ_CTID_OS_VER=\$CT$1_OS_VER"
+    if ! isVERunning $1 ; then
+        $VZCTL mount $1 &>>/dev/null
+        need_umount=1
+        local issue_file="$(vzctPath $VE_ROOT /etc/issue )"
+        local release_files="$(vzctPath $VE_ROOT /etc/)/*-release"
+        issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
+    else
+        VEExecRun "set +f; cat /etc/*-release /etc/issue 2>/dev/null"
+        issue_string="$(VEexecGetLastStdOut)"
+    fi
+    local _os=$(detectOS "$issue_string")
+    local _os_ver=$(getOSVersion "$issue_string")
+    if [[ "$OS" == "ubuntu" ]]; then
+        SED_COPY_OPTION=''
+    fi
+    local _v="VE$1"
+    local _cmd="${_v}_ROOT=$_root;${_v}_PRIVATE=$_private;${_v}_OS=$_os;${_v}_OS_VER=${_os_ver%%.*}"
+    eval $_cmd
+    [[ $need_umount -eq 1 ]] && $umountVE $1 &>>/dev/null
+
+    return 0;
+}
+
+function populateVEVarsVZ() {
+    : ${1:?"Missing VEID param"}
+    if isUUID $1; then
+        populateVMVarsVEID $1 || return $?
+    else
+        populateContainerVarsVEID $1 || return $?
+    fi
+    local _cmd="VZ_VEID_ROOT=\$VE$1_ROOT;VZ_VEID_PRIVATE=\$VE$1_PRIVATE;VZ_VEID_OS=\$VE$1_OS;VZ_VEID_OS_VER=\$VE$1_OS_VER"
     eval $_cmd
 
     return 0

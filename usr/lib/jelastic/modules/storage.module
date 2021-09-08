@@ -172,22 +172,20 @@ function onModLoadCallback() {
         vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; };
     fi
 
-    ########################################
-    [ -n "$CTID" ] && {
-        populateContainerVarsVZ $CTID
+    [ -n "$VEID" ] && {
+        populateVEVarsVZ VEID
         res=$?
         if [[ "$res" -eq 3 ]] ; then
             writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"
             die -q;
         fi
 
-        if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
+        if VEExecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
             res=$(vzexecGetLastStdOut)
             [ -n "$res" ] && eval "$res"
         fi
     }
 
-    #########################################
     [[ -n "$UUID" && "$VTYPE" == VM ]] && {
         VE_ROOT="/vz/tmp/${UUID}"
     }
@@ -198,24 +196,6 @@ function onModLoadCallback() {
     }
     log "${UNKNOWN_ARG[*]}"
     return 0
-}
-
-##########################################
-function getOS(){
-    isVERunning ${VEID} && {
-        VEExecRun "set +f; cat /etc/*-release /etc/issue 2>/dev/null"
-        issue_string="$(VEexecGetLastStdOut)"
-    } || {
-        local issue_file="$(vzctPath $VE_ROOT /etc/issue )"
-        local release_files="$(vzctPath $VE_ROOT /etc/)/*-release"
-        issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    }
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
-    if [[ "$OS" == "ubuntu" ]]; then
-        SED_COPY_OPTION=''
-    fi
 }
 
 function _hasActiveMounts() {
@@ -347,7 +327,7 @@ function processnfs3() {
     processnfs $*
 }
 
-function processnfs() {
+function populateContainerVars() {
     local sourceIP=${1:?"Source address required"}
     local sourceMount=${2:?"Source share name required"}
     local sourceMountUnEsc=$($SED -re 's/\\(\/|\(|\)|\]|\[|\\)/\1/g' <<< "$sourceMount")
@@ -362,8 +342,8 @@ function processnfs() {
                 return 99; }
     fi
 
-    OS=$VZ_CTID_OS
-    OS_ver=$VZ_CTID_OS_VER
+    OS=$VZ_VEID_OS
+    OS_ver=$VZ_VEID_OS_VER
 
     if [[ "x$OS" == "xalpine" ]] ; then
         echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Alpine Linux detected. " >> ${JEM_CALLS_LOG}
@@ -475,22 +455,34 @@ function processnfs() {
     return 0
 }
 
-###############################################
 function checkUtils() {
-    #check only on mounted or running container
-    [ -z "$VZ_CTID_ROOT" ] && return 1
-    isContainerMounted $CTID || return 1
+    if isUUID $VEID; then
+      #check only on running VM
+      [ -z "$VZ_VEID_ROOT" ] && return 1
+      isVERunning $VEID || return 1
 
-    #check for jelastic's autofs config
-    if [ ! -e "$VZ_CTID_ROOT/etc/autofs.gluster" ] ; then
-        return 1
+      #check for jelastic's autofs config
+      VEExecRun "[ -e $VZ_VEID_ROOT/etc/autofs.gluster ]"
+      [[ "$(VEexecGetLastErrCode)" != "0" ]] && return 1
+
+      #check for gluster helper
+      VEExecRun "[ ! -x $VZ_VEID_ROOT/usr/sbin/mount.glusterfs -a ! -x $VZ_VEID_ROOT/sbin/mount.glusterfs ]"
+      [[ "$(VEexecGetLastErrCode)" == "0" ]] && return 1
+    else
+      #check only on mounted or running container
+      [ -z "$VZ_VEID_ROOT" ] && return 1
+      isContainerMounted $CTID || return 1
+
+      #check for jelastic's autofs config
+      if [ ! -e "$VZ_VEID_ROOT/etc/autofs.gluster" ] ; then
+          return 1
+      fi
+
+      #check for gluster helper
+      if [ ! -x "$VZ_VEID_ROOT/usr/sbin/mount.glusterfs" -a ! -x "$VZ_VEID_ROOT/sbin/mount.glusterfs" ] ; then
+          return 1
+      fi
     fi
-
-    #check for gluster helper
-    if [ ! -x "$VZ_CTID_ROOT/usr/sbin/mount.glusterfs" -a ! -x "$VZ_CTID_ROOT/sbin/mount.glusterfs" ] ; then
-        return 1
-    fi
-
     return 0
 }
 
@@ -499,9 +491,8 @@ function processgluster() {
     STORAGE_BACKEND="gluster"
 
     #check if client available
-    ##############################################
-    if isContainerRunning $CTID ; then
-        if ! vzexecRun "command -v mount.glusterfs &>/dev/null" ; then
+    if isVERunning $VEID ; then
+        if ! VEExecRun "command -v mount.glusterfs &>/dev/null" ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID glusterfs helper not found. Installing..." >> $JEM_CALLS_LOG
             dosetupUtils || return 2
         fi
@@ -526,8 +517,8 @@ function processgluster() {
         $VZCTL mount $CTID > /dev/null 2>&1
     fi
 
-    OS=$VZ_CTID_OS
-    OS_ver=$VZ_CTID_OS_VER
+    OS=$VZ_VEID_OS
+    OS_ver=$VZ_VEID_OS_VER
 
     if [[ "x$OS" == "xalpine" ]] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Alpine Linux detected. Glusterfs is not supported for it" >> $JEM_CALLS_LOG
@@ -681,8 +672,8 @@ function processlocal() {
 }
 
 function doRemount() {
-    OS=$VZ_CTID_OS
-    OS_ver=$VZ_CTID_OS_VER
+    OS=$VZ_VEID_OS
+    OS_ver=$VZ_VEID_OS_VER
 
     if [[ "x$OS" == "xalpine" ]] ; then
         log "OS is ALPINE"
@@ -717,8 +708,8 @@ function dosetupUtils() {
         return 1
     fi
 
-    OS=$VZ_CTID_OS
-    OS_ver=$VZ_CTID_OS_VER
+    OS=$VZ_VEID_OS
+    OS_ver=$VZ_VEID_OS_VER
 
     #JE-25896
     if [[ "x$OS" == "xalpine" ]] ; then
@@ -754,10 +745,9 @@ function dosetupUtils() {
         fi
         VEExecRun "rm -f autofs_5.1.6-1j_amd64.deb"
         if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
-######################################
             if [ "x$OS" == "xubuntu" ] ; then
                 #Ubuntu
-                vzexecRun "add-apt-repository ppa:gluster/glusterfs-7 -y"
+                VEExecRun "add-apt-repository ppa:gluster/glusterfs-7 -y"
             else
                 #Debian
                 if [ "$OS_ver" -eq "8" ] ; then
@@ -769,13 +759,12 @@ function dosetupUtils() {
                 [ "$OS_ver" -eq "9"  ] && _code_name="stretch"
                 [ "$OS_ver" -eq "10" ] && _code_name="buster"
 
-                vzexecRun "wget -O - https://download.gluster.org/pub/gluster/glusterfs/7/rsa.pub | apt-key add -"
-                vzexecRun "[ ! -d /etc/apt/sources.list.d ] && mkdir -p /etc/apt/sources.list.d"
-                vzexecRun "echo deb [arch=amd64] https://download.gluster.org/pub/gluster/glusterfs/7/LATEST/Debian/$_code_name/amd64/apt $_code_name main > /etc/apt/sources.list.d/gluster.list"
-                vzexecRun "apt install apt-transport-https -y"
+                VEExecRun "wget -O - https://download.gluster.org/pub/gluster/glusterfs/7/rsa.pub | apt-key add -"
+                VEExecRun "[ ! -d /etc/apt/sources.list.d ] && mkdir -p /etc/apt/sources.list.d"
+                VEExecRun "echo deb [arch=amd64] https://download.gluster.org/pub/gluster/glusterfs/7/LATEST/Debian/$_code_name/amd64/apt $_code_name main > /etc/apt/sources.list.d/gluster.list"
+                VEExecRun "apt install apt-transport-https -y"
             fi
-            vzexecRun "apt-get update -y"
-##########################################
+            VEExecRun "apt-get update -y"
 
             installCmd="$(installPackageCmd $OS install glusterfs-client)"
             checkCmd=$(checkPackageCmd $OS autofs glusterfs-client)
@@ -942,8 +931,8 @@ function doUmount() {
                 return 99; }
     fi
 
-    OS=$VZ_CTID_OS
-    OS_ver=$VZ_CTID_OS_VER
+    OS=$VZ_VEID_OS
+    OS_ver=$VZ_VEID_OS_VER
 
     for i in $(seq 0 $((${#UNKNOWN_ARG[@]}-1))); do
         if [ ! -z "${UNKNOWN_ARG[$i]}" ] ; then
