@@ -184,6 +184,10 @@ function onModLoadCallback() {
             res=$(vzexecGetLastStdOut)
             [ -n "$res" ] && eval "$res"
         fi
+
+        if [[ "$VZ_VEID_OS" == "ubuntu" ]]; then
+            SED_COPY_OPTION=''
+        fi
     }
 
     [[ -n "$UUID" && "$VTYPE" == VM ]] && {
