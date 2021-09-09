@@ -173,7 +173,7 @@ function onModLoadCallback() {
     fi
 
     [ -n "$VEID" ] && {
-        populateVEVarsVZ VEID
+        populateVEVarsVZ $VEID
         res=$?
         if [[ "$res" -eq 3 ]] ; then
             writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"
@@ -327,7 +327,7 @@ function processnfs3() {
     processnfs $*
 }
 
-function populateContainerVars() {
+function processnfs() {
     local sourceIP=${1:?"Source address required"}
     local sourceMount=${2:?"Source share name required"}
     local sourceMountUnEsc=$($SED -re 's/\\(\/|\(|\)|\]|\[|\\)/\1/g' <<< "$sourceMount")
