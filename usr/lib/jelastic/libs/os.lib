@@ -333,19 +333,20 @@ function installPackageCmd() {
     local OS=$1; shift
     local pmaction=$1; shift
     local _apk_wait_timeout=${APK_WAIT_TIMEOUT:="10"}
+    local proxy_env="export http_proxy=\"$(printenv http_proxy)\"; export https_proxy=\"$(printenv https_proxy)\"; export no_proxy=\"$(printenv no_proxy)\"";
     for arg do PKGS="$arg $PKGS"; done
     case $OS in
         suse)
-                PM="zypper --quiet --non-interactive"
+                PM="$proxy_env; zypper --quiet --non-interactive"
             ;;
         debian|ubuntu|kali)
-                PM="DEBIAN_FRONTEND=noninteractive apt-get -y --allow-unauthenticated -o Dpkg::Options::=\"--force-confold\""
+                PM="$proxy_env; DEBIAN_FRONTEND=noninteractive apt-get -y --allow-unauthenticated -o Dpkg::Options::=\"--force-confold\""
             ;;
         centos|redhat|fedora)
-                PM="yum -y"
+                PM="$proxy_env; yum -y"
             ;;
         alpine)
-            PM="apk --wait $_apk_wait_timeout"
+                PM="$proxy_env; apk --wait $_apk_wait_timeout"
             case $pmaction in
                 install)
                         pmaction="add -f"
