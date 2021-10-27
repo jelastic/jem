@@ -333,7 +333,7 @@ function installPackageCmd() {
     local OS=$1; shift
     local pmaction=$1; shift
     local _apk_wait_timeout=${APK_WAIT_TIMEOUT:="10"}
-    local proxy_env="export http_proxy=\"$(printenv http_proxy)\"; export https_proxy=\"$(printenv https_proxy)\"; export no_proxy=\"$(printenv no_proxy)\"";
+    local proxy_env="export http_proxy=\"$(printenv http_proxy)\"; export https_proxy=\"$(printenv https_proxy)\"; export ftp_proxy=\"$(printenv ftp_proxy)\"; export no_proxy=\"$(printenv no_proxy)\"";
     for arg do PKGS="$arg $PKGS"; done
     case $OS in
         suse)
