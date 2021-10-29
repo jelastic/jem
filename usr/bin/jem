@@ -108,7 +108,7 @@ if [ ! -e /dev/vzctl ] ; then
             else
                 count=0
             fi
-            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction - waiting start $count" >> $JEM_CALLS_LOG
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction - waiting start $count, status: $out" >> $JEM_CALLS_LOG
         done
     fi
 fi
