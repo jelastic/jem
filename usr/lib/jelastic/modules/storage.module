@@ -190,9 +190,12 @@ function onModLoadCallback() {
         fi
     }
 
-    [[ -n "$UUID" && "$VTYPE" == VM ]] && {
+    if [[ -n "$UUID" && "$VTYPE" == VM ]] ; then
         VE_ROOT="/vz/tmp/${UUID}"
-    }
+    else
+        #fallback to old var
+        VE_ROOT=$VZ_VEID_ROOT
+    fi
 
     for arg do UNKNOWN_ARG+=("$arg") ; done
     [[ ! -z "${VEID}" ]] && {
@@ -244,24 +247,29 @@ function getTargetIPs() {
 function preparePath() {
     local tpath=${1:?"Path required"}
     local hn=${2}
-    if [[ ! -z "${hn}" ]] ; then
+
+    isVERunning $VEID; _running=$?
+
+    if [[ ! -z "$hn" ]] ; then
+        [[ $_running -eq 0 ]] || tpath="$VZ_VEID_ROOT$tpath"
         tpath=$($SED -re 's/\$/\\$/g' -e 's/(`)/\\\1/g' <<< "${tpath}")
     fi
 
     local cmd="[[ -d '$($SED -re "s/'/\\\'\'/g" <<< "${tpath}")' ]] || { mkdir -p \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\" 2>/dev/null && chmod 0777 \"$($SED -re 's/"/\\\"/g' <<< "${tpath}")\";}";
-    if [[ -z "${hn}" ]] ; then
-        log "${cmd}"
-        VEExecRun "${cmd}"
+    if [[ $_running -eq 0 ]] ; then
+        VEExecRun "$cmd"
         return $(VEexecGetLastErrCode)
+
     fi
-    log "${cmd}"
+
     /bin/bash -c "$cmd"
-    return $?;
+    return $?
+
 }
 
 function remountPath() {
-    local share=${1}
-    local remountCmd="umount -l ${share} ; mount ${share}"
+    local share=$1
+    local remountCmd="umount -l \"$share\" ; mount \"$share\""
     out=$(VEExecRunInteractive "$remountCmd" 2>&1)
     if [[ -z "${out}" ]] ; then
        log "$out"
@@ -349,7 +357,7 @@ function processnfs() {
     OS=$VZ_VEID_OS
     OS_ver=$VZ_VEID_OS_VER
 
-    if [[ "x$OS" == "xalpine" ]] ; then
+    if [[ "x$VZ_VEID_OS" == "xalpine" ]] ; then
         echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Alpine Linux detected. " >> ${JEM_CALLS_LOG}
 
         if VEExecRun "[[ ! -e \"$MOUNTPROG_APK\" ]]" ; then
@@ -368,10 +376,19 @@ function processnfs() {
         #cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE};"
 
     else
-        if ! $GREP -q "$CONTAINER_MOUNTS_STORAGE" <<<"$(VEExecRunInteractive cat /etc/auto.master 2>/dev/null)" 2>&1; then
-            dosetupUtils || {
-                return 2
-            }
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : looking for $CONTAINER_MOUNTS_STORAGE " >> ${JEM_CALLS_LOG}
+        isConfigDefined=1
+        if [ $running -eq 0 -a "x$VTYPE" == "xVM" ] ; then
+            grep -q "$CONTAINER_MOUNTS_STORAGE" <<< "$(VEExecRunInteractive cat /etc/auto.master 2>/dev/null)" 2>&1
+            isConfigDefined=$?
+        else
+            grep -q "$CONTAINER_MOUNTS_STORAGE" "$(vzctPath $VZ_VEID_ROOT /etc/auto.master)" 2>&1
+            isConfigDefined=$?
+        fi
+
+        if [[ $isConfigDefined -ne 0 ]] ; then
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : installing storage utils " >> ${JEM_CALLS_LOG}
+            dosetupUtils || return 2
         fi
 
         autofsdest="$($SED -e 's/\s/\\ /g' <<< $_DESTINATION)"
@@ -398,7 +415,7 @@ function processnfs() {
         if ! [[ $running == 0 && "$VTYPE" == VM ]]; then
             out=$(echo -e $mntEntry >> ${MOUNTS_STORAGE})
         else
-            VEExecRun "echo -e $mntEntry >> ${MOUNTS_STORAGE##"$VE_ROOT"}"
+            VEExecRun "echo -e $mntEntry >> ${MOUNTS_STORAGE##"$VZ_VEID_ROOT"}"
             out=$(vzexecGetLastStdOut)
         fi
         if [[ ! -z "${out}" ]] ; then
@@ -409,7 +426,7 @@ function processnfs() {
     msg=""
     res=0
 
-    if [[ "x$OS" == "xalpine" ]] ; then
+    if [[ "x$VZ_VEID_OS" == "xalpine" ]] ; then
         if [[ $running -eq 0 ]] ; then
             mntcmd="mount \"$($SED -re 's/("\*|\$|\?|\|\^|`|'\'')/\\\1/g' <<< "${_DESTINATION}")\""
             VEExecRun "${mntcmd}"
@@ -497,12 +514,12 @@ function processgluster() {
     #check if client available
     if isVERunning $VEID ; then
         if ! VEExecRun "command -v mount.glusterfs &>/dev/null" ; then
-            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID glusterfs helper not found. Installing..." >> $JEM_CALLS_LOG
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID glusterfs helper not found. Installing..." >> $JEM_CALLS_LOG
             dosetupUtils || return 2
         fi
     else
         if ! checkUtils $CTID ; then
-            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running. Missing utilities" >> $JEM_CALLS_LOG
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - container is not running. Missing utilities" >> $JEM_CALLS_LOG
             writeJSONResponseErr "result=>4207" "message=>Can not setup gluster native client. Container is stopped"
             return 2
         fi
@@ -517,14 +534,11 @@ function processgluster() {
     }
 
     if [[ $running -ne 0 ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - container is not running." >> $JEM_CALLS_LOG
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - container is not running." >> $JEM_CALLS_LOG
         $VZCTL mount $CTID > /dev/null 2>&1
     fi
 
-    OS=$VZ_VEID_OS
-    OS_ver=$VZ_VEID_OS_VER
-
-    if [[ "x$OS" == "xalpine" ]] ; then
+    if [[ "x$VZ_VEID_OS" == "xalpine" ]] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Alpine Linux detected. Glusterfs is not supported for it" >> $JEM_CALLS_LOG
         writeJSONResponseErr "result=>4207" "message=>Can not setup gluster native client"
         return 2
@@ -676,14 +690,11 @@ function processlocal() {
 }
 
 function doRemount() {
-    OS=$VZ_VEID_OS
-    OS_ver=$VZ_VEID_OS_VER
-
-    if [[ "x$OS" == "xalpine" ]] ; then
+    if [[ "x$VZ_VEID_OS" == "xalpine" ]] ; then
         log "OS is ALPINE"
         local shares=(${_DESTINATION})
         [[ -z ${_DESTINATION} ]] && {
-            [[ ! -z "${VEID}" ]] && MOUNTS_STORAGE="$(vzctPath $VE_ROOT /etc/fstab)"
+            [[ ! -z "${VEID}" ]] && MOUNTS_STORAGE="$(vzctPath $VZ_VEID_ROOT /etc/fstab)"
             shares=($($SED -nre "/\snfs(3|4)?\s/{s/\s*(\S+)\s*(\S+).*/\2/;p}" "$MOUNTS_STORAGE" ))
         }
         for share in ${shares[*]} ; do
@@ -875,11 +886,12 @@ function doMount() {
     isVERunning ${VEID} ; running=$?
 
     if [[ $running -ne 0 ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - VE is not running." >> ${JEM_CALLS_LOG}
-        mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 || { writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID" ;
-                log "Cannot mount VE:$VEID";
-                return 99; }
-        [ -e "$(vzctPath $VE_ROOT /etc/autofs.conf)" ] && $SED -i -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VE_ROOT /etc/autofs.conf)"
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - VE is not running." >> $JEM_CALLS_LOG
+        if ! mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 ; then
+            writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID"
+            return 99
+        fi
+        [ -e "$(vzctPath $VZ_VEID_ROOT /etc/autofs.conf)" ] && $SED -i -e "s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g" "$(vzctPath $VZ_VEID_ROOT /etc/autofs.conf)"
     else
         VEExecRun " [ -e \"/etc/autofs.conf\" ] && sed -i $SED_COPY_OPTION -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
     fi
@@ -890,7 +902,10 @@ function doMount() {
     availModes="[Rr][Oo]|[Rr][Ww]"
     eval "$(echo "${_SOURCE}" | \
         $SED -rne "s/(($availModes):?($availProtos):?(\/){0,2})?([^:]+):?(.*)/atype=\2\nmtype='\3'\nsourceIP='\5'\nsourceMount='\6';/g;p" | \
-            $SED -re "s/='(.*?)'.*/=\1/g" | $SED -re "s/('|\"|\`)/\\\\\1/g" | $SED -re 's/(.*)=(.*)/\1="\2"/g')"
+        $SED -re "s/='(.*?)'.*/=\1/g" | \
+        $SED -re "s/('|\"|\`)/\\\\\1/g" | \
+        $SED -re 's/(.*)=(.*)/\1="\2"/g')"
+
     mtype=${mtype,,}
     atype=${atype,,}
     atype=$($SED -re 's/;//g' <<< $atype)
@@ -929,14 +944,12 @@ function doUmount() {
 
     isVERunning ${VEID}; running=$?
     if [[ $running -ne 0 ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - VE is not running." >> ${JEM_CALLS_LOG}
-        mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 || { writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID" ;
-                log "Cannot mount VE:$VEID";
-                return 99; }
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - VE is not running." >> $JEM_CALLS_LOG
+        if ! mountVE ${VEID} $VE_ROOT > /dev/null 2>&1 ; then
+            writeJSONResponseOut "result=>4195" "message=>Cannot mount VE:$VEID"
+            return 99
+        fi
     fi
-
-    OS=$VZ_VEID_OS
-    OS_ver=$VZ_VEID_OS_VER
 
     for i in $(seq 0 $((${#UNKNOWN_ARG[@]}-1))); do
         if [ ! -z "${UNKNOWN_ARG[$i]}" ] ; then
@@ -948,9 +961,8 @@ function doUmount() {
         shares+=("${_DESTINATION}")
     fi
 
-    if [[ "x$OS" == "xalpine" ]] ; then
-        log "OS is ALPINE"
-        [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="$(vzctPath $VE_ROOT /etc/fstab)"
+    if [[ "x$VZ_VEID_OS" == "xalpine" ]] ; then
+        [[ ! -z "${CTID}" ]] && MOUNTS_STORAGE="$(vzctPath $VZ_VEID_ROOT /etc/fstab)"
     fi
 
     OIFS=$IFS; IFS=$'\n'
@@ -958,7 +970,7 @@ function doUmount() {
         IFS=$OIFS
         if [[ $running -eq 0 ]] ; then
             if ! VEExecRun "umount '${shares[$i]}';" ; then
-                log "Performing lazy umount"
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - Performing lazy umount of ${shares[$i]}" >> $JEM_CALLS_LOG
                 if ! VEExecRun "umount -l '${shares[$i]}';" ; then
                     msg="$(VEexecGetLastStdErr)";
                 else
@@ -980,7 +992,7 @@ function doUmount() {
 
         if [[ "x$SAVE_CONFIG" == "xtrue" ]] ; then
             if [ $rescode -eq 0 ] ; then
-                if [[ "x$OS" == "xalpine" ]] ; then
+                if [[ "x$VZ_VEID_OS" == "xalpine" ]] ; then
                     local dpath="\s+$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\040/g' <<< "${shares[$i]}"))\s+(nfs|none)\s+";
                 else
                     local dpath="^$($SED -re 's/\//\\\//g' <<< $($SED -re 's/\^/\\^/g' -e 's/\$/\\$/g' -e 's/(\+\{|\}|\[|\]|\(|\))/\\\1/g'  -e 's/\s/\\\\ /g' <<< "${shares[$i]}"))\s+-fstype=(nfs|glusterfs).*";
