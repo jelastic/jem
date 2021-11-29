@@ -172,7 +172,7 @@ function onModLoadCallback() {
         vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; };
     fi
 
-    [ -n "$VEID" ] && {
+    if [ -n "$VEID" ] ; then
         populateVEVarsVZ $VEID
         res=$?
         if [[ "$res" -eq 3 ]] ; then
@@ -185,10 +185,12 @@ function onModLoadCallback() {
             [ -n "$res" ] && eval "$res"
         fi
 
-        if [[ "$VZ_VEID_OS" == "ubuntu" ]]; then
+        if [ "x$VZ_VEID_OS" == "xubuntu" -o "x$VZ_VEID_OS" == "xdebian" ] ; then
             SED_COPY_OPTION=''
         fi
-    }
+    else
+        SED_COPY_OPTION=''
+    fi
 
     if [[ -n "$UUID" && "$VTYPE" == VM ]] ; then
         VE_ROOT="/vz/tmp/${UUID}"
