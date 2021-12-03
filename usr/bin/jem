@@ -98,10 +98,18 @@ function executeFirstRunScenario() {
 
 #do not perform any operation if container not fully started
 if [ ! -e /dev/vzctl ] ; then
-    if [ -d /run/systemd/system ] ; then
+    pcount=10
+    while [[ $pcount -gt 0 ]] ; do
+        [[ -e /proc/1/exe ]] && ! readlink -f /proc/1/exe | grep -q vzctl && break
+        echo "`date +%D.%k:%M:%S.%N`: no proc/1/exe" >> $JEM_CALLS_LOG
+        sleep 0.5
+        pcount=$((pcount-1))
+    done
+
+    if readlink -f /proc/1/exe | grep -qE 'systemd/systemd' ; then
         count=10
         while [[ $count -gt 0 ]] ; do
-            out=$(systemctl is-system-running)
+            out=$(systemctl is-system-running 2>&1 )
             if [[ "x$out" == "xstarting" || "x$out" == "xinitializing" ]] ; then
                 count=$((count-1))
                 sleep 1
@@ -110,6 +118,8 @@ if [ ! -e /dev/vzctl ] ; then
             fi
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction - waiting start $count, status: $out" >> $JEM_CALLS_LOG
         done
+    else
+        echo "`date +%D.%k:%M:%S.%N`: not systemd system $(readlink -f /proc/1/exe)" >> $JEM_CALLS_LOG
     fi
 fi
 
