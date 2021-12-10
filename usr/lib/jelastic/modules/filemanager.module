@@ -137,7 +137,7 @@ function doRead() {
         return $result_code;
     fi
 
-    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'r'" 2>>${JEM_CALLS_LOG} ) ; then
+    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'r'" >>${JEM_CALLS_LOG} 2>&1 ) ; then
         return 0 ;
     else
 	result=$?;
@@ -163,7 +163,7 @@ function doWrite() {
 		return 33;
 	fi
 	local parent_dir=$(dirname "$FS_PATH") ;
-        if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'w'" 2>>${JEM_CALLS_LOG} ) ; then
+        if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'w'" >>${JEM_CALLS_LOG} 2>&1 ) ; then
 	    return 0
 	else
 	    result=$?
@@ -203,7 +203,7 @@ function doCreate() {
     fi
     local parent_dir=$(dirname "$FS_PATH") ;
 
-    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w' 'x'" 2>>${JEM_CALLS_LOG} ) ; then
+    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w' 'x'" >>${JEM_CALLS_LOG} 2>&1 ) ; then
         return 0;
     else
 	result=$?;
@@ -230,7 +230,7 @@ function doDelete() {
         return 35;
     fi
     local parent_dir=$(dirname "$FS_PATH");
-    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w' 'x'" 2>>${JEM_CALLS_LOG} ) ; then
+    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${parent_dir}") 'w' 'x'" >>${JEM_CALLS_LOG} 2>&1 ) ; then
         return 0;
     else
 	result=$?;
@@ -243,7 +243,7 @@ function doDelete() {
         return 37;
     fi
 
-    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'w'" 2>>${JEM_CALLS_LOG} ) ; then
+    if $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_PATH}") 'w'" >>${JEM_CALLS_LOG} 2>&1) ; then
         return 0;
     else
 	result=$?;
@@ -292,7 +292,7 @@ function doCopy() {
             writeJSONResponseErr "result=>4042" "message=>Destination directory $FS_DESTINATION not exists";
             return 42;
         else
-            if ! $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_DESTINATION}") 'w' 'x'" 2>>${JEM_CALLS_LOG}) ; then
+            if ! $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_DESTINATION}") 'w' 'x'" >>${JEM_CALLS_LOG} 2>&1) ; then
 		writeJSONResponseErr "result=>4037" "message=>Permission denied";
 		return 37;
 	    fi
