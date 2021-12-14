@@ -40,6 +40,8 @@ ROOT_CRONFILE="/var/spool/cron/root";
 AUTOUPDATE_CRON_STRING="* * * * * jem vcs autoupdate";
 REDEPLOY_CONF_FILE="/etc/jelastic/redeploy.conf";
 
+BRANCH_NAME_FILTER="(\.\.|[[:space:]]|[\ []|[]\ ]|[\/\\@\,\"\'\|\~\^:\;\<\>\?\!\+\{\}\(\)]|\.$|\.lock$)";
+
 GITSSH_SCRIPT="/var/lib/jelastic/libs/gitssh.sh"
 export GIT_SSH=${GITSSH_SCRIPT};
 
@@ -243,6 +245,12 @@ function doCreateProject(){
   parseArguments "$@";
 
   isValidURL $URL || { writeJSONResponseErr "result=>4050" "message=>URL is not valid!"; return 1; };
+  [ -n "$BRANCH" ] && {
+        if [[ $BRANCH =~ $BRANCH_NAME_FILTER ]]; then
+          writeJSONResponseErr "result=>4050" "message=>Branch name is not valid!";
+          return 1;
+        fi
+  }
   local incorrect_login_regex="[~\!\#\$%^&\*\(\)\{\}\\\/=]";
 
   [[ $LOGIN  =~ $incorrect_login_regex ]] && { writeJSONResponseErr "result=>4053" "message=>Login is not valid!"; return 1; };
@@ -489,6 +497,12 @@ function doEditProject(){
   [ ! -z "$AUTHORIZATION_KEY_VAL" ]  && { # ssh key was in params, clean password
         CLEAN_PASSWORD=1;
         [ "$CLEAN_KEY" -eq 1 ] && { writeJSONResponseErr "result=>4017" "message=>Project edit failed"; return 1; }
+  }
+  [ -n "$BRANCH" ] && {
+        if [[ $BRANCH =~ $BRANCH_NAME_FILTER ]]; then
+          writeJSONResponseErr "result=>4050" "message=>Branch name is not valid!";
+          return 1;
+        fi
   }
 
   #[ ! -z $URL ]  &&  repository_url_was_changed="true";
