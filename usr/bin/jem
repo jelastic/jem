@@ -113,7 +113,7 @@ if [ ! -e /dev/vzctl ] ; then
             if [[ "x$out" == "xstarting" || "x$out" == "xinitializing" ]] ; then
                 count=$((count-1))
                 sleep 1
-            elif grep D-Bus <<< $out; then
+            elif grep -q D-Bus <<< $out; then
                 sleep 1
             else
                 count=0
