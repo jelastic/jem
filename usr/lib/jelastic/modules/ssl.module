@@ -103,7 +103,18 @@ function doRemove(){
                fi                                          
         fi
 
-      $(disableSSL) && writeJSONResponseOut "result=>0" "message=>SSL removed successfully" || { writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"; return 1; };
+	$(disableSSL)  ; sslresult=$?;
+	case $sslresult in
+	    220|221 )
+	    ;;
+	    0)
+		writeJSONResponseOut "result=>0" "message=>SSL removed successfully" 
+	    ;;
+	    *)
+		writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"
+	    ;;
+	esac
+	return $sslresult;
 }
 
 
