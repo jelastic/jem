@@ -55,7 +55,7 @@ function getPassword(){
 
 
 function decryptPassword(){
-    local index=0;
+    local index=0 result=0;
     JEM_PARAMS=( $@ )
 
     for arg in ${JEM_PARAMS[@]}
@@ -64,7 +64,9 @@ function decryptPassword(){
 	case $arg in
 	    -p|--password)
 	    JEM_PARAMS[$index]=$( getPassword ${JEM_PARAMS[$index]} );
+	    result=$?
 	    ;;
 	esac
     done
+    return $result
 }

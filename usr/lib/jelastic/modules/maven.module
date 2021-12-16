@@ -48,7 +48,10 @@ free_mem=`free -m | $GREP Mem | $AWK '{print $2}'`;
 
 function parseArguments() {
     EXTRA_BUILD_DEPLOY_PARAM=''
-    decryptPassword $@;
+    local res=0
+    decryptPassword $@
+    res=$?
+    [ $res -eq 0 ] || die -q
     set -- ${JEM_PARAMS[@]};
 while [ "$1" != "" ]; do
   case $1 in

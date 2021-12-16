@@ -34,7 +34,10 @@ function doUsage() {
 }
 
 function preSetCallback(){
+    local res=0
     decryptPassword $@
+    res=$?
+    [ $res -eq 0 ] || die -q
 }
 
 function doSet(){
@@ -73,7 +76,10 @@ function postSetCallback(){
 }
 
 function preSetosCallback(){
+    local res=0
     decryptPassword $@
+    res=$?
+    [ $res -eq 0 ] || die -q
 }
 
 function doSetos(){

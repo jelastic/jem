@@ -253,7 +253,10 @@ function doDisableReplication(){
 }
 
 function doAddToCluster(){
+    local res=0
     decryptPassword $@
+    res=$?
+    [ $res -eq 0 ] || die -q
     set -- ${JEM_PARAMS[@]}
 
     while [ $# -gt 0 ]
