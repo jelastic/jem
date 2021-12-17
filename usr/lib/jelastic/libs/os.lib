@@ -102,7 +102,7 @@ function startService() {
 # $1 - service name
 function startServiceSilent() {
     local name=${1};
-    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} start >>JEM_CALLS_LOG 2>&1;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} start >>$JEM_CALLS_LOG 2>&1;
     result=$?;
     sleep 1;
     return ${result};
@@ -120,7 +120,7 @@ function stopService() {
 # $1 - service name
 function stopServiceSilent() {
     local name=${1};
-    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} stop >>JEM_CALLS_LOG 2>&1;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} stop >>$JEM_CALLS_LOG 2>&1;
     result=$?;
     sleep 1;
     return ${result};
@@ -134,13 +134,13 @@ function reloadService() {
 
 function reloadServiceSilent() {
     local name=${1};
-    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} reload >>JEM_CALLS_LOG 2>&1;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} reload >>$JEM_CALLS_LOG 2>&1;
     return ${?};
 }
 
 function restartServiceSilent() {
     local name=${1};
-    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} restart >>JEM_CALLS_LOG 2>&1;
+    ${SUDO_COMMAND} ${SERVICE_CMD} ${name} restart >>$JEM_CALLS_LOG 2>&1;
     return ${?};
 }
 
