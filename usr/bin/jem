@@ -97,7 +97,7 @@ function executeFirstRunScenario() {
 }
 
 #do not perform any operation if container not fully started
-if [ ! -e /dev/vzctl ] ; then
+if [[ ! -e /dev/vzctl && $UID == 0 ]] ; then
     pcount=10
     while [[ $pcount -gt 0 ]] ; do
         [[ -e /proc/1/exe ]] && ! readlink -f /proc/1/exe | grep -q vzctl && break
