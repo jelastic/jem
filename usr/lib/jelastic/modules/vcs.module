@@ -40,7 +40,7 @@ ROOT_CRONFILE="/var/spool/cron/root";
 AUTOUPDATE_CRON_STRING="* * * * * jem vcs autoupdate";
 REDEPLOY_CONF_FILE="/etc/jelastic/redeploy.conf";
 
-BRANCH_NAME_FILTER="(\.\.|[[:space:]]|[\ []|[]\ ]|[\/\\@\,\"\'\|\~\^:\;\<\>\?\!\+\{\}\(\)]|\.$|\.lock$)";
+BRANCH_NAME_FILTER="(\.\.|[[:space:]]|[\ []|[]\ ]|[\/\\@\,\"\'\|\~\^:\;\<\>\`\%\?\!\+\{\}\(\)]|\.$|\.lock$)";
 
 GITSSH_SCRIPT="/var/lib/jelastic/libs/gitssh.sh"
 export GIT_SSH=${GITSSH_SCRIPT};
