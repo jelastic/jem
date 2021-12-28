@@ -195,9 +195,11 @@ function deploy(){
         APPWEBROOT=${WEBROOT}/ROOT;
     else
         undeploy ${context};
-        unpack $APPWEBROOT && echo "Application deployed successfully!" >> $ACTIONS_LOG 2>&1 && deployLog "Application successfully deployed to $APPWEBROOT" || { rm -rf $APPWEBROOT 1>/dev/null 2>&1; writeJSONResponseErr "result=>4071" "message=>Cannot unpack package"; die -q; }
+        unpack $APPWEBROOT  || { rm -rf $APPWEBROOT 1>/dev/null 2>&1; writeJSONResponseErr "result=>4071" "message=>Cannot unpack package"; die -q; }
         shiftContentFromSubdirectory $APPWEBROOT;
         setContext $context;
+        echo "Application deployed successfully!" >> $ACTIONS_LOG 2>&1;
+        deployLog "Application successfully deployed to $APPWEBROOT";
     fi
     finishDeploy;
 }
