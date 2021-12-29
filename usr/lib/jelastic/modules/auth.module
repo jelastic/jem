@@ -943,7 +943,8 @@ Description=Jelastic UNFSD
 Requires=rpcbind.target rpcbind.service
 
 [Service]
-ExecStart=/sbin/unfsd
+Type=forking
+ExecStart=/sbin/unfsd -i /var/run/unfsd.pid
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 Restart=on-failure
