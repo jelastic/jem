@@ -71,6 +71,11 @@ function doPostDiscovery(){
     [ -f "${ROUTEFIXER}" ] && [ ! -z "$externalIp" ] && bash ${ROUTEFIXER} >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
 }
 
+function doPostRun(){
+    echo "doPostRun" >>$JEM_CALLS_LOG;
+    isFunction postRun && postRun >>$JEM_CALLS_LOG 2>>$JEM_CALLS_LOG;
+}
+
 function doApply(){
     VERBOSE=${ENV_VERBOSE:-1}
     local localResult=0
