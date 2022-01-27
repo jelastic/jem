@@ -17,7 +17,9 @@
 
 
 inherit default os envinfo;
-inherit ${engine_module_inherit};
+inherit_check ${engine_module_inherit} || {
+    writeJSONResponseOut "result=>4031" "message=>Invalid engine module";
+    kill ${MANAGE_KILL_TARGET} 2>/dev/null; exit 255; }
 inherit extendperm;
 
 DESCRIPTION="Switch engine version";
