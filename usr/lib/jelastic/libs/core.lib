@@ -496,6 +496,14 @@ function inherit() {
     done
 }
 
+function inherit_check() {
+    local x e;
+    for x in "$@"; do
+        [[ -e "${MANAGE_CORE_PATH}/${x}.lib" ]] || return 1;
+        inherit ${x};
+    done
+}
+
 function include() {
     local x e;
 

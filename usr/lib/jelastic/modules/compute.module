@@ -21,7 +21,9 @@ VERSION="1";
 DEFAULT_ACTION="Usage";
 DESCRIPTION="Compute node operations";
 
-inherit "$deploy_module_inherit";
+inherit_check "$deploy_module_inherit" || {
+    writeJSONResponseOut "result=>4060" "message=>Invalid deploy module"; 
+    kill ${MANAGE_KILL_TARGET} 2>/dev/null; exit 255; }
 include "$replication_module_inherit";
 include cartridge-common decrypt-passwd;
 
