@@ -61,6 +61,7 @@ GROUPID=0
 VERBOSE=1
 DEFAULT_AUTOFS_TIMEOUT=300
 JELASTIC_AUTOFS_TIMEOUT=3
+NOLOCK=0
 
 EXEC="/bin/bash -c "
 SED_COPY_OPTION='--copy'
@@ -73,7 +74,7 @@ function onModLoadCallback() {
     log "Preload callback";
 
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -o c:,s:,d:,u:,g:,l:,m: -l ctid:,source:,destination:,ip:,uid:,gid:,movedata:,saveconfig:,force:,cluster:,uuid:,vtype:,backend: -- "$@" 2>/dev/null`;
+    local temp=`getopt -o c:,s:,d:,u:,g:,l:,m: -l ctid:,source:,destination:,ip:,uid:,gid:,movedata:,saveconfig:,force:,cluster:,uuid:,vtype:,backend:,nolock: -- "$@" 2>/dev/null`;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
@@ -152,6 +153,15 @@ function onModLoadCallback() {
                 if [ "x$STORAGE_BACKEND" != "xgluster" -a "x$STORAGE_BACKEND" != "xnfs" ] ; then
                     STORAGE_BACKEND="nfs"
                 fi
+                ;;
+            --nolock)
+                shift;
+                if [ "x$NOLOCK" != "xtrue" ]; then
+                    NOLOCK=1
+                else
+                    NOLOCK=0
+                fi
+                shift;
                 ;;
             --)
                 shift;
@@ -332,7 +342,8 @@ function checkMount() {
 }
 
 function processnfs4() {
-    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nolock,soft,timeo=30,retrans=2,_netdev"
+    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,soft,timeo=30,retrans=2,_netdev"
+    [[ $NOLOCK -eq 1 ]] && _DEFAULT_NFS_MOUNT_OPTS="$_DEFAULT_NFS_MOUNT_OPTS"
     processnfs $*
 }
 
