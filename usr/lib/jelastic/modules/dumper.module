@@ -17,7 +17,9 @@
 
 
 inherit default os envinfo;
-inherit ${dumper_module_inherit};
+inherit_check ${dumper_module_inherit} || {
+    writeJSONResponseOut "result=>4100" "message=>Invalid dumper module";
+    kill ${MANAGE_KILL_TARGET} 2>/dev/null; exit 255; }
 include output;
 
 DESCRIPTION="Database dumping module";
