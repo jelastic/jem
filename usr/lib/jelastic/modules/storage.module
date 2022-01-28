@@ -343,7 +343,7 @@ function checkMount() {
 
 function processnfs4() {
     _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,soft,timeo=30,retrans=2,_netdev"
-    [[ $NOLOCK -eq 1 ]] && _DEFAULT_NFS_MOUNT_OPTS="$_DEFAULT_NFS_MOUNT_OPTS"
+    [[ $NOLOCK -eq 1 ]] && _DEFAULT_NFS_MOUNT_OPTS="$_DEFAULT_NFS_MOUNT_OPTS,nolock"
     processnfs $*
 }
 
