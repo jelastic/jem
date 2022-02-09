@@ -75,12 +75,10 @@ function writeJSONResponseOut(){
         local json_resp_full=$(echo {"$args"} | $SED 's/\=>/\":\"/g');
     }
 
-    set -f;
-    json_resp_full=$(echo "$json_resp_full" | $SED "s/}\s*]\s*\"/}]/g" | $SED -re 's/"\[\s+?\{/\[{/g' -e 's|\"\[\]\"|\[\]|' ) ;
+    json_resp_full=$(set +f; echo "$json_resp_full" | $SED "s/}\s*]\s*\"/}]/g" | $SED -re 's/"\[\s+?\{/\[{/g' -e 's|\"\[\]\"|\[\]|' ) ;
     echo -n `date +%D.%k:%M:%S.%N` >> ${JEM_CALLS_LOG} 2>&1;
     echo ":[RESPONSE] [PID: $$]: $json_resp_full" >> ${JEM_CALLS_LOG} 2>&1;
     echo "$json_resp_full";
-    set +f;
     cleanActionsLog ;
 }
 
