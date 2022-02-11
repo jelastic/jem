@@ -691,6 +691,7 @@ function _removeNativeip() {
     }
 
     DESTINATION=${DESTINATION//\//\\/}
+    DESTINATION=${DESTINATION//\+/\\+}
     if [[ $running -eq 0 ]] ; then
         vzexecRun "which iptables"
         IPT="$(vzexecGetLastStdOut)"
