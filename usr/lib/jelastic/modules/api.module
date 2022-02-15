@@ -35,15 +35,20 @@ describeApiCall(){
 }
 
 doApiCall(){
-  getInfraAddresses infraAddr;
-  [[ -z "${domain}" ]] && {
-    log  "Can not obtain core address";
-    writeJSONResponseErr "result=>9999" "message=>Cannot get app domain";
-    return 1;
-  }
+    getInfraAddresses infraAddr;
+    [[ -z "${domain}" ]] && {
+        log  "Can not obtain core address";
+        writeJSONResponseErr "result=>9999" "message=>Cannot get app domain";
+        return 1;
+    }
 
-  local APP_DOMAIN="https://app.${domain}"
-  $CURL $(sed -r "s@\[API_DOMAIN\]@$APP_DOMAIN@" <<<"$@")
+    API_PARAMS=();
+    for i in "$@"; do
+        API_PARAMS=( "${API_PARAMS[@]}" "\"${i}\"")
+    done
+
+    local APP_DOMAIN="https://app.${domain}"
+    eval $CURL $(sed -r "s@\[API_DOMAIN\]@$APP_DOMAIN@" <<<"${API_PARAMS[@]}")
 
 }
 
