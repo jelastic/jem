@@ -25,7 +25,6 @@ DEFAULT_ACTION="Usage";
 VERBOSE=1;
 $PROGRAM 'curl';
 
-
 function doUsage() {
     showUsageMessage;
 }
@@ -35,6 +34,7 @@ describeApiCall(){
 }
 
 doApiCall(){
+    local i
     getInfraAddresses infraAddr;
     [[ -z "${domain}" ]] && {
         log  "Can not obtain core address";
@@ -44,6 +44,7 @@ doApiCall(){
 
     API_PARAMS=();
     for i in "$@"; do
+        i="$(sed  -re 's/["]/\\"/g' <<<"$i")"
         API_PARAMS=( "${API_PARAMS[@]}" "\"${i}\"")
     done
 
