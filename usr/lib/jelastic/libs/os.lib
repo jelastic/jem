@@ -316,6 +316,7 @@ function detectOS() {
     : ${1:?"Missing param: issue_string"};
     local issue_string=$1
 
+    [ -z "$_OS" ] && $GREP -iq "vzlinux" <<< $issue_string && _OS="vzlinux"
     [ -z "$_OS" ] && $GREP -iq "kali" <<< $issue_string && _OS="kali"
     [ -z "$_OS" ] && $GREP -iq "ubuntu\|mint" <<< $issue_string && _OS="ubuntu"
     [ -z "$_OS" ] && $GREP -iq "debian" <<< $issue_string && _OS="debian"
