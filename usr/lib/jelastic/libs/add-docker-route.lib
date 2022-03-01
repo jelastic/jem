@@ -142,3 +142,11 @@ function delSuseRoute(){
     fi
     return 0;
 }
+
+function addVzlinuxRoute(){
+     addCentosRoute
+}
+
+function delVzlinuxRoute(){
+    delCentosRoute;
+}
