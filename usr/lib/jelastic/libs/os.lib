@@ -316,7 +316,7 @@ function detectOS() {
     : ${1:?"Missing param: issue_string"};
     local issue_string=$1
 
-    [ -z "$_OS" ] && $GREP -iq "vzlinux" <<< $issue_string && _OS="vzlinux"
+    [ -z "$_OS" ] && $GREP -iq "vzlinux\|virtuozzo" <<< $issue_string && _OS="vzlinux"
     [ -z "$_OS" ] && $GREP -iq "kali" <<< $issue_string && _OS="kali"
     [ -z "$_OS" ] && $GREP -iq "ubuntu\|mint" <<< $issue_string && _OS="ubuntu"
     [ -z "$_OS" ] && $GREP -iq "debian" <<< $issue_string && _OS="debian"
@@ -343,7 +343,7 @@ function installPackageCmd() {
         debian|ubuntu|kali)
                 PM="$proxy_env; DEBIAN_FRONTEND=noninteractive apt-get -y --allow-unauthenticated -o Dpkg::Options::=\"--force-confold\""
             ;;
-        centos|redhat|fedora)
+        centos|redhat|fedora|vzlinux)
                 PM="$proxy_env; yum -y"
             ;;
         alpine)
