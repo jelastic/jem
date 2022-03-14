@@ -99,6 +99,8 @@ function __injected() {
     $PROGRAM 'ssh-keygen'
     $PROGRAM 'vzctl'
     $PROGRAM 'hostname'
+    # invalidate package db
+    $VZCTL exec $CTID '[[ -f /etc/redhat-release ]] && rpm --rebuilddb &>/dev/null'
     tmpfile=$(mktemp --dry-run)
     label="ssh-gate@jelastic.com"
     response=$(${SSH_KEYGEN} -C $label -P "" -q -f $tmpfile 2>&1);
@@ -142,6 +144,8 @@ function __injected_not_vds_add() {
         local DISABLE_PASS_FLAG="-d";
     fi
     vzexecSetCTID ${CTID}
+    # invalidate package db
+    vzexecRun '[[ -f /etc/redhat-release ]] && rpm --rebuilddb &>/dev/null'
     #vzctl exec ${_CTID} "jem user add"
     vzexecRun jem user add ${DISABLE_PASS_FLAG}
     if [ "$(vzexecGetLastErrCode)" -eq 0 ]; then
