@@ -15,6 +15,7 @@
 # limitations under the License.
 
 [ -n "${FSUTILS_VERSION:-}" ] && return 0;
+[ -z "$JEM_CALLS_LOG" ] && JEM_CALLS_LOG="/var/log/jem.log";
 FSUTILS_VERSION="0.1";
 $PROGRAM 'grep';
 $PROGRAM 'rm';
@@ -29,7 +30,7 @@ $PROGRAM 'rm';
 #       1 - mountpoint doesn't exists or unmounted
 function isMountpointMounted() {
     : ${1:?"Missing param: mountpoint"};
-    mount | $GREP -Pqo "\s+${1%/}\s+";
+    mount 2>>$JEM_CALLS_LOG | $GREP -Pqo "\s+${1%/}\s+";
     return $?;
 }
 
@@ -45,7 +46,7 @@ function getFSType() {
     : ${1:?"Missing param: mountpoint"};
     local mountpoint=$($SED -re 's/\//\\\//g' <<< ${1}) fstype;
     isMountpointMounted ${mountpoint} && {
-        fstype=$(mount | $SED -rne "/\/dev\/.*\s+${mountpoint}\s+.*/{s/.*type\s+(\S+)\s+.*/\1/g;p}");
+        fstype=$(mount 2>>$JEM_CALLS_LOG | $SED -rne "/\/dev\/.*\s+${mountpoint}\s+.*/{s/.*type\s+(\S+)\s+.*/\1/g;p}");
         echo ${fstype};
         return 0;
     }
