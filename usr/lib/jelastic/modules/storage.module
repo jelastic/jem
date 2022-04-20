@@ -764,14 +764,15 @@ function dosetupUtils() {
     [[ "$STORAGE_BACKEND" == "gluster" ]] && _packages="autofs glusterfs-fuse"
 
     if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
-        VEExecRun "apt update; curl -sLO http://repository.jelastic.com/pub/autofs_5.1.6-1j_amd64.deb"
+        VEExecRun "apt update; curl -sLO http://repository.jelastic.com/pub/autofs_5.1.8-1j_amd64.deb"
+        VEExecRun "curl -sLO http://repository.jelastic.com/pub/mount-recovery-1.1.deb"
         if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "8" ]; then
             VEExecRun "$(installPackageCmd $OS install autofs)"
-            VEExecRun "DEBIAN_FRONTEND=noninteractive dpkg -i ./autofs_5.1.6-1j_amd64.deb"
+            VEExecRun "DEBIAN_FRONTEND=noninteractive dpkg -i ./autofs_5.1.8-1j_amd64.deb ./mount-recovery-1.1.deb"
         else
-            VEExecRun "$(installPackageCmd $OS install ./autofs_5.1.6-1j_amd64.deb)"
+            VEExecRun "$(installPackageCmd $OS install ./autofs_5.1.8-1j_amd64.deb)"
         fi
-        VEExecRun "rm -f autofs_5.1.6-1j_amd64.deb"
+        VEExecRun "rm -f autofs_5.1.8-1j_amd64.deb mount-recovery-1.1.deb"
         if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
             if [ "x$OS" == "xubuntu" ] ; then
                 #Ubuntu
@@ -802,13 +803,10 @@ function dosetupUtils() {
         fi
     elif [ "x$OS" == "xcentos" ] ; then
         if [ "$OS_ver" -eq "8" ]; then
-            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el8.x86_64.rpm"
+            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.8-1j.el8.x86_64.rpm http://repository.jelastic.com/pub/mount-recovery-1.1-1.x86_64.rpm"
         fi
         if [ "$OS_ver" -eq "7" ]; then
-            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el7.x86_64.rpm"
-        fi
-        if [ "$OS_ver" -eq "6" ]; then
-            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el6.x86_64.rpm"
+            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.8-1j.el7.x86_64.rpm http://repository.jelastic.com/pub/mount-recovery-1.1-1.x86_64.rpm"
         fi
 
         if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
