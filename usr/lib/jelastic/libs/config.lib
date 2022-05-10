@@ -112,6 +112,8 @@ function loadINISection() {
     ini=( ${ini[*]/%\\ \)/ \\} );
     ini=( ${ini[*]/%\( \)/\(\) \{} );
     ini=( ${ini[*]/%\} \)/\}} );
+    ini=( ${ini[*]/\>/\\>} );
+    ini=( ${ini[*]/\</\\<} );
     ini[0]="";
     ini[${#ini[*]} + 1]='}';
     ini=( $(sed -nr -e '/^/H' -e '${g; s/(\n[[:blank:]]*[^[:blank:]]+[[:blank:]]*[(][[:blank:]]*[)][[:blank:]]*[{][[:blank:]]*[\n]?[[:blank:]]*)([}])/\1\ttrue;\n\2/g; p}' <<<"${ini[*]}") )
