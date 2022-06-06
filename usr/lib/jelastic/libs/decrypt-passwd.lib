@@ -41,7 +41,11 @@ function getPassword(){
                                 log "unknown __CTID. Please set it via vzexecSetCTID first";
                                 return 99;
                         fi
-                        keyString=$(cat $(vzlist $__CTID -Ho private)/.vza/eid.conf 2>/dev/null)
+                        if [[ "$VZ_VERSION" == "7" ]]; then
+                            keyString=$(cat $(vzlist $__CTID -Ho private)/.vza/eid.conf 2>/dev/null)
+                        else
+                            keyString="$__CTID"
+                        fi
 
                         ;;
                 * )
