@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-inherit default os output exceptor vzexec;
+inherit default os output exceptor;
+include vzexec;
 
 DESCRIPTION="JEM package installation module";
 VERSION="1";
