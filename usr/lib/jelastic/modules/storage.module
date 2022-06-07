@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-inherit os output vzexec tests;
-include log virtuozzo;
+inherit os output tests;
+include log virtuozzo vzexec;
 
 DESCRIPTION="Manipulate storage mounts inside specified container";
 VERSION="1"

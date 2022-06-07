@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-inherit os net vzexec;
-include log virtuozzo;
+inherit os net;
+include log virtuozzo vzexec;
 
 DESCRIPTION="Manipulate NFS authentication inside container";
 VERSION="1"

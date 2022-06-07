@@ -16,8 +16,8 @@
 
 
 
-inherit default os envinfo vzexec;
-include output net virtuozzo;
+inherit default os envinfo;
+include output net virtuozzo vzexec;
 
 $PROGRAM 'sed';
 $PROGRAM 'grep';
