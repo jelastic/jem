@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-inherit default vzexec virtuozzo;
-include os output
+inherit default vzexec;
+include os output virtuozzo;
 
 DESCRIPTION="Jelastic hooks module"
 VERSION="1"
