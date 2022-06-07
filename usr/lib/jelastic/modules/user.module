@@ -194,7 +194,11 @@ function preAddCallback(){
     _SUPPLEMENTARY_GROUPS="$_SSH_ACCESS_GROUP";
 
     if [ ! -z "${_EID}" ]; then
-        _CTID=$($SED -nr '/^<ns1:veid>([[:digit:]]+)<[/]ns1:veid>$/{s//\1/p; q}' "/var/opt/pva/agent/etc/configs/${_EID}" 2>/dev/null || :)
+        if [[ "$VZ_VERSION" == "7" ]]; then
+            _CTID=$($SED -nr '/^<ns1:veid>([[:digit:]]+)<[/]ns1:veid>$/{s//\1/p; q}' "/var/opt/pva/agent/etc/configs/${_EID}" 2>/dev/null || :)
+        else
+            _CTID="${_EID}"
+        fi
         [[ -z "${_CTID}" ]] && {
             writeJSONResponseErr "result=>4105" "message=>Container not found"
             die -q
