@@ -20,8 +20,8 @@ DESCRIPTION="Firewall module";
 VERSION="1.1";
 DEFAULT_ACTION="Usage";
 
-inherit tests os envinfo log net config vzexec virtuozzo
-include cartridge-common;
+inherit tests os envinfo log net config vzexec;
+include cartridge-common virtuozzo;
 
 $PROGRAM 'iptables'
 $PROGRAM 'ip6tables'

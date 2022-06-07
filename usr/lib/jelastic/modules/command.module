@@ -15,8 +15,8 @@
 # limitations under the License.
 
 
-inherit default config vzexec virtuozzo;
-include os output;
+inherit default config vzexec;
+include os output virtuozzo;
 
 DESCRIPTION="Description goes here";
 VERSION="1"
