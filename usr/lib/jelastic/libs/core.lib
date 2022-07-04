@@ -263,6 +263,8 @@ function startJemThreadQueueManager(){
         jempidfile="/var/run/jem.fd9de7ac314ec$$.pid"
     elif [[ "$action" == "isolation" || "$action" == "hnfw" ]] ; then
         jempidfile="/var/run/jem.23b9ec1f564e4.pid"
+    elif [[ "$action" == "network" ]] ; then
+        jempidfile="/var/run/jem.network.pid"
     elif [ "x$action" == "xdocker" -o "x$action" == "xcommand" -o "x$action" == "xstorage" -o "x$action" == "xfirewall" ] ; then
             while [ "$1" != "" ]
             do

@@ -134,3 +134,16 @@ function appendConfig() {
         storeConfig ${configfile} ${key} ${newvalue[@]}
     fi
 }
+
+function render_template() {
+    template="$1"
+    [[ ! -z "$template" ]] || {
+        log "Template is not defined" 
+        return 255
+    }
+    [[ -f "$template" ]] || {
+        log "No such template"
+        return 255
+    }
+    eval "echo \"$(cat ${template})\""
+}
