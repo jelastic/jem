@@ -434,3 +434,22 @@ function isValidShare()
     [[ -z "$opts" ]] && return 1
     return 0
 }
+
+getRealExternalIp(){
+    local extip
+    local services=( 'http://ifconfig.co' 'http://ifconfig.io' 'http://ipecho.net/plain' )
+    for i in ${services[@]}; do
+        extip=$(curl -m 3 --connect-timeout 2 -Lkq --silent "$i")
+        [[ ! -z "$extip" ]] && isValidIP "$extip" && { echo "$extip"; return 0; }
+    done
+    which dig &>/dev/null || yum -y install bind-utils &>>${JEM_CALLS_LOG}
+    extip=$(dig TXT +short o-o.myaddr.l.google.com @ns1.google.com | tr -d \")
+    [[ ! -z "$extip" ]] && isValidIP "$extip" && { echo "$extip"; return 0; }
+    { writeJSONResponseErr "result=>4212" "message=>Failed to get real external IP" ; return 99; }
+}
+
+getOutgoingIp(){
+    local EXTERNAL_IP=$(ip route get 1 | sed -nre 's/.*src\s(.*)\s/\1/p')
+    [[ ! -z "$EXTERNAL_IP" ]] && isValidIP "$EXTERNAL_IP" && { echo "$EXTERNAL_IP"; return 0; }
+    { writeJSONResponseErr "result=>4212" "message=>Failed to get external IP" ; return 99; }
+}
