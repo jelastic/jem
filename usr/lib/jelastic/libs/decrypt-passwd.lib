@@ -28,7 +28,14 @@ function getPassword(){
         local passwString="$1";
         local rsaKey="/root/.ssh/id_rsa" ;
         local decType=${passwString%%\:*};
-        local passwordEncrypted=${passwString#*\:};
+        local openssl_version="$(openssl version | sed -r 's/^OpenSSL[[:blank:]]+([0-9]+)[.][^[:space:]]+[[:blank:]]+.*/\1/')"
+        if  (( $openssl_version >= 3 )); then
+            local passwordEncrypted=$(awk -F: '{print $3}' <<<"${passwString}" 2>/dev/null)
+            local openssl_parameters='-aes-256-cbc -pbkdf2 -md sha512 -iter 10000 -salt -S 429488b2f3870b4a -iv dcb9fe5ecb4011cd20114119930aadc3'
+        else
+            local passwordEncrypted=$(awk -F: '{print $2}' <<<"${passwString}" 2>/dev/null)
+            local openssl_parameters='-aes-128-cbc -nosalt -A -nosalt'
+        fi
         local keyString='';
         case ${decType,,} in
                 'rsa' )
@@ -54,7 +61,7 @@ function getPassword(){
                         exit 0;
                         ;;
         esac
-        echo $passwordEncrypted | openssl enc -d -a -A -aes-128-cbc -nosalt -pass "pass:$keyString" 2>> $ACTIONS_LOG || {  writeJSONResponseErr "result=>4087" "message=>Could not decrypt password!!"; die -q; }
+        echo $passwordEncrypted | openssl enc -d -a -pass "pass:$keyString" $openssl_parameters  2>> $ACTIONS_LOG || {  writeJSONResponseErr "result=>4087" "message=>Could not decrypt password!!"; die -q; }
 }
 
 
