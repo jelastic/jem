@@ -1,0 +1,269 @@
+#!/bin/bash
+# Copyright 2022 Jelastic, Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+#nft -j list table inet jelastic | jq ".nftables[] | select (.rule.handle == 7 or .rule.handle == 6 ) "
+
+
+FW_TABLE_NAME='jelastic'
+
+#valid values are: ip,ip6,inet
+FW_DEFAULT_TABLE_TYPE='inet'
+
+#valid values accept,drop
+FW_DEFAULT_POLICY='drop'
+FW_JELASTIC_INIT_FILE="/etc/nftables/jelastic.nft"
+FW_RULESET_FILE="/etc/nftables/main.nft"
+
+
+# $1 - type
+listTables() {
+    nft list tables $1 | sed -E 's/table $1[[:space:]]+//g'
+}
+
+# $1 - type
+# $2 - name
+removeTable() {
+    nft delete table $1 $2
+}
+
+clearTables() {
+    #supported tables ip,ip6,inet
+    local families=('ip', 'ip6', 'inet')
+
+    for f in ${families[@]} ; do
+        tables=($(listTables $f))
+        for t in ${tables[@]} ; do
+            removeTable $f $t
+        done
+    done
+
+}
+
+putShabang() {
+    echo '#!/usr/sbin/nft -f'
+}
+
+initTables() {
+    echo "delete chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME"
+    echo "add table $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input   { type filter hook input priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME forward { type filter hook forward priority 0 ; policy accept ; }"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME output  { type filter hook output priority 0 ;  policy accept ; }"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME nat { type nat hook prerouting priority dstnat; }"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME prerouting { type nat hook prerouting priority -100 ; }"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME postrouting { type nat hook postrouting priority 100 ; }"
+}
+
+# $cmd $proto $ptype $dport $srchost $dsthost $chain $tcptype $raction
+addRule() {
+    protos="${2,,}"
+    if [ "x$protos" == "xall" ] ; then
+        protos=('tcp' 'udp')
+    else
+        protos=($protos)
+    fi
+
+    chain="${7,,}"
+    dport="${4,,}"
+    src="${5,,}"
+    dst="${6,,}"
+    raction="${9,,}"
+    tcptype="${8^^}"
+    if [ "x$tcptype" == "xIPV4" ] ; then
+        tcptype="ip"
+    else
+        tcptype="ip6"
+    fi
+
+    # command can be add, insert, delete. default add
+    cmd="${1,,}"
+    if [ "x$cmd" != "x" ] ; then
+        case $cmd in
+            i)
+                cmd="insert"
+                ;;
+            a)
+                cmd="add"
+                ;;
+        esac
+    else
+        cmd="add"
+    fi
+
+    #source address
+    if [ "x$src" != "x" ] ; then
+        if grep -q '!' <<< $src ; then
+            src=${src//'!'/}
+            src="$tcptype saddr != $src"
+        else
+            src="$tcptype saddr $src"
+        fi
+    fi
+
+    #destibation address
+    if [ "x$dst" != "x" ] ; then
+        if grep -q '!' <<< $dst ; then
+            dst=${dst//'!'/}
+            dst="$tcptype daddr != $dst"
+        else
+            dst="$tcptype daddr $dst"
+        fi
+    fi
+
+    for proto in ${protos[@]} ; do
+
+        ptype="${3,,}"
+        if [ "x$ptype" == "xrange" ] ; then
+            #proto should be specified
+            if [ "x$proto" == "x" ] ; then
+                return 2
+            fi
+
+            if [ "x$dport" != "x" ] ; then
+                #replace : to -
+                dp=${dport/:/-}
+                dp="$proto dport { $dp}"
+            fi
+        else
+            if [ "x$dport" != "x" ] ; then
+                dp="$proto dport $dport"
+            fi
+        fi
+
+        echo "$cmd rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $chain $src $dst $dp counter $raction"
+    done
+}
+
+function netfilterStop() {
+    [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
+    nft flush ruleset
+}
+
+function setDefaultPolicy() {
+    #stub
+    return 0
+}
+
+#filename to save
+function saveCurrentRules() {
+    savefile="${1:=$FW_RULESET_FILE}"
+    nft -s list ruleset >> "$savefile" 2>> $JEM_CALLS_LOG
+}
+
+function netfilterStart() {
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Starting firewall"
+
+    #making backup of current rules
+    [ ! -d "/etc/jelastic" ] && mkdir -p "/etc/jelastic" 2>>$JEM_CALLS_LOG
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction backup current rules" >>$JEM_CALLS_LOG
+    saveCurrentRules "/etc/jelastic/jelastic.nft"
+
+    #test rule files
+
+    nft -c -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
+    if [[ $? -gt 0 ]] ; then
+        echo "Current iptables rules not modified due to errors in new rule-files" >>$JEM_CALLS_LOG
+        return 2
+    fi
+
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction flushing current rules" >>$JEM_CALLS_LOG
+    nft flush ruleset 2>> $JEM_CALLS_LOG
+
+    #exports
+    set -f
+    NFSIPS=()
+    [ -e '/etc/exports' ] && NFSIPS=($($SED -re 's/.+(\s|\t)+((\*)|([0-9]+\.){3}[0-9]+(\/[0-9]{0,2})?).*/\2/g' -e '/#/d' '/etc/exports' | sort | uniq | $SED -e '/^$/d' -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'))
+    local __allnetwork=0
+
+    # for internal services:
+    intips=($(getLANIPs))
+    for ip in ${intips[@]} ; do
+        for nfsip in ${NFSIPS[@]} ; do
+            if [[ "${#NFSPort}" -gt 0 ]] ; then
+                if [ "$nfsip" == "*" ] ; then
+                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip daddr $ip tcp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
+                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip daddr $ip udp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
+                    __allnetwork=1
+                else
+                    if [[ "$__allnetwork" -eq 0 ]] ; then
+                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
+                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
+                    fi
+                fi
+            fi
+            if [[ "${#RPCPort}" -gt 0 ]] ; then
+                if [ "$nfsip" == "*" ] ; then
+                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip daddr $ip tcp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
+                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip daddr $ip udp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
+                    __allnetwork=1
+                else
+                    if [[ "$__allnetwork" -eq 0 ]] ; then
+                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
+                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
+                    fi
+                fi
+            fi
+        done
+    done;
+    set +f
+
+    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input iifname "tap" accept
+
+    redirPorts=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts; } || _defaultComputeNodeRedirPorts));
+
+    # process input chain NAT
+    for port in ${redirPorts[@]} ; do
+        local ruleParams=($($SED 's/:/ /g' <<< ${port}));
+        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ${ruleParams[0],,} ip saddr ${ruleParams[1]} ip daddr ${ruleParams[2]} tcp dport ${ruleParams[3]} counter ${ruleParams[5],,} to ${ruleParams[4]}
+    done;
+
+    if [ -f /proc/net/if_inet6 ] ; then
+        nft insert $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol ipv6-icmp counter accept
+    fi
+
+    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol icmp counter accept
+    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input iifname "lo" counter accept
+    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ct state related,established  counter accept
+
+    checkRule "INPUT" "-j REJECT --reject-with icmp-host-prohibited" || $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited
+}
+
+function netfilterEnable() {
+    systemctl disable firewalld &> $JEM_CALLS_LOG
+    systemctl enable nftables &> $JEM_CALLS_LOG
+    nft -f "$FW_JELASTIC_INIT_FILE" &> $JEM_CALLS_LOG
+}
+
+# global variable RULES required see firewall.module
+firewallSet() {
+    if [ ${#RULES[@]} -eq 0 ] ; then
+        echo "rules are epmty"
+        return 1
+    fi
+    putShabang > "$(vzctPath $VZ_CTID_ROOT $FW_JELASTIC_INIT_FILE)"
+    initTables >> "$(vzctPath $VZ_CTID_ROOT $FW_JELASTIC_INIT_FILE)"
+    for ruleraw in ${RULES[@]} ; do
+        rulevars=$(awk -F, '{print "proto="$1";ptype="$2";dport="$3";srchost="$4";dsthost="$5";chain="$6";raction="$7";tcptype="$8";cmd="$9";"}' <<< $ruleraw )
+        eval $rulevars
+        addRule "$cmd" "$proto" "$ptype" "$dport" "$srchost" "$dsthost" "$chain" "$tcptype" "$raction" >> "$(vzctPath $VZ_CTID_ROOT $FW_JELASTIC_INIT_FILE)"
+        res=$?
+        if [ $res -gt 0 ] ; then
+            echo "error adding rules"
+            return 1
+        fi
+    done
+
+}

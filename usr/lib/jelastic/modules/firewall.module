@@ -40,17 +40,8 @@ $PROGRAM 'ip6tables-restore'
 $PROGRAM 'ip6tables-save'
 $PROGRAM 'vzctl'
 
-SAVEFILE='/var/lib/jelastic/firewall'
-CUSTOM_RULES_FILE='/etc/sysconfig/iptables-custom'
-CUSTOM_6RULES_FILE='/etc/sysconfig/ip6tables-custom'
-JELASTIC_RULES_DIR='/etc/sysconfig'
-JELASTIC_4RULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic'
-JELASTIC_4NATRULES_FILE=${JELASTIC_RULES_DIR}'/iptables4-jelastic-nat'
-JELASTIC_6RULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic'
-JELASTIC_6NATRULES_FILE=${JELASTIC_RULES_DIR}'/iptables6-jelastic-nat'
-
-BACKUP_IPV4='/etc/jelastic/iptables4.backup'
-BACKUP_IPV6='/etc/jelastic/iptables6.backup'
+#posible values: iptables, nftables
+BACKEND='iptables'
 
 declare PublicIP;
 declare FTPPort;
@@ -143,14 +134,7 @@ function isRange() {
 }
 
 function _setDefaultPolicy() {
-    local policy=${1:-"DROP"}
-    $IPTABLES -P INPUT ${policy}
-    $IPTABLES -P FORWARD ${policy}
-    $IPTABLES -P OUTPUT ACCEPT
-
-    $IP6TABLES -P INPUT ${policy}
-    $IP6TABLES -P FORWARD ${policy}
-    $IP6TABLES -P OUTPUT ACCEPT
+    setDefaultPolicy $1
 }
 
 function checkRule() {
@@ -175,14 +159,8 @@ function processRule6File() {
     return $?
 }
 
-function saveCurrentRules() {
-    if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
-        [ -x /etc/init.d/netfilter-persistent ] && /etc/init.d/netfilter-persistent save &>> $JEM_CALLS_LOG
-    else
-        /sbin/service iptables save &>> $JEM_CALLS_LOG
-        /sbin/service ip6tables save &>> $JEM_CALLS_LOG
-    fi
-    echo "iptables rules saved" >>$JEM_CALLS_LOG
+function _saveCurrentRules() {
+    saveCurrentRules
 }
 
 function doUsage() {
@@ -193,49 +171,13 @@ function onModLoadCallback() {
     log "Preload callback";
     local __closedports __openports
 
-    OPENPORTS=($(loadConfig "${SAVEFILE}" OPENPORTS))
-    CLOSEDPORTS=($(loadConfig "${SAVEFILE}" CLOSEDPORTS))
-
     ## TODO: remove "params" garbarge option
-    local temp=`getopt -l ctid:,rules:,cp:,op:,rp: -- params "$@" 2>/dev/null` oldifs;
+    local temp=`getopt -l ctid:,rules: -- params "$@" 2>/dev/null` oldifs;
     [[ $? != 0 ]] && die -q "Terminating...";
     eval set -- "$temp";
 
     while true ; do
         case "$1" in
-            --cp)
-                # ports to close
-                [[ ! -z "$2" && -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
-                oldifs=$IFS;
-                IFS=',';
-                __closedports=(${2});
-                IFS=${oldifs};
-                shift 2;
-                ;;
-            --op)
-                # ports to open
-                [[ ! -z "$2" && -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
-                oldifs=$IFS;
-                IFS=',';
-                __openports=(${2});
-                IFS=${oldifs};
-                shift 2;
-                ;;
-            --rp)
-                # ports to remove from open ports list
-                [[ ! -z "$2" && -z "$($SED -rne '/[0-9]+/p' <<< $2)" ]] && { shift 1; break; }
-                oldifs=$IFS;
-                IFS=',';
-                __removeports=(${2});
-                IFS=${oldifs};
-                shift 2;
-
-                for i in "${__removeports[@]}" ; do
-                    # remove the port to remove from stored list of open ports
-                    OPENPORTS=($(removeValueFromArray "${OPENPORTS[*]}" "${i}"));
-                done
-
-                ;;
             --ctid)
                 shift
                 CTID=$1
@@ -309,6 +251,12 @@ function onModLoadCallback() {
         fi
     fi
 
+    if [ "x$OS" == "xalmalinux" -a "$OS_ver" -ge "9" ] ; then
+        inherit nftables
+    else
+        inherit iptables
+    fi
+
     return 0
 }
 
@@ -317,169 +265,28 @@ function describeStart() {
 }
 
 function describeStartParameters() {
-    echo "--op [port1,[port2,[port3-port4]] --cp [port1,[port2,[port3-port4]] --rp [port1,[port2]]";
+    echo "--rules string --ctid integer";
 }
 
 function describeStartOptions() {
-    echo "op: open port(s) list. A list of ports which have an 'ACCEPT' policy";
-    echo "cp: closed port(s) list. A list of ports which have a 'DROP' policy";
-    echo "rp: ports to remove from existing 'open' ports";
+    echo "rules: firewall rules to apply";
+    echo "ctid: container id";
 }
 
 function doStart() {
-    declare -a ports;
-    log "Starting firewall";
-
-    #making backup of current rules
-    [ ! -d "/etc/jelastic" ] && mkdir -p "/etc/jelastic" 2>>$JEM_CALLS_LOG
-    $IPTABLES_SAVE > $BACKUP_IPV4 2>>$JEM_CALLS_LOG
-    $IP6TABLES_SAVE > $BACKUP_IPV6 2>>$JEM_CALLS_LOG
-
-
     local cartridge_config="/opt/repo/jelastic/jelastic.conf";
     [ -f "$cartridge_config"  ] && Firewall_Enabled=$($GREP Firewall_Enabled "$cartridge_config" | $AWK -F "=" '{ print $2 }')
     [ ! -z "${Firewall_Enabled}" ] && FIREWALL_ENABLED=${Firewall_Enabled};  ### Override for cartridges
     [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
 
-    _rule4Files=($CUSTOM_RULES_FILE $JELASTIC_4RULES_FILE $JELASTIC_4NATRULES_FILE)
-    _rule6Files=($CUSTOM_6RULES_FILE $JELASTIC_6RULES_FILE $JELASTIC_6NATRULES_FILE)
-
-    #test rule files
-    _testRes=0
-    for j in $(seq 4 2 6) ; do
-        eval "_ruleFiles=(\${_rule${j}Files[*]})"
-        eval "_processRuleFile=processRule${j}File"
-        for i in $(seq 0 $((${#_ruleFiles[*]}-1)) ) ; do
-            $_processRuleFile  ${_ruleFiles[$i]} "-t"
-            _res=$?
-            [[ "$_res" -ne 0 ]] && echo "Test contents of ${_ruleFiles[$i]} filed" >>$JEM_CALLS_LOG
-            _testRes=$((_testRes+_res))
-        done
-    done
-    if [[ $_testRes -gt 0 ]] ; then
-        echo "Current iptables rules not modified due to errors in new rule-files" >>$JEM_CALLS_LOG
-        return 2
-    fi
-
-    if [ "x$OS" == "xubuntu" ] ; then
-        #fix ubuntu with broken links
-        [ -e '/etc/iptables/rules.v4' ] && [ -L "$CUSTOM_RULES_FILE" ] && cp -H $CUSTOM_RULES_FILE{,.bkp} 2>> $JEM_CALLS_LOG && rm -f $CUSTOM_RULES_FILE 2>> $JEM_CALLS_LOG
-        [ -e '/etc/iptables/rules.v6' ] && [ -L "$CUSTOM_6RULES_FILE" ] && cp -H $CUSTOM_6RULES_FILE{,.bkp} 2>> $JEM_CALLS_LOG && rm -f $CUSTOM_6RULES_FILE 2>> $JEM_CALLS_LOG
-    fi
-
-    $IPTABLES -F;
-    $IPTABLES -t nat -F;
-
-    if [ -f /proc/net/if_inet6 ] ; then
-        $IP6TABLES -F;
-        $IP6TABLES -t nat -F 2>/dev/null;
-    fi
-    _setDefaultPolicy
-
-    #exports
-    set -f
-    NFSIPS=()
-    [ -e '/etc/exports' ] && NFSIPS=($($SED -re 's/.+(\s|\t)+((\*)|([0-9]+\.){3}[0-9]+(\/[0-9]{0,2})?).*/\2/g' -e '/#/d' '/etc/exports' | sort | uniq | $SED -e '/^$/d' -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g'))
-    local __allnetwork=0
-
-    # for internal services:
-    intips=($(getLANIPs))
-    for ip in ${intips[@]} ; do
-        for nfsip in ${NFSIPS[@]} ; do
-            if [[ "${#NFSPort}" -gt 0 ]] ; then
-                if [ "$nfsip" == "*" ] ; then
-                    $IPTABLES -A INPUT -p tcp -m multiport --dports $NFSPort -d $ip -j ACCEPT
-                    $IPTABLES -A INPUT -p udp -m multiport --dports $NFSPort -d $ip -j ACCEPT
-                    __allnetwork=1
-                else
-                    if [[ "$__allnetwork" -eq 0 ]] ; then
-                        $IPTABLES -A INPUT -p tcp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT
-                        $IPTABLES -A INPUT -p udp -m multiport --dports $NFSPort -d $ip -s $nfsip -j ACCEPT
-                    fi
-                fi
-            fi
-            if [[ "${#RPCPort}" -gt 0 ]] ; then
-                if [ "$nfsip" == "*" ] ; then
-                    $IPTABLES -A INPUT -p tcp -m multiport --dports $RPCPort -d $ip -j ACCEPT
-                    $IPTABLES -A INPUT -p udp -m multiport --dports $RPCPort -d $ip -j ACCEPT
-                    __allnetwork=1
-                else
-                    if [[ "$__allnetwork" -eq 0 ]] ; then
-                        $IPTABLES -A INPUT -p tcp -m multiport --dports $RPCPort -d $ip -s $nfsip -j ACCEPT
-                        $IPTABLES -A INPUT -p udp -m multiport --dports $RPCPort -d $ip -s $nfsip -j ACCEPT
-                    fi
-                fi
-            fi
-        done
-    done;
-    set +f
-
-    $IPTABLES -A INPUT -i tap -j ACCEPT;
-
-    redirPorts=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts; } || _defaultComputeNodeRedirPorts));
-
-    # process input chain NAT
-    for port in ${redirPorts[@]} ; do
-        local ruleParams=($($SED 's/:/ /g' <<< ${port}));
-        $IPTABLES -t nat -A ${ruleParams[0]} -s ${ruleParams[1]} -d ${ruleParams[2]} -m tcp -p tcp --dport ${ruleParams[3]} -j ${ruleParams[5]} --to-port ${ruleParams[4]};
-    done;
-
-    [ "x${COMPUTE_TYPE}" == "xcartridge" ] && {
-        [ -f "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" ] && source "${CARTRIDGE_HOME}/jelastic/scripts/firewall.sh" >>$JEM_CALLS_LOG 2>&1;
-    }
-
-    _loadRes=0
-    for j in $(seq 4 2 6) ; do
-        eval "_ruleFiles=(\${_rule${j}Files[*]})"
-        eval "_processRuleFile=processRule${j}File"
-        for i in $(seq 0 $((${#_ruleFiles[*]}-1)) ) ; do
-            $_processRuleFile ${_ruleFiles[$i]}
-            _res=$?
-            [[ "$_res" -ne 0 ]] && echo "Load contents of ${_ruleFiles[$i]} filed" >>$JEM_CALLS_LOG
-            _loadRes=$((_loadRes+_res))
-        done
-    done
-
-    if [ -f /proc/net/if_inet6 ] ; then
-        $IP6TABLES -I INPUT -p icmpv6 -j ACCEPT
-        $IP6TABLES -I INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-        $IP6TABLES -I INPUT -i lo -j ACCEPT
-    fi
-
-    $IPTABLES -I INPUT -p icmp -j ACCEPT
-    $IPTABLES -I INPUT -i lo -j ACCEPT
-    $IPTABLES -I INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
-
-    #Add reject only if there was no problem while loading rules
-    if [[ "$_loadRes" -gt 0 ]] ; then
-        echo "Not saving rules due to errors above" >>$JEM_CALLS_LOG
-        _setDefaultPolicy "ACCEPT"
-        return 2
-    fi
-
-    checkRule "INPUT" "-j REJECT --reject-with icmp-host-prohibited" || $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited
-
-    saveCurrentRules
+    netfilterStart
+    _saveCurrentRules
 
     return 0
 }
 
 function describeFWStart() {
     echo "Alias for Start";
-}
-
-function describeList() {
-    echo "List firewall rules";
-}
-
-function doList() {
-    echo "IPTABLES rules ($@)"
-    echo "--------------------"
-    $IPTABLES -L -t $@
-    echo
-    echo "IP6TABLES rules ($@)"
-    echo "--------------------"
-    $IP6TABLES -L -t $@
 }
 
 function doFWStart() {
@@ -500,13 +307,7 @@ function describeStop() {
 }
 
 function doStop() {
-    [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
-    $IPTABLES -X;
-    $IPTABLES -X -t nat;
-    $IPTABLES -F;
-    $IPTABLES -F -t nat;
-    _setDefaultPolicy "ACCEPT"
-    return 0;
+    netfilterStop
 }
 
 function describeFWStop() {
@@ -583,10 +384,7 @@ function describeEnableOptions() {
 }
 
 function doEnable() {
-    [ -d "${JELASTIC_RULES_DIR}" ] || mkdir -p "${JELASTIC_RULES_DIR}"
     [ ! -e "${META_FILE}" ] && touch ${META_FILE}
-    [ ! -e "${CUSTOM_6RULES_FILE}" ] && touch ${CUSTOM_6RULES_FILE}
-    [ -n "$DATA_OWNER" ] && chown "$DATA_OWNER" "${CUSTOM_6RULES_FILE}" &>>"$JEM_CALLS_LOG"
     if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
         $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=1/g" ${META_FILE}
     else
@@ -594,17 +392,7 @@ function doEnable() {
         $SED -i -re '/^$/d' ${META_FILE}
     fi
 
-    # patch iptables-persistent plugins
-    # VZ containers has no modprobe support
-    if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
-        [ -d "/usr/share/netfilter-persistent/plugins.d/" ] && {
-            sed -i -re '/\/sbin\/modprobe/s/^/#/g' /usr/share/netfilter-persistent/plugins.d/* >>$ACTIONS_LOG 2>&1
-            systemctl enable netfilter-persistent >>$ACTIONS_LOG 2>&1
-        }
-    else
-        chkconfig --level 345 iptables on 2>&1 | $GRAB_OUTPUT
-        chkconfig --level 345 ip6tables on 2>&1 | $GRAB_OUTPUT
-    fi
+    netfilterEnable
 
     writeJSONResponseOut "result=>0" "message=>Firewall has been enabled"
     return 0
@@ -649,7 +437,7 @@ function doDisable() {
     _setDefaultPolicy "ACCEPT"
     $IPTABLES -F ; service iptables save &>>$JEM_CALLS_LOG
     $IP6TABLES -F ; service ip6tables save &>>$JEM_CALLS_LOG
-    saveCurrentRules
+    _saveCurrentRules
     writeJSONResponseOut "result=>0" "message=>Firewall has been disabled"
     return 0;
 }
@@ -675,13 +463,9 @@ function describePanic() {
 }
 
 function doPanic() {
-    [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
-    $IPTABLES -X;
-    $IPTABLES -X -t nat;
-    $IPTABLES -F;
-    $IPTABLES -F -t nat;
+    netfilterStop
     _setDefaultPolicy "DROP"
-    saveCurrentRules
+    _saveCurrentRules
     return 0
 }
 
@@ -693,74 +477,8 @@ function dofwset() {
         vzctl mount ${CTID} >> $ACTIONS_LOG 2>&1
     fi
     
-    [ -d "$(vzctPath $VZ_CTID_ROOT $JELASTIC_RULES_DIR)" ] || mkdir -p "${VZ_CTID_ROOT}${JELASTIC_RULES_DIR}"
-    echo "*filter" > "$(vzctPath $VZ_CTID_ROOT $JELASTIC_4RULES_FILE)"
-    echo "*filter" > "$(vzctPath $VZ_CTID_ROOT $JELASTIC_6RULES_FILE)"
-    for ruleraw in ${RULES[@]} ; do
-        rulevars=$(awk -F, '{print "proto="$1";ptype="$2";dport="$3";srchost="$4";dsthost="$5";chain="$6";raction="$7";tcptype="$8";cmd="$9";"}' <<< $ruleraw )
-        eval $rulevars
-        chain="${chain^^}"
-        proto="${proto,,}"
-        cmd="${cmd,^^}"
-        if [ "x$cmd" != "x" ] ; then
-            cmd="-$cmd"
-        else
-            cmd="-A"
-        fi
+    firewallSet
 
-        rulecmd="$cmd $chain"
-        if [ "x$proto" != "x" ] ; then
-            rulecmd="$rulecmd -p $proto"
-        fi
-
-        srchost=${srchost/ALL/0.0.0.0\/0}
-        if [ "x$srchost" != "x" ] ; then
-            if grep -q '!' <<< $srchost ; then
-                srchost=${srchost//'!'/}
-                rulecmd="$rulecmd ! -s $srchost"
-            else
-                rulecmd="$rulecmd -s $srchost"
-            fi
-        fi
-
-        dsthost=${dsthost/ALL/0.0.0.0\/0}
-        if [ "x$dsthost" != "x" ] ; then
-            if grep -q '!' <<< $dsthost ; then
-                dsthost=${dsthost//'!'/}
-                rulecmd="$rulecmd ! -d $dsthost"
-            else
-                rulecmd="$rulecmd -d $dsthost"
-            fi
-        fi
-
-        if [ "x$ptype" == "xrange" ] ; then
-            if [ "x$dport" != "x" ] ; then
-                rulecmd="$rulecmd -m multiport --dports $dport"
-            fi
-        else
-            if [ "x$dport" != "x" ] ; then
-                rulecmd="$rulecmd --dport $dport"
-            fi
-        fi
-
-        rulecmd="$rulecmd -j $raction"
-
-        if [ "x$proto" == "xall" ] ; then
-            tcprule=$($SED -e 's/all/tcp/g' <<< $rulecmd )
-            udprule=$($SED -e 's/all/udp/g' <<< $rulecmd )
-            rulecmd="${tcprule}\n${udprule}"
-        fi
-
-        if [ "x$tcptype" == "xIPV4" ] ; then
-            echo -e $rulecmd >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_4RULES_FILE)"
-        else
-            echo -e $rulecmd >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_6RULES_FILE)"
-        fi
-
-        echo "CTID $CTID RULE $rulecmd" >> ${JEM_CALLS_LOG} 2>&1
-    done
-    echo "COMMIT" >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_4RULES_FILE)"
-    echo "COMMIT" >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_6RULES_FILE)"
     if [[ $running -eq 1 ]] ; then
         vzexecRun "jem firewall start"
     else
