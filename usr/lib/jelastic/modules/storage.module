@@ -871,8 +871,9 @@ function gatherCTInfo() {
     _ctFstab="$(VEExecRun " [ -e \"/etc/fstab\" ] && cat /etc/fstab || echo \"/etc/fstab not found\""; VEexecGetLastStdOut)"
     _ctIptablesRules="$(VEExecRun "iptables -S"; VEexecGetLastStdOut)"
     _ctIpInfo="$(VEExecRun "ip a l; ip r l; [ -e /etc/resolv.conf ] && cat /etc/resolv.conf || echo /etc/resolv.conf" ; VEexecGetLastStdOut)"
+    _ctnftablesrules="$(VEExecRun "[ -x /usr/sbin/nft ] && nft -s list ruleset")"
 
-    echo -e "\n`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID \n=====\nContainer $VEID Info:\nautofs:\n$_ctAutoFSFile\nfstab:\n$_ctFstab\nip info:\n$_ctIpInfo\niptables:\n$_ctIptablesRules\n=====\n"
+    echo -e "\n`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID \n=====\nContainer $VEID Info:\nautofs:\n$_ctAutoFSFile\nfstab:\n$_ctFstab\nip info:\n$_ctIpInfo\niptables:\n$_ctIptablesRules\n=====\nnft:\n$_ctnftablesrules\n======"
 }
 
 function doMount() {
