@@ -238,7 +238,9 @@ function netfilterStart() {
     nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input iifname "lo" counter accept
     nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ct state related,established  counter accept
 
-    checkRule "INPUT" "-j REJECT --reject-with icmp-host-prohibited" || $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited
+    nft add rule ip filter INPUT counter reject with icmp type host-prohibited
+    #TODO:
+    #checkRule "INPUT" "-j REJECT --reject-with icmp-host-prohibited" || $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited
 }
 
 function netfilterEnable() {
