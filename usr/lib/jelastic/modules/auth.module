@@ -318,7 +318,52 @@ function _adjustNFSFirewall() {
             vzexecRun "service iptables save"
             #JE-26417
             vzexecRun "[ -x /etc/init.d/iptables-persistent ] && /etc/init.d/iptables-persistent save ; [ -x /etc/init.d/netfilter-persistent ] && /etc/init.d/netfilter-persistent save"
+
+        else
+            inherit nftables
+            local __allnetwork=0
+
+            for nfsip in ${NFSIPS[@]} ; do
+                if [[ "${#NFSPort}" -gt 0 ]] ; then
+                    if [ "$nfsip" == "*" ] ; then
+                        vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip daddr $ip tcp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
+                        vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip daddr $ip udp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
+                        __allnetwork=1
+                    else
+                        if [[ "$__allnetwork" -eq 0 ]] ; then
+                            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
+                            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
+                        fi
+                    fi
+                fi
+                if [[ "${#RPCPort}" -gt 0 ]] ; then
+                    if [ "$nfsip" == "*" ] ; then
+                        vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip daddr $ip tcp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
+                        vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip daddr $ip udp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
+                        __allnetwork=1
+                    else
+                        if [[ "$__allnetwork" -eq 0 ]] ; then
+                            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
+                            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
+                        fi
+                    fi
+                fi
+            done
+
+            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input iifname \"lo\" accept"
+
+            if [[ "$__allnetwork" -eq 0 ]] ; then
+                #DROP ALL OTHER SOURCES
+                vzexecRun "nft delete rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ip protocol udp dport { 111,2049} counter drop"
+                vzexecRun "nft delete rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ip protocol tcp dport { 111,2049} counter drop"
+                vzexecRun "nft delete rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ip protocol udp dport { 111,2049} counter accept"
+                vzexecRun "nft delete rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ip protocol tcp dport { 111,2049} counter accept"
+            fi
+
+            vzexecRun "nft -s list ruleset >> \"$FW_RULESET_FILE\" 2>> $JEM_CALLS_LOG"
+
         fi
+
         set +f
     else
         #firewall is enabled, so call reconfiguration method
@@ -724,7 +769,24 @@ function _removeNativeip() {
                 fi
                 vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $i -j ACCEPT; $IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $i -j ACCEPT"
             done
+        else
+
+            vzexecRun "which nft"
+            NFT="$(vzexecGetLastStdOut)"
+            if [ ! -z "$NFT" ] ; then
+                for i in "${IPLIST[@]}" ; do
+                    isValidIP $i || continue
+                    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID removing $i | $err " >> ${JEM_CALLS_LOG}
+                    if ! vzexecRun "sed -i -re \"/\\\"?$DESTINATION\\\"?\s+${i//./\\.}/{/${i//./\\.}[\(| ]/{s/(${i//./\\.}(\([^\)]*\))?)\s?.*//g}}\" $CONTAINER_EXPORTS_FILE" ; then
+                        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID error removing $i " >> ${JEM_CALLS_LOG}
+                    fi
+
+                    vzexecRun "nft delete rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ip protocol udp ip saddr $i udp dport { 111,2049} counter accept"
+                    vzexecRun "nft delete rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ip protocol tcp ip saddr $i tcp dport { 111,2049} counter accept"
+                done
+            fi
         fi
+
         #JE-26420
         vzexecRun "jem firewall isEnabled"
         fwstatus=$(vzexecGetLastErrCode)
