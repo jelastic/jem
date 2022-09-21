@@ -220,7 +220,7 @@ function preAddCallback(){
         if [[ -f ${prefix}/etc/jelastic/metainf.conf ]]; then
             # JE-45748: evalueate compute type from metainf, empty value if there is no compute type in file
             eval "CT_$(grep "COMPUTE_TYPE=" ${prefix}/etc/jelastic/metainf.conf 2>/dev/null || echo "COMPUTE_TYPE=")"
-            if [ ! -z $CT_COMPUTE_TYPE ] && [ "x$CT_COMPUTE_TYPE" != "xvds" ] && [ "x$CT_COMPUTE_TYPE" != "xubuntuvds" ] && [ "x$CT_COMPUTE_TYPE" != "xdebianvds" ] && [ "x$CT_COMPUTE_TYPE" != "xvzlinuxvps" ] ; then
+            if [ ! -z $CT_COMPUTE_TYPE ] && [ "x$CT_COMPUTE_TYPE" != "xvds" ] && [ "x$CT_COMPUTE_TYPE" != "xubuntuvds" ] && [ "x$CT_COMPUTE_TYPE" != "xdebianvds" ] && [ "x$CT_COMPUTE_TYPE" != "xvzlinuxvps" ] && [ "x$CT_COMPUTE_TYPE" != "xalmalinuxvps" ] ; then
                 # JE-45748 : container with metainf.conf and not empty compute type
                 __processNotVDS ${_CTID}
                 _UID=700

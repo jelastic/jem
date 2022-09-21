@@ -150,3 +150,11 @@ function addVzlinuxRoute(){
 function delVzlinuxRoute(){
     delCentosRoute;
 }
+
+function addAlmalinuxRoute(){
+     addCentosRoute
+}
+
+function delAlmalinuxRoute(){
+    delCentosRoute;
+}
