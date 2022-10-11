@@ -92,9 +92,6 @@ function doInstall(){
 	220 )
 		writeJSONResponseOut "result=>4020" "message=>Cannot enable SSL module!"
 	;;
-	221 )
-		writeJSONResponseOut "result=>4021" "message=>Cannot disable SSL module!"
-	;;
 	4 )
 		writeJSONResponseOut "result=>4004" "message=>Can not save user files!"
 	;;
@@ -127,14 +124,33 @@ function doRemove(){
 
 	$(disableSSL)  ; sslresult=$?;
 	case $sslresult in
-	    220|221 )
-	    ;;
-	    0)
+	182 )
+		writeJSONResponseErr "result=>4182" "Service restart failed"
+	;;
+	183 )
+		writeJSONResponseErr "result=>4183" "Service start failed"
+	;;
+	184 )
+		writeJSONResponseErr "result=>4184" "Service stop failed"
+	;;
+	185 )
+		writeJSONResponseErr "result=>4147" "message=>Service reload failed"
+	;;
+	221 )
+		writeJSONResponseOut "result=>4021" "message=>Cannot disable SSL module!"
+	;;
+	4 )
+		writeJSONResponseOut "result=>4004" "message=>Can not save user files!"
+	;;
+	39 )
+		writeJSONResponseOut "result=>4039" "message=>File not found!"
+	;;
+	0)
 		writeJSONResponseOut "result=>0" "message=>SSL removed successfully" 
-	    ;;
-	    *)
+	;;
+	*)
 		writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"
-	    ;;
+	;;
 	esac
 	return $sslresult;
 }
