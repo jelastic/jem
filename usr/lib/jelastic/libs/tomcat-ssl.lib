@@ -30,18 +30,20 @@ function enableSSL(){
         msg=$(doAction keystore install 2>&1);
         local result=$?;
         [ "$result" -ne 0 ] && return $result;
-        stopServiceSilent "$SERVICE" ;
-        $SED -i '/<!--/d' $SERVER_XML_CONFIG;
-        $SED -i '/-->/d' $SERVER_XML_CONFIG;
-        startServiceSilent "$SERVICE";
+        #stopServiceSilent "$SERVICE" ;
+        [ -f "$SERVER_XML_CONFIG" ] || return 39
+        $SED -i '/<!--/d' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4
+        $SED -i '/-->/d' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4
+        restartServiceSilent "$SERVICE" || return 182
 }
 
 function disableSSL(){
         local msg=$(doAction keystore remove 2>&1);
         local result=$?;
         [ "$result" -ne 0 ] && return $result;
-        stopServiceSilent "$SERVICE" ;
-        $SED  -i '1i  <!--' $SERVER_XML_CONFIG;
-        $SED  -i '$a  -->' $SERVER_XML_CONFIG;
-        startServiceSilent "$SERVICE";
+        #stopServiceSilent "$SERVICE" ;
+        [ -f "$SERVER_XML_CONFIG" ] || return 39
+        $SED  -i '1i  <!--' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4
+        $SED  -i '$a  -->' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4
+        restartServiceSilent "$SERVICE" || return 182
 }

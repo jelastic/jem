@@ -32,14 +32,15 @@ function enableSSL(){
 	err=$?;
 	# [ -z "$msg" ] || echo "$msg" | $SED -re 's|.*result.*message\":||' -e 's|\}||' >>$ACTIONS_LOG;
 	[[ ${err} -gt 0 ]] && exit "$err";
-	$SED -i 's/SSLEngine=\"off\"/SSLEnabled=\"on\"/g' $SERVER_XML_CONFIG;
-	msg=$(doAction apache2ext enmod ssl > /dev/null 2>&1) ||  { writeJSONResponseErr "result=>4020" "message=>Cannot enable SSL module!"; return 220; };
+	[ -f "$SERVER_XML_CONFIG" ] || return 39
+	$SED -i 's/SSLEngine=\"off\"/SSLEnabled=\"on\"/g' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4
+	msg=$(doAction apache2ext enmod ssl > /dev/null 2>&1) ||  { writeJSONResponseErr "result=>4020" "message=>Cannot enable SSL module!"; return 220; }
 }
 
 function disableSSL(){
 	local err;
 	local msg=$(doAction keystore remove 2>&1);
 	err=$?; [[ ${err} -gt 0 ]] && exit "$err";
-	$SED -i 's/SSLEngine=\"on\"/SSLEnabled=\"off\"/g' $SERVER_XML_CONFIG;
+	[ -f "$SERVER_XML_CONFIG" ] && { $SED -i 's/SSLEngine=\"on\"/SSLEnabled=\"off\"/g' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4; }
 	msg=$(doAction apache2ext dismod ssl > /dev/null 2>&1) ||  { writeJSONResponseErr "result=>4021" "message=>Cannot disable SSL module!"; return 221; };
 }

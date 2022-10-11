@@ -41,26 +41,25 @@ function removeChain(){
 	[ -f "$CHAIN_CERTIFICATE_FILE" ] && rm -Rf "$CHAIN_CERTIFICATE_FILE";
 }
 
-
 function enableSSL(){
-	local err;
-	stopServiceSilent "$SERVICE";
-	local msg;
-	msg=$(doAction keystore DownloadKeys 2>&1);
-	err=$?;
-#	[ -z "$msg" ] || echo "$msg" | $SED -re 's|.*result.*message\":||' -e 's|\}||' >>$ACTIONS_LOG;
-	[[ ${err} -gt 0 ]] && exit "$err";
-	createChain;
-	[ -f "${SSL_XML_CONFIG}.disabled" ] && mv "${SSL_XML_CONFIG}.disabled" "$SSL_XML_CONFIG";
-	startServiceSilent "$SERVICE" ;
+        local err;
+        # stopServiceSilent "$SERVICE";
+        local msg;
+        msg=$(doAction keystore DownloadKeys 2>&1);
+        err=$?;
+#       [ -z "$msg" ] || echo "$msg" | $SED -re 's|.*result.*message\":||' -e 's|\}||' >>$ACTIONS_LOG;
+        [[ ${err} -gt 0 ]] && exit "$err";
+        createChain;
+        [ -f "${SSL_XML_CONFIG}.disabled" ] && { mv "${SSL_XML_CONFIG}.disabled" "$SSL_XML_CONFIG" 2>>$ACTIONS_LOG || return 4; } || return 39
+        restartServiceSilent "$SERVICE" || return 182
 }
 
 function disableSSL(){
-	local err;
-	stopServiceSilent "$SERVICE" ;
-	local msg=$(doAction keystore remove 2>&1);
-	err=$?; [[ ${err} -gt 0 ]] && exit "$err";
-	removeChain;
-	[ -f "$SSL_XML_CONFIG" ] && mv "${SSL_XML_CONFIG}" "${SSL_XML_CONFIG}.disabled";
-	startServiceSilent "$SERVICE";
+        local err;
+        # stopServiceSilent "$SERVICE" ;
+        local msg=$(doAction keystore remove 2>&1);
+        err=$?; [[ ${err} -gt 0 ]] && exit "$err";
+        removeChain;
+        [ -f "$SSL_XML_CONFIG" ] && { mv "${SSL_XML_CONFIG}" "${SSL_XML_CONFIG}.disabled" 2>>$ACTIONS_LOG || return 4; }
+        restartServiceSilent "$SERVICE" || return 182;
 }
