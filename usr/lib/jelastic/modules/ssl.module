@@ -96,7 +96,7 @@ function doInstall(){
 		writeJSONResponseOut "result=>4004" "message=>Can not save user files!"
 	;;
 	39 )
-		writeJSONResponseOut "result=>4039" "message=>File not found!"
+		writeJSONResponseOut "result=>4039" "message=>SSL config not found!"
 	;;
 	0 )
 		writeJSONResponseOut "result=>0" "message=>SSL installed successfully"
@@ -143,7 +143,7 @@ function doRemove(){
 		writeJSONResponseOut "result=>4004" "message=>Can not save user files!"
 	;;
 	39 )
-		writeJSONResponseOut "result=>4039" "message=>File not found!"
+		writeJSONResponseOut "result=>4039" "message=>SSL config not found!"
 	;;
 	0)
 		writeJSONResponseOut "result=>0" "message=>SSL removed successfully" 
