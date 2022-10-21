@@ -142,6 +142,9 @@ function doRemove(){
 	4 )
 		writeJSONResponseOut "result=>4004" "message=>Can not save user files!"
 	;;
+	143 )
+		writeJSONResponseOut "result=>4143" "message=>Can not save configuration files!"
+	;;
 	39 )
 		writeJSONResponseOut "result=>4039" "message=>SSL config not found!"
 	;;

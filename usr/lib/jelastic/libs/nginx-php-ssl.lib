@@ -50,7 +50,7 @@ function enableSSL(){
 #       [ -z "$msg" ] || echo "$msg" | $SED -re 's|.*result.*message\":||' -e 's|\}||' >>$ACTIONS_LOG;
         [[ ${err} -gt 0 ]] && exit "$err";
         createChain;
-        [ -f "${SSL_XML_CONFIG}.disabled" ] && { mv "${SSL_XML_CONFIG}.disabled" "$SSL_XML_CONFIG" 2>>$ACTIONS_LOG || return 4; } || { [ -f "${SSL_XML_CONFIG}" ] || return 39; }
+        [ -f "${SSL_XML_CONFIG}.disabled" ] && { mv "${SSL_XML_CONFIG}.disabled" "$SSL_XML_CONFIG" 2>>$ACTIONS_LOG || return 143; } || { [ -f "${SSL_XML_CONFIG}" ] || return 39; }
         restartServiceSilent "$SERVICE" || return 182
 }
 
@@ -60,6 +60,6 @@ function disableSSL(){
         local msg=$(doAction keystore remove 2>&1);
         err=$?; [[ ${err} -gt 0 ]] && exit "$err";
         removeChain;
-        [ -f "$SSL_XML_CONFIG" ] && { mv "${SSL_XML_CONFIG}" "${SSL_XML_CONFIG}.disabled" 2>>$ACTIONS_LOG || return 4; }
+        [ -f "$SSL_XML_CONFIG" ] && { mv "${SSL_XML_CONFIG}" "${SSL_XML_CONFIG}.disabled" 2>>$ACTIONS_LOG || return 143; }
         restartServiceSilent "$SERVICE" || return 182;
 }

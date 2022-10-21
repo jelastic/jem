@@ -32,8 +32,8 @@ function enableSSL(){
         [ "$result" -ne 0 ] && return $result;
         #stopServiceSilent "$SERVICE" ;
         [ -f "$SERVER_XML_CONFIG" ] || return 39
-        $SED -i '/<!--/d' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4
-        $SED -i '/-->/d' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4
+        $SED -i '/<!--/d' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 143
+        $SED -i '/-->/d' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 143
         restartServiceSilent "$SERVICE" || return 182
 }
 
@@ -43,7 +43,7 @@ function disableSSL(){
         [ "$result" -ne 0 ] && return $result;
         #stopServiceSilent "$SERVICE" ;
         [ -f "$SERVER_XML_CONFIG" ] || return 39
-        $SED  -i '1i  <!--' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4
-        $SED  -i '$a  -->' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 4
+        $SED  -i '1i  <!--' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 143
+        $SED  -i '$a  -->' $SERVER_XML_CONFIG 2>$ACTIONS_LOG || return 143
         restartServiceSilent "$SERVICE" || return 182
 }
