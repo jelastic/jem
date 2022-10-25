@@ -316,6 +316,7 @@ function detectOS() {
     : ${1:?"Missing param: issue_string"};
     local issue_string=$1
 
+    [ -z "$_OS" ] && $GREP -iq "almalinux" <<< $issue_string && _OS="almalinux"
     [ -z "$_OS" ] && $GREP -iq "vzlinux\|virtuozzo" <<< $issue_string && _OS="vzlinux"
     [ -z "$_OS" ] && $GREP -iq "kali" <<< $issue_string && _OS="kali"
     [ -z "$_OS" ] && $GREP -iq "ubuntu\|mint" <<< $issue_string && _OS="ubuntu"
@@ -326,7 +327,6 @@ function detectOS() {
     [ -z "$_OS" ] && $GREP -iq "redhat" <<< $issue_string && _OS="centos"
     [ -z "$_OS" ] && $GREP -iq "suse" <<< $issue_string && _OS="suse"
     [ -z "$_OS" ] && $GREP -iq "alpine" <<< $issue_string && _OS="alpine"
-    [ -z "$_OS" ] && $GREP -iq "almalinux" <<< $issue_string && _OS="almalinux"
     echo $_OS
 }
 

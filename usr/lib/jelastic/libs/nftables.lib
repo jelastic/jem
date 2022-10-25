@@ -17,13 +17,25 @@
 #nft -j list table inet jelastic | jq ".nftables[] | select (.rule.handle == 7 or .rule.handle == 6 ) "
 
 
-FW_TABLE_NAME='jelastic'
+FW_FILTER_TABLE_NAME='filter'
+FW_NAT_TABLE_NAME='nat'
+
+FW_FILTER_INPUT_CHAIN='INPUT'
+FW_FILTER_OUTPUT_CHAIN='OUTPUT'
+FW_FILTER_FORWARD_CHAIN='FORWARD'
+
+FW_FORWARD_CHECKS_CHAIN='fw_checks'
+FW_FORWARD_LANS_CHAIN='fw_lans'
+FW_FORWARD_ACCOUNTS_CHAIN='fw_accounts'
+
+FW_NAT_POSTROUTING_CHAIN="POSTROUTING"
+FW_NAT_PREROUTING_CHAIN="PREROUTING"
 
 #valid values are: ip,ip6,inet
-FW_DEFAULT_TABLE_TYPE='inet'
+FW_DEFAULT_TABLE_TYPE='ip'
 
 #valid values accept,drop
-FW_DEFAULT_POLICY='drop'
+FW_DEFAULT_POLICY='accept'
 FW_JELASTIC_INIT_FILE="/etc/nftables/jelastic.nft"
 FW_RULESET_FILE="/etc/nftables/main.nft"
 
@@ -56,15 +68,122 @@ putShabang() {
     echo '#!/usr/sbin/nft -f'
 }
 
+
+setExists() {
+    : ${1:?"Missing param: name"};
+    out=$(nft -j list sets inet | jq '.nftables[] | select(.set) | select(.set.name|test($var))' --arg var $1)
+    [[ -n "$out" ]]
+}
+
+
+getNumberOfActiveSets() {
+    local mask="${1:='.*'}"
+    local re='^[0-9]+$'
+    out=$(nft -j list sets | jq 'def count(s): reduce s as $i  (0; .+1); count(.nftables[].set| select(.!=null) | select(.name|test($var)))' --arg var $mask)
+    if ! [[ $out =~ $re ]] ; then
+        echo "0"
+    else
+        echo $out
+    fi
+}
+
+# 1 - type
+# 2 - name
+tableExists() {
+    local ttype="${1:=$FW_DEFAULT_TABLE_TYPE}"
+    local tname="${2:=$FW_FILTER_TABLE_NAME}"
+    out=$(nft -j list tables | jq '.nftables[].table | select(.!=null) | select(.family|test($fam)) | select(.name|test($name))' --arg fam $ttype --arg name $tname)
+    [[ -n "$out" ]]
+}
+
+
+# 1 - type
+# 2 - table name
+# 3 - chain name
+chainExists() {
+    local ttype="${1:=$FW_DEFAULT_TABLE_TYPE}"
+    local tname="${2:=$FW_FILTER_TABLE_NAME}"
+    local cname="${3:="FORWARD"}"
+    out=$(nft -j list tables | jq '.nftables[].chain | select(.!=null) | select(.table|test($tname)) | select (.name|test($cname)) | select(.family|test($ttype))' --arg ttype $ttype --arg tname $tname --arg cname $cname)
+    [[ -n "$out" ]]
+}
+
+
+#create required tables with checks
+#used for isolation init
+initTablesCheck() {
+    #check filter table
+    if ! tableExists $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME ; then
+        echo "add table $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME"
+    fi
+
+    # check for input
+    if ! chainExists $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN; then
+        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  { type filter hook input priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
+    fi
+
+    # check for forward
+    if ! chainExists $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_FORWARD_CHAIN; then
+        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_FORWARD_CHAIN   { type filter hook forward priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
+    fi
+
+    # check for output
+    if ! chainExists $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_OUTPUT_CHAIN; then
+        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_OUTPUT_CHAIN   { type filter hook output priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
+    fi
+
+    # check for forward_checks
+    if ! chainExists $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FORWARD_CHECKS_CHAIN; then
+        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FORWARD_CHECKS_CHAIN"
+    fi
+
+    # check for forward_lans
+    if ! chainExists $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FORWARD_LANS_CHAIN; then
+        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FORWARD_LANS_CHAIN "
+    fi
+
+    # check for forward_accounts
+    if ! chainExists $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FORWARD_ACCOUNTS_CHAIN; then
+        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FORWARD_ACCOUNTS_CHAIN"
+    fi
+
+
+    #----------------------------------------------------------------------------------------------------------------------------
+    #check nat table
+    if ! tableExists $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME ; then
+        echo "add table $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME"
+    fi
+
+    # check for prerouting
+    if ! chainExists $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN; then
+        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN  { type nat hook prerouting priority -100 ; }"
+    fi
+
+    # check for postrouting
+    if ! chainExists $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN; then
+        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN   postrouting { type nat hook postrouting priority 100 ; }"
+    fi
+
+}
+
 initTables() {
-    echo "delete chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME"
-    echo "add table $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input   { type filter hook input priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME forward { type filter hook forward priority 0 ; policy accept ; }"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME output  { type filter hook output priority 0 ;  policy accept ; }"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME nat { type nat hook prerouting priority dstnat; }"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME prerouting { type nat hook prerouting priority -100 ; }"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME postrouting { type nat hook postrouting priority 100 ; }"
+    echo "add table $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  { type filter hook input priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_FORWARD_CHAIN   { type filter hook forward priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_OUTPUT_CHAIN   { type filter hook output priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
+    echo "add table $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN  { type nat hook prerouting priority -100 ; }"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN   postrouting { type nat hook postrouting priority 100 ; }"
+}
+
+_doInitTables() {
+    local rulesFile=$(mktemp)
+    putShabang > $rulesFile
+    initTablesCheck >> $rulesFile
+    nft -f $rulesFile 2>> $JEM_CALLS_LOG
+    if [ $? -eq 0 ] ; then
+        rm $rulesFile
+    fi
 }
 
 # $cmd $proto $ptype $dport $srchost $dsthost $chain $tcptype $raction

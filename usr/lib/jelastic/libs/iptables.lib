@@ -90,6 +90,10 @@ function addRule() {
         fi
 }
 
+#just stub because iptables doesn't need additional init
+function _doInitTables() {
+    return 0
+}
 
 function setDefaultPolicy() {
     local policy=${1:-"DROP"}
@@ -296,4 +300,13 @@ function firewallSet() {
     done
     echo "COMMIT" >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_4RULES_FILE)"
     echo "COMMIT" >> "$(vzctPath $VZ_CTID_ROOT $JELASTIC_6RULES_FILE)"
+}
+
+function getNumberOfActiveSets() {
+    local jel_sets=($(ipset -L -n  2>>$JEM_CALLS_LOG | sed -rne "/^${_JELASTIC_REGEX}\$/p;" | grep "${HOSTER_DOMAIN}" | sed ':a;N;$!ba;s/\n/ /g'))
+    echo "${#jel_sets[@]}"
+}
+
+function setExists() {
+    ipset -L -n 2>>$JEM_CALLS_LOG | grep -q "$1"
 }
