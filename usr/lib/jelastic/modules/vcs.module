@@ -311,6 +311,9 @@ function doUpdate(){
             [ -n "${CURRENT_DIR}" ] && { ln -sfT "${WEBROOT}/${CURRENT_DIR}" ${WEBROOT}/ROOT && _deployLog "Swithing the ROOT context to ${CURRENT_DIR}"; updateOwnership ${WEBROOT}/ROOT; }
         fi
         if [[ -d ${WEBROOT}/ROOT && ! -h ${WEBROOT}/ROOT ]] ; then
+            if [ "$UID" == '0' ]; then
+                chown -R ${DATA_OWNER} ${WEBROOT}/ROOT;
+            fi 
             mv -f ${WEBROOT}/ROOT ${WEBROOT}/$NEXT_DIR && _deployLog "Copying content of the ROOT directory to $NEXT_DIR";
         fi
         if [ -z "${PREVIOUS_DIR}" ] ;then
@@ -319,6 +322,9 @@ function doUpdate(){
         fi
         [ -n "${PREVIOUS_DIR}" ] && rm -rf ${WEBROOT}/${PREVIOUS_DIR} && _deployLog "Removing old deprecated context directory ${PREVIOUS_DIR}";
         if [ -n "${CURRENT_DIR}" ] ;then
+            if [ "$UID" == '0' ]; then
+                chown -R ${DATA_OWNER} ${WEBROOT}/${CURRENT_DIR};
+            fi 
             cp -rf ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1  && _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR}";
             if [ $? -ne 0 ]; then
                 writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR}";
@@ -370,6 +376,9 @@ function doUpdate(){
                     rm -rf ${WEBROOT}/ROOT/* && _deployLog "Removing the content of current ROOT directory";
                     shopt -u dotglob;
                 fi
+		if [ "$UID" == '0' ]; then
+                    chown -R ${DATA_OWNER} "${WEBROOT}/${TARGET_DIR}/";
+                fi 
                 shopt -s dotglob;
                 set +f
                 mv -f ${WEBROOT}/${TARGET_DIR}/* ${WEBROOT}/ROOT;
