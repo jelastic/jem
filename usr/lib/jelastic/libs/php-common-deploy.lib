@@ -251,6 +251,9 @@ function renameContext(){
     if [ ! -h "${WEBROOT}/${oldContext}" ]; then
     if [ -d "${WEBROOT}/${oldContext}" ]
     then
+        if [ "$UID" == '0' ]; then
+              chown -R ${DATA_OWNER} "${WEBROOT}/${oldContext}";
+        fi 
         shopt -s dotglob;
         mv "$WEBROOT/$oldContext/"* "$WEBROOT/$newContext/" 2>/dev/null && [ "$oldContext" != "ROOT" ] && rm -rf $WEBROOT/$oldContext;
         deployLog "Moving application data from $oldContext to $newContext";
@@ -276,6 +279,9 @@ function renameContext(){
                 [ ! -d ${WEBROOT}/${CURRENT_DIR} ] && CURRENT_DIR=$(ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1);
                 [ ! -n ${CURRENT_DIR} ] && { writeJSONResponseErr "result=>4052" "message=>Context does not exist"; die -q; }
                 if [ -d ${WEBROOT}/${CURRENT_DIR} ] ;then
+                        if [ "$UID" == '0' ]; then
+                            chown -R ${DATA_OWNER} ${WEBROOT}/${CURRENT_DIR};
+                        fi 
                         shopt -s dotglob;
                         set +f
                         mv ${WEBROOT}/${CURRENT_DIR}/* ${WEBROOT}/${newContext} 2>/dev/null && deployLog "Moving application data from ${CURRENT_DIR} to ${newContext}";

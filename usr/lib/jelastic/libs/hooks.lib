@@ -70,6 +70,9 @@ function applyHook(){
         else
             echo -e "[ERROR] $(date) ${hookDisplayName} hook execution failed. Exit code ${result}\n\n" | tee -a ${WRITE_OUTPUT_TO} >> ${HOOKS_LOG};
         fi
+        if [ "$UID" == '0' ]; then
+            chown -R ${DATA_OWNER} ${target};
+        fi 
         return ${result}
     else
         return 0;
