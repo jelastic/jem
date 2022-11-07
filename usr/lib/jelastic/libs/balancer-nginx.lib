@@ -91,7 +91,7 @@ function generateMapRegexFromIp(){
 
 function reloadConfigs(){
     cat "$NGINX_CONFIG_TEMPLATE" > "$NGINX_CONFIG"
-    cat "$DHCPD_CONFIG_TEMPLATE" > "$DHCPD_CONFIG"
+    [ -f "$DHCPD_CONFIG_TEMPLATE" ] && cat "$DHCPD_CONFIG_TEMPLATE" > "$DHCPD_CONFIG"
     if [ -e "$LEASES_FILE" ]; then
         set -f
         rm -f "$LEASES_FILE";
