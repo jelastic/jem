@@ -233,12 +233,13 @@ function populateContainerVarsVEID() {
 
 function populateVMVarsVEID() {
     : ${1:?"Missing ENVID param"}
-    isVMexist $1 || return 3
-    local _root="/vz/tmp/$1"
-    local _private="prlctl list ${ENVID} -Ho private"
+    ENVID=$1
+    isVMexist $ENVID || return 3
+    local _root="/vz/tmp/${ENVID}"
+    local _private="$(prlctl list ${ENVID} -Ho private)"
 
-    if ! isVERunning $1 ; then
-        $VZCTL mount $1 &>>/dev/null
+    if ! isVERunning $ENVID ; then
+        $VZCTL mount $ENVID &>>/dev/null
         need_umount=1
         local issue_file="$(vzctPath $VE_ROOT /etc/issue )"
         local release_files="$(vzctPath $VE_ROOT /etc/)/*-release"
@@ -252,10 +253,10 @@ function populateVMVarsVEID() {
     if [[ "$OS" == "ubuntu" ]]; then
         SED_COPY_OPTION=''
     fi
-    local _v="VE$1"
+    local _v="VE${ENVID//-/_}"
     local _cmd="${_v}_ROOT=$_root;${_v}_PRIVATE=$_private;${_v}_OS=$_os;${_v}_OS_VER=${_os_ver%%.*}"
     eval $_cmd
-    [[ $need_umount -eq 1 ]] && $umountVE $1 &>>/dev/null
+    [[ $need_umount -eq 1 ]] && $umountVE $ENVID &>>/dev/null
 
     return 0;
 }
@@ -267,7 +268,7 @@ function populateVEVarsVZ() {
     else
         populateContainerVarsVEID $1 || return $?
     fi
-    local _cmd="VZ_VEID_ROOT=\$VE$1_ROOT;VZ_VEID_PRIVATE=\$VE$1_PRIVATE;VZ_VEID_OS=\$VE$1_OS;VZ_VEID_OS_VER=\$VE$1_OS_VER"
+    local _cmd="VZ_VEID_ROOT=\$VE${1//-/_}_ROOT;VZ_VEID_PRIVATE=\$VE${1//-/_}_PRIVATE;VZ_VEID_OS=\$VE${1//-/_}_OS;VZ_VEID_OS_VER=\$VE${1//-/_}_OS_VER"
     eval $_cmd
 
     return 0
