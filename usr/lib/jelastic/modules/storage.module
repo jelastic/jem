@@ -540,7 +540,6 @@ function processgluster() {
 
     local sourceMountUnEsc=$(sed -re 's/\\(\/|\(|\)|\]|\[|\\)/\1/g' <<< "$sourceMount")
     local destinationEsc=$(sed -re 's/\s/\\\\040/g' <<< "$_DESTINATION" )
-    local running
 
     [[ ! -z "$VEID" ]] && {
         MOUNTS_STORAGE="${VE_ROOT}${CONTAINER_MOUNTS_STORAGE}"
