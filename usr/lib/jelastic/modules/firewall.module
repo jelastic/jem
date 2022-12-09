@@ -444,10 +444,12 @@ function doStart() {
         $IP6TABLES -I INPUT -p icmpv6 -j ACCEPT
         $IP6TABLES -I INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
         $IP6TABLES -I INPUT -i lo -j ACCEPT
+        $IP6TABLES -I OUTPUT -o lo -j ACCEPT
     fi
 
     $IPTABLES -I INPUT -p icmp -j ACCEPT
     $IPTABLES -I INPUT -i lo -j ACCEPT
+    $IPTABLES -I OUTPUT -o lo -j ACCEPT
     $IPTABLES -I INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 
     #Add reject only if there was no problem while loading rules
