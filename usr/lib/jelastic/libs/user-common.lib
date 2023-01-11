@@ -32,7 +32,7 @@ function fixRights(){
 #    chmod 500 /usr/lib/jelastic/libs 2>>"$JEM_CALLS_LOG";
 #    chmod 500 /usr/lib/jelastic/modules 2>>"$JEM_CALLS_LOG";
 #    chmod 500 /usr/lib/jelastic/tpls 2>>"$JEM_CALLS_LOG";
-    chmod 665 /var/log 2>>"$JEM_CALLS_LOG";
+    chmod 775 /var/log 2>>"$JEM_CALLS_LOG";
     chmod 777 /var/log/jem.log 2>>"$JEM_CALLS_LOG";
     [ -f /etc/logrotate.d/jelastic ] && chmod 644 /etc/logrotate.d/jelastic 2>>"$JEM_CALLS_LOG";
     chmod 777 /var/run 2>>"$JEM_CALLS_LOG";
