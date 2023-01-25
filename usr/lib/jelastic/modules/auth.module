@@ -211,7 +211,7 @@ function dosetupUtils() {
     fi
 
     if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] ; then
-        VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/deb/22.04/unfsd_0.9.23.deb; dpkg --install ./unfsd_0.9.23.deb && rm ./unfsd_0.9.23.deb"
+        VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/deb/22.04/unfsd_0.9.23.deb"
     else
         $TAR hzxf "$MOUNTPACKAGE" -C "$VZ_CTID_ROOT/"
     fi
@@ -224,6 +224,10 @@ function dosetupUtils() {
 
         #log output from package manager
         echo "CTID:$CTID Detected OS: $OS package manager response: $(vzexecGetLastStdOut) $(vzexecGetLastStdErr)" >> $ACTIONS_LOG
+
+        if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] ; then
+            VEExecRun "dpkg --install ./unfsd_0.9.23.deb && rm ./unfsd_0.9.23.deb"
+        fi
 
         vzexecRun "eval $checkCmd"
         stdout=$(vzexecGetLastStdOut)
