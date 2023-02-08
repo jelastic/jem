@@ -451,14 +451,14 @@ function doAutoUpdate(){
     do
         source ${project}
         enableVCSLibrary;
-        [ $AUTOUPDATE == "true" ] && {
+        [[ "x$AUTOUPDATE" == "xtrue" ]] && {
 	    LastRemoteCommitVal=$(getLastRemoteCommit)
-            [ ${LAST_DEPLOYED_COMMIT} == $LastRemoteCommitVal ] && continue ;
-            [ $LastRemoteCommitVal == "00000000000" ] && continue ;
+            [[ ${LAST_DEPLOYED_COMMIT} == $LastRemoteCommitVal ]] && continue ;
+            [[ $LastRemoteCommitVal == "00000000000" ]] && continue ;
             local next_allowed_update=$(( $LASTUPDATE + $UPDATE_INTERVAL * 60 ));
             local current_timestamp=`date +%s`;
-            [ $next_allowed_update -lt $current_timestamp ] && doUpdate >> $JEM_CALLS_LOG && UPDATE_IS_OK="true" && writeProjectConfig;
-            [ ${COMPUTE_TYPE} == "maven" ] && [ $UPDATE_IS_OK == "true" ] && doCallProjectUpdate $PROJECT_NAME;
+            [[ $next_allowed_update -lt $current_timestamp ]] && doUpdate >> $JEM_CALLS_LOG && UPDATE_IS_OK="true" && writeProjectConfig;
+            [[ "x${COMPUTE_TYPE}" == "xmaven" ]] && [[ "x${UPDATE_IS_OK,,}" == "xtrue" ]] && doCallProjectUpdate $PROJECT_NAME;
         }
 
     done
