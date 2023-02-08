@@ -17,6 +17,8 @@
 
 [ -n "${DECPASSWDLIB_VERSION:-}" ] && return 0;
 DECPASSWDLIB_VERSION="0.1";
+VZ_VERSION="$(cat /etc/*release /etc/issue | grep -i "virtuozzo\|parallels" | awk '{ for (i=1; i<NF; i++ ) {if ($i ~ "release" ) print $(i+1) }}' | awk -F'.' '{print $1}' | head -n 1)";
+
 include virtuozzo;
 
 declare -a JEM_PARAMS
