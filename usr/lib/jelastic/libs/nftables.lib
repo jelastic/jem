@@ -278,7 +278,7 @@ function setDefaultPolicy() {
 
 #filename to save
 function saveCurrentRules() {
-    savefile="${1:=$FW_RULESET_FILE}"
+    savefile="${1:-$FW_RULESET_FILE}"
     nft -s list ruleset >> "$savefile" 2>> $JEM_CALLS_LOG
 }
 
@@ -300,6 +300,9 @@ function netfilterStart() {
 
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction flushing current rules" >>$JEM_CALLS_LOG
     nft flush ruleset 2>> $JEM_CALLS_LOG
+
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
+    nft -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
 
     #exports
     set -f
@@ -339,7 +342,9 @@ function netfilterStart() {
     done;
     set +f
 
-    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input iifname "tap" accept
+    #TODO: Remove it
+    #tomcat has no this interface anymore
+    #nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input iifname "tap" accept
 
     redirPorts=($(isFunction _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts && { _get$($SED -re 's/-/_/g' <<< ${COMPUTE_TYPE})RedirPorts; } || _defaultComputeNodeRedirPorts));
 
@@ -350,12 +355,12 @@ function netfilterStart() {
     done;
 
     if [ -f /proc/net/if_inet6 ] ; then
-        nft insert $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol ipv6-icmp counter accept
+        nft insert rule $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN $FW_DEFAULT_TABLE_TYPE protocol ipv6-icmp counter accept
     fi
 
-    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol icmp counter accept
-    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input iifname "lo" counter accept
-    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ct state related,established  counter accept
+    nft insert rule $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN $FW_DEFAULT_TABLE_TYPE protocol icmp counter accept
+    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  iifname "lo" counter accept
+    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ct state related,established  counter accept
 
     nft add rule ip filter INPUT counter reject with icmp type host-prohibited
     #TODO:
