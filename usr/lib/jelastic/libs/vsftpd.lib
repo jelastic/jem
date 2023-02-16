@@ -28,7 +28,7 @@ SHELLS_FILE="/etc/shells";
 
 function setvsFtpCert(){
     APPSERVER_USER_UID=$(id -u jelastic 2>/dev/null || echo 700 )
-    chown -R  $APPSERVER_USER_UID $MOUNT_DIR 2>/dev/null;
+    [[ "x${COMPUTE_TYPE,,}" == "xstorage" ]] || chown -R  $APPSERVER_USER_UID $MOUNT_DIR 2>/dev/null;
 
     [ -d "/var/ftp/pub" ]  && rmdir "/var/ftp/pub/" >/dev/null 2>&1;
     if [ -f /usr/lib/systemd/system/vsftpd.service ]; then 
