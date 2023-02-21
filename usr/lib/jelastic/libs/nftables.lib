@@ -38,6 +38,7 @@ FW_DEFAULT_TABLE_TYPE='ip'
 FW_DEFAULT_POLICY='accept'
 FW_JELASTIC_INIT_FILE="/etc/nftables/jelastic.nft"
 FW_RULESET_FILE="/etc/nftables/main.nft"
+FW_JELASTIC_CUSTOM_RULES_FILE="/etc/nftables/jelastic-custom.nft"
 
 
 # $1 - type
@@ -292,17 +293,21 @@ function netfilterStart() {
 
     #test rule files
 
-    nft -c -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
-    if [[ $? -gt 0 ]] ; then
-        echo "Current iptables rules not modified due to errors in new rule-files" >>$JEM_CALLS_LOG
-        return 2
+    if [ -f "$FW_JELASTIC_INIT_FILE" ] ; then
+        nft -c -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
+        if [[ $? -gt 0 ]] ; then
+            echo "Current iptables rules not modified due to errors in new rule-files" >>$JEM_CALLS_LOG
+            return 2
+        fi
     fi
 
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction flushing current rules" >>$JEM_CALLS_LOG
     nft flush ruleset 2>> $JEM_CALLS_LOG
 
-    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
-    nft -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
+    if [ -f "$FW_JELASTIC_INIT_FILE" ] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
+        nft -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
+    fi
 
     #exports
     set -f
@@ -353,6 +358,17 @@ function netfilterStart() {
         local ruleParams=($($SED 's/:/ /g' <<< ${port}));
         nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ${ruleParams[0],,} ip saddr ${ruleParams[1]} ip daddr ${ruleParams[2]} tcp dport ${ruleParams[3]} counter ${ruleParams[5],,} to ${ruleParams[4]}
     done;
+
+    if [ -f "$FW_JELASTIC_CUSTOM_RULES_FILE" ] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_CUSTOM_RULES_FILE" >>$JEM_CALLS_LOG
+        nft -c -f "$FW_JELASTIC_CUSTOM_RULES_FILE" >>$JEM_CALLS_LOG
+        if [[ $? -gt 0 ]] ; then
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Custom netfilter rules not loaded due to errors in $FW_JELASTIC_CUSTOM_RULES_FILE. See logs for details" >>$JEM_CALLS_LOG
+        else
+            nft -f "$FW_JELASTIC_CUSTOM_RULES_FILE" >>$JEM_CALLS_LOG
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction rules loaded" >>$JEM_CALLS_LOG
+        fi
+    fi
 
     if [ -f /proc/net/if_inet6 ] ; then
         nft insert rule $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN $FW_DEFAULT_TABLE_TYPE protocol ipv6-icmp counter accept
