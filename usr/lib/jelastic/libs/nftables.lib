@@ -39,6 +39,7 @@ FW_DEFAULT_POLICY='accept'
 FW_JELASTIC_INIT_FILE="/etc/nftables/jelastic.nft"
 FW_RULESET_FILE="/etc/nftables/main.nft"
 FW_JELASTIC_CUSTOM_RULES_FILE="/etc/nftables/jelastic-custom.nft"
+FW_JELASTIC_STATIC_RULES_FILE="/etc/nftables/static-rules.nft"
 
 
 # $1 - type
@@ -268,8 +269,21 @@ addRule() {
 }
 
 function netfilterStop() {
-    #[[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
+    [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
+
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction flushing ruleset" >>$JEM_CALLS_LOG
     nft flush ruleset
+
+    if [ -f "$FW_JELASTIC_STATIC_RULES_FILE" ] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+        nft -c -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+        if [[ $? -gt 0 ]] ; then
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Static netfilter rules not loaded due to errors in $FW_JELASTIC_STATIC_RULES_FILE. See logs for details" >>$JEM_CALLS_LOG
+        else
+            nft -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction rules loaded" >>$JEM_CALLS_LOG
+        fi
+    fi
 }
 
 function setDefaultPolicy() {
@@ -358,6 +372,17 @@ function netfilterStart() {
         local ruleParams=($($SED 's/:/ /g' <<< ${port}));
         nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ${ruleParams[0],,} ip saddr ${ruleParams[1]} ip daddr ${ruleParams[2]} tcp dport ${ruleParams[3]} counter ${ruleParams[5],,} to ${ruleParams[4]}
     done;
+
+    if [ -f "$FW_JELASTIC_STATIC_RULES_FILE" ] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+        nft -c -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+        if [[ $? -gt 0 ]] ; then
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Static netfilter rules not loaded due to errors in $FW_JELASTIC_STATIC_RULES_FILE. See logs for details" >>$JEM_CALLS_LOG
+        else
+            nft -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction rules loaded" >>$JEM_CALLS_LOG
+        fi
+    fi
 
     if [ -f "$FW_JELASTIC_CUSTOM_RULES_FILE" ] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_CUSTOM_RULES_FILE" >>$JEM_CALLS_LOG
