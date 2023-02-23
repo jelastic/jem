@@ -264,7 +264,7 @@ addRule() {
             fi
         fi
 
-        echo "$cmd rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $chain $src $dst $dp counter $raction"
+        echo "$cmd rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $chain $src $dst $dp counter $raction"
     done
 }
 
@@ -335,25 +335,25 @@ function netfilterStart() {
         for nfsip in ${NFSIPS[@]} ; do
             if [[ "${#NFSPort}" -gt 0 ]] ; then
                 if [ "$nfsip" == "*" ] ; then
-                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip daddr $ip tcp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
-                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip daddr $ip udp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
+                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip daddr $ip tcp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
+                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip daddr $ip udp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
                     __allnetwork=1
                 else
                     if [[ "$__allnetwork" -eq 0 ]] ; then
-                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
-                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
+                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
+                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $NFSPort} counter accept 2>>$JEM_CALLS_LOG
                     fi
                 fi
             fi
             if [[ "${#RPCPort}" -gt 0 ]] ; then
                 if [ "$nfsip" == "*" ] ; then
-                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip daddr $ip tcp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
-                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip daddr $ip udp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
+                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip daddr $ip tcp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
+                    nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip daddr $ip udp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
                     __allnetwork=1
                 else
                     if [[ "$__allnetwork" -eq 0 ]] ; then
-                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
-                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME input ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
+                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
+                        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $RPCPort} counter accept 2>>$JEM_CALLS_LOG
                     fi
                 fi
             fi
@@ -370,7 +370,7 @@ function netfilterStart() {
     # process input chain NAT
     for port in ${redirPorts[@]} ; do
         local ruleParams=($($SED 's/:/ /g' <<< ${port}));
-        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME ${ruleParams[0],,} ip saddr ${ruleParams[1]} ip daddr ${ruleParams[2]} tcp dport ${ruleParams[3]} counter ${ruleParams[5],,} to ${ruleParams[4]}
+        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME ${ruleParams[0],,} ip saddr ${ruleParams[1]} ip daddr ${ruleParams[2]} tcp dport ${ruleParams[3]} counter ${ruleParams[5],,} to ${ruleParams[4]}
     done;
 
     if [ -f "$FW_JELASTIC_STATIC_RULES_FILE" ] ; then
