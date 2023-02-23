@@ -197,7 +197,7 @@ addRule() {
         protos=($protos)
     fi
 
-    chain="${7,,}"
+    chain="${7^^}"
     dport="${4,,}"
     src="${5,,}"
     dst="${6,,}"
