@@ -163,7 +163,7 @@ initTablesCheck() {
 
     # check for postrouting
     if ! chainExists $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN; then
-        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN   postrouting { type nat hook postrouting priority 100 ; }"
+        echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN  { type nat hook postrouting priority 100 ; }"
     fi
 
 }
@@ -175,7 +175,7 @@ initTables() {
     echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_OUTPUT_CHAIN   { type filter hook output priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
     echo "add table $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME"
     echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN  { type nat hook prerouting priority -100 ; }"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN   postrouting { type nat hook postrouting priority 100 ; }"
+    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN   { type nat hook postrouting priority 100 ; }"
 }
 
 _doInitTables() {
