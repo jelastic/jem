@@ -31,7 +31,6 @@ $PROGRAM 'grep';
 $PROGRAM 'git';
 $PROGRAM 'curl';
 $PROGRAM 'awk';
-$PROGRAM 'rsync';
 
 VCS_CONFIG_DIR="/var/lib/jelastic/vcs";
 VCS_LOG_DIR="/var/log/jelastic/vcs";
@@ -326,13 +325,21 @@ function doUpdate(){
             if [ "$UID" == '0' ]; then
                 chown -R ${DATA_OWNER} ${WEBROOT}/${CURRENT_DIR};
             fi
-            $RSYNC -avzh --inplace --quiet --ignore-errors ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1  && _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR} - successful";
-            local result=$?;
-            if [ $result -ne 0 ]; then
-            writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR} (probably because of unsufficient disk space). rsync exit code is $
-                result";
-            return 1;
-            fi 
+            if which rsync &>>/dev/null; then 
+                rsync -avzh --inplace --quiet --ignore-errors ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1  && _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR} - successful";
+                local result=$?;
+                if [ $result -ne 0 ]; then
+                    writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR} (probably because of unsufficient disk space). rsync exit code is $
+result";
+                    return 1;
+                fi    
+            else
+                cp -rf ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1  && _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR}";
+                if [ $? -ne 0 ]; then
+                    writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR}";
+                    return 1;
+                fi
+            fi
         fi
         J_OLD_PROJECT_NAME="${PROJECT_NAME}";
         PROJECT_NAME="${NEXT_DIR}"
