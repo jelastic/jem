@@ -370,7 +370,7 @@ function netfilterStart() {
     # process input chain NAT
     for port in ${redirPorts[@]} ; do
         local ruleParams=($($SED 's/:/ /g' <<< ${port}));
-        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME ${ruleParams[0],,} ip saddr ${ruleParams[1]} ip daddr ${ruleParams[2]} tcp dport ${ruleParams[3]} counter ${ruleParams[5],,} to ${ruleParams[4]}
+        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME ${ruleParams[0]^^} ip saddr ${ruleParams[1]} ip daddr ${ruleParams[2]} tcp dport ${ruleParams[3]} counter ${ruleParams[5],,} to ${ruleParams[4]}
     done;
 
     if [ -f "$FW_JELASTIC_STATIC_RULES_FILE" ] ; then
