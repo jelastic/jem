@@ -200,7 +200,9 @@ addRule() {
     chain="${7^^}"
     dport="${4,,}"
     src="${5,,}"
+    src=${src/ALL/0.0.0.0\/0}
     dst="${6,,}"
+    dst=${dst/ALL/0.0.0.0\/0}
     raction="${9,,}"
     tcptype="${8^^}"
     if [ "x$tcptype" == "xIPV4" ] ; then
