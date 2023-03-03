@@ -34,8 +34,11 @@ FW_NAT_PREROUTING_CHAIN="PREROUTING"
 #valid values are: ip,ip6,inet
 FW_DEFAULT_TABLE_TYPE='ip'
 
+FW_V4_TABLE="ip"
+FW_V6_TABLE="ip6"
+
 #valid values accept,drop
-FW_DEFAULT_POLICY='accept'
+FW_DEFAULT_POLICY='drop'
 FW_JELASTIC_INIT_FILE="/etc/nftables/jelastic.nft"
 FW_RULESET_FILE="/etc/nftables/main.nft"
 FW_JELASTIC_CUSTOM_RULES_FILE="/etc/nftables/jelastic-custom.nft"
@@ -113,6 +116,7 @@ chainExists() {
 
 #create required tables with checks
 #used for isolation init
+#here is only V4 tables because isolation is not support V6
 initTablesCheck() {
     #check filter table
     if ! tableExists $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME ; then
@@ -169,13 +173,25 @@ initTablesCheck() {
 }
 
 initTables() {
-    echo "add table $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  { type filter hook input priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_FORWARD_CHAIN   { type filter hook forward priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_OUTPUT_CHAIN   { type filter hook output priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
-    echo "add table $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN  { type nat hook prerouting priority -100 ; }"
-    echo "add chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN   { type nat hook postrouting priority 100 ; }"
+    #default firewall policy applied only for INPUT chains. FORWARD and OUTPUT always have "accept policy"
+
+    ## IPv4 tables
+    echo "add table $FW_V4_TABLE $FW_FILTER_TABLE_NAME"
+    echo "add chain $FW_V4_TABLE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  { type filter hook input priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
+    echo "add chain $FW_V4_TABLE $FW_FILTER_TABLE_NAME $FW_FILTER_FORWARD_CHAIN   { type filter hook forward priority 0 ;   policy accept ; }"
+    echo "add chain $FW_V4_TABLE $FW_FILTER_TABLE_NAME $FW_FILTER_OUTPUT_CHAIN   { type filter hook output priority 0 ;   policy accept ; }"
+    echo "add table $FW_V4_TABLE $FW_NAT_TABLE_NAME"
+    echo "add chain $FW_V4_TABLE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN  { type nat hook prerouting priority -100 ; }"
+    echo "add chain $FW_V4_TABLE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN   { type nat hook postrouting priority 100 ; }"
+
+    ## IPv6 tables
+    echo "add table $FW_V6_TABLE $FW_FILTER_TABLE_NAME"
+    echo "add chain $FW_V6_TABLE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  { type filter hook input priority 0 ;   policy $FW_DEFAULT_POLICY ; }"
+    echo "add chain $FW_V6_TABLE $FW_FILTER_TABLE_NAME $FW_FILTER_FORWARD_CHAIN   { type filter hook forward priority 0 ;   policy accept ; }"
+    echo "add chain $FW_V6_TABLE $FW_FILTER_TABLE_NAME $FW_FILTER_OUTPUT_CHAIN   { type filter hook output priority 0 ;   policy accept ; }"
+    echo "add table $FW_V6_TABLE $FW_NAT_TABLE_NAME"
+    echo "add chain $FW_V6_TABLE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN  { type nat hook prerouting priority -100 ; }"
+    echo "add chain $FW_V6_TABLE $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN   { type nat hook postrouting priority 100 ; }"
 }
 
 _doInitTables() {
@@ -197,6 +213,8 @@ addRule() {
         protos=($protos)
     fi
 
+    local filter_tt=$FW_DEFAULT_TABLE_TYPE
+
     chain="${7^^}"
     dport="${4,,}"
     src="${5^^}"
@@ -209,6 +227,9 @@ addRule() {
         tcptype="ip"
     else
         tcptype="ip6"
+        src=${src/0.0.0.0\/0/::\/0}
+        dst=${dst/0.0.0.0\/0/::\/0}
+        filter_tt="ip6"
     fi
 
     # command can be add, insert, delete. default add
@@ -236,7 +257,7 @@ addRule() {
         fi
     fi
 
-    #destibation address
+    #destination address
     if [ "x$dst" != "x" ] ; then
         if grep -q '!' <<< $dst ; then
             dst=${dst//'!'/}
@@ -247,7 +268,7 @@ addRule() {
     fi
 
     for proto in ${protos[@]} ; do
-
+        p=""
         ptype="${3,,}"
         if [ "x$ptype" == "xrange" ] ; then
             #proto should be specified
@@ -263,10 +284,12 @@ addRule() {
         else
             if [ "x$dport" != "x" ] ; then
                 dp="$proto dport $dport"
+            else
+                p="ip protocol $proto"
             fi
         fi
 
-        echo "$cmd rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $chain $src $dst $dp counter $raction"
+        echo "$cmd rule $filter_tt $FW_FILTER_TABLE_NAME $chain $p $src $dst $dp counter $raction"
     done
 }
 
