@@ -217,79 +217,90 @@ addRule() {
 
     chain="${7^^}"
     dport="${4,,}"
-    src="${5^^}"
-    src=${src/ALL/0.0.0.0\/0}
-    dst="${6^^}"
-    dst=${dst/ALL/0.0.0.0\/0}
     raction="${9,,}"
     tcptype="${8^^}"
-    if [ "x$tcptype" == "xIPV4" ] ; then
-        tcptype="ip"
+
+    if [ "x$tcptype" == "xALL" ] ; then
+        ttype=('IPV4' 'IPV6')
     else
-        tcptype="ip6"
-        src=${src/0.0.0.0\/0/::\/0}
-        dst=${dst/0.0.0.0\/0/::\/0}
-        filter_tt="ip6"
+        ttype=($tcptype)
     fi
 
-    # command can be add, insert, delete. default add
-    cmd="${1,,}"
-    if [ "x$cmd" != "x" ] ; then
-        case $cmd in
-            i)
-                cmd="insert"
-                ;;
-            a)
-                cmd="add"
-                ;;
-        esac
-    else
-        cmd="add"
-    fi
+    for tcptype in ${ttype[@]} ; do
+        src="${5^^}"
+        src=${src/ALL/0.0.0.0\/0}
+        dst="${6^^}"
+        dst=${dst/ALL/0.0.0.0\/0}
 
-    #source address
-    if [ "x$src" != "x" ] ; then
-        if grep -q '!' <<< $src ; then
-            src=${src//'!'/}
-            src="$tcptype saddr != $src"
+        if [ "x$tcptype" == "xIPV4" ] ; then
+            tcptype="ip"
         else
-            src="$tcptype saddr $src"
+            tcptype="ip6"
+            src=${src/0.0.0.0\/0/::\/0}
+            dst=${dst/0.0.0.0\/0/::\/0}
+            filter_tt="ip6"
         fi
-    fi
 
-    #destination address
-    if [ "x$dst" != "x" ] ; then
-        if grep -q '!' <<< $dst ; then
-            dst=${dst//'!'/}
-            dst="$tcptype daddr != $dst"
+        # command can be add, insert, delete. default add
+        cmd="${1,,}"
+        if [ "x$cmd" != "x" ] ; then
+            case $cmd in
+                i)
+                    cmd="insert"
+                    ;;
+                a)
+                    cmd="add"
+                    ;;
+                esac
         else
-            dst="$tcptype daddr $dst"
+            cmd="add"
         fi
-    fi
 
-    for proto in ${protos[@]} ; do
-        p=""
-        ptype="${3,,}"
-        if [ "x$ptype" == "xrange" ] ; then
-            #proto should be specified
-            if [ "x$proto" == "x" ] ; then
-                return 2
-            fi
-
-            if [ "x$dport" != "x" ] ; then
-                #replace : to -
-                dp=${dport/:/-}
-                dp="$proto dport { $dp}"
-            fi
-        else
-            if [ "x$dport" != "x" ] ; then
-                dp="$proto dport $dport"
+        #source address
+        if [ "x$src" != "x" ] ; then
+            if grep -q '!' <<< $src ; then
+                src=${src//'!'/}
+                src="$tcptype saddr != $src"
             else
-                p="ip protocol $proto"
+                src="$tcptype saddr $src"
             fi
         fi
 
-        echo "$cmd rule $filter_tt $FW_FILTER_TABLE_NAME $chain $p $src $dst $dp counter $raction"
+        #destination address
+        if [ "x$dst" != "x" ] ; then
+            if grep -q '!' <<< $dst ; then
+                dst=${dst//'!'/}
+                dst="$tcptype daddr != $dst"
+            else
+                dst="$tcptype daddr $dst"
+            fi
+        fi
+
+        for proto in ${protos[@]} ; do
+            p=""
+            dp=""
+            ptype="${3,,}"
+            if [ "x$ptype" == "xrange" ] ; then
+                #proto should be specified
+                if [ "x$proto" == "x" ] ; then
+                    return 2
+                fi
+
+                if [ "x$dport" != "x" ] ; then
+                    #replace : to -
+                    dp=${dport/:/-}
+                    dp="$proto dport { $dp}"
+                fi
+            else
+                if [ "x$dport" != "x" ] ; then
+                    dp="$proto dport $dport"
+                else
+                    p="meta l4proto $proto"
+                fi
+            fi
+
+            echo "$cmd rule $filter_tt $FW_FILTER_TABLE_NAME $chain $p $src $dst $dp counter $raction"
+        done
     done
 }
 
@@ -436,6 +447,7 @@ function netfilterStart() {
 function netfilterEnable() {
     systemctl disable firewalld &> $JEM_CALLS_LOG
     systemctl enable nftables &> $JEM_CALLS_LOG
+    systemctl start nftables &> $JEM_CALLS_LOG
 
     [[ -e "/etc/sysconfig/nftables.conf" ]] && sed -i -e 's|#include "/etc/nftables/main.nft"|include "/etc/nftables/main.nft"|' "/etc/sysconfig/nftables.conf"
 
