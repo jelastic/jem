@@ -359,8 +359,8 @@ function processnfs() {
     fi
 
     if ! preparePath "${_DESTINATION}" "${_CTID}" ; then
-        echo "Can not create path ${_DESTINATION}"
-        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Can not create path ${_DESTINATION}. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+        echo "Cannot create path ${_DESTINATION}"
+        echo "echo `date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID : Cannot create path ${_DESTINATION}. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1
     fi
 
@@ -458,11 +458,11 @@ function processlocal() {
     fi
 
     if ! preparePath "${_DESTINATION}" 1 ; then
-        echo "Can not create path ${_DESTINATION}"
+        echo "Cannot create path ${_DESTINATION}"
         return 1
     fi
     if ! preparePath "${sourceMount}" 1 ; then
-        echo "Can not create path ${sourceMount}"
+        echo "Cannot create path ${sourceMount}"
         return 1
     fi
 
@@ -532,7 +532,7 @@ function doRemount() {
 
 function dosetupUtils() {
     if ! isContainerRunning $CTID ; then
-        writeJSONResponseErr "result=>4110" "message=>Can not execute command. Container is not running"
+        writeJSONResponseErr "result=>4110" "message=>Cannot execute command. Container is not running"
         return 1
     fi
 

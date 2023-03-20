@@ -112,7 +112,7 @@ function doExec2() {
     if isContainerRunning $CTID ; then
         doExec3
     else
-        writeJSONResponseErr "result=>4110" "message=>Can not execute command. Container is not running"
+        writeJSONResponseErr "result=>4110" "message=>Cannot execute command. Container is not running"
     fi
 }
 
