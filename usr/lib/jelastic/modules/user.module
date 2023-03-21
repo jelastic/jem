@@ -76,7 +76,7 @@ function groupId(){
 	local group=${1};
 	unset _response_GUID;
 	log "groupId: ${group}";
-	[ -z "$group" ] && {  writeJSONResponseErr "result=>4027" "message=>Can not get GUID!"; die -q; };
+	[ -z "$group" ] && {  writeJSONResponseErr "result=>4027" "message=>Cannot get GUID!"; die -q; };
 	checkGroupExists "${group}";
 	[ "$_GROUP_EXISTS" -ne 0 ] && {
 		log "Adding group ${group}";
@@ -152,11 +152,11 @@ function __injected_not_vds_add() {
         DATA_OWNER="$(vzexecGetLastStdOut | $SED -rn 's/.*["]data_owner["]:[[:blank:]]*["]([^"]+)["].*/\1/p')"
         _UID=${DATA_OWNER/:*}
         _GUID=${DATA_OWNER/*:}
-        [ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
+        [ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Cannot get UID!"; die -q; };
         if [ "x${COMPUTE_TYPE}" == "xgate" ] ;then
             return 0;
         fi
-        bashRestricts 2>>"$JEM_CALLS_LOG" && vzexecGetLastStdOut && return 0 || { writeJSONResponseErr "result=>4119" "message=>Can not fix user rights"; return 4119; }
+        bashRestricts 2>>"$JEM_CALLS_LOG" && vzexecGetLastStdOut && return 0 || { writeJSONResponseErr "result=>4119" "message=>Cannot fix user rights"; return 4119; }
     else
         writeJSONResponseErr "result=>4045" "message=>${vzexecGetLastStdErr}"
     fi
@@ -207,7 +207,7 @@ function preAddCallback(){
             waitCT=$((waitCT-1))
             sleep 0.5
             if [[ $waitCT == 0 ]]; then
-                writeJSONResponseErr "result=>4110" "message=>Can not execute command. Container is not running" ;
+                writeJSONResponseErr "result=>4110" "message=>Cannot execute command. Container is not running" ;
                 die -q;
             fi
             isContainerRunning ${_CTID} ; running=$?
@@ -239,8 +239,8 @@ function preAddCallback(){
         fi
     fi
 
-    isFunction "getAppUserInfo" && { log "Call getAppUserInfo"; "getAppUserInfo" "${_USER_NAME}"; } || {  writeJSONResponseErr "result=>4048" "message=>Can not get user info!"; die -q; };
-    [ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
+    isFunction "getAppUserInfo" && { log "Call getAppUserInfo"; "getAppUserInfo" "${_USER_NAME}"; } || {  writeJSONResponseErr "result=>4048" "message=>Cannot get user info!"; die -q; };
+    [ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Cannot get UID!"; die -q; };
 }
 
 function doAdd() {
@@ -248,10 +248,10 @@ function doAdd() {
 	log "detected group id $_GUID";
 	#check jelastic-ssh group and add if not exists
 
-	[ -z "${_UID}" ]  && { log "Can not get UID"; writeJSONResponseErr "result=>4026" "message=>Can not get UID!"; die -q; };
-	[ -z "${_GUID}" ]  && { log "Can not get GUID";  writeJSONResponseErr "result=>4027" "message=>Can not get GUID!"; die -q; };
-	[ -z "${_homedir}" ] && { log "Can not get homedir";  writeJSONResponseErr "result=>4025" "message=>Can not get homedir!"; die -q; };
-	[ -z "${_USER_NAME}" ] && { log "Can not get user name";  writeJSONResponseErr "result=>4024" "message=>Can not get user name!"; die -q; };
+	[ -z "${_UID}" ]  && { log "Cannot get UID"; writeJSONResponseErr "result=>4026" "message=>Cannot get UID!"; die -q; };
+	[ -z "${_GUID}" ]  && { log "Cannot get GUID";  writeJSONResponseErr "result=>4027" "message=>Cannot get GUID!"; die -q; };
+	[ -z "${_homedir}" ] && { log "Cannot get homedir";  writeJSONResponseErr "result=>4025" "message=>Cannot get homedir!"; die -q; };
+	[ -z "${_USER_NAME}" ] && { log "Cannot get user name";  writeJSONResponseErr "result=>4024" "message=>Cannot get user name!"; die -q; };
 
 	checkUserExists "${_USER_NAME}";
 	[ ${_USER_EXISTS} -ne 0 ] && {
