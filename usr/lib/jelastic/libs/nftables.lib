@@ -334,7 +334,7 @@ function saveCurrentRules() {
 }
 
 function netfilterStart() {
-    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Starting firewall"
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Starting firewall" >>$JEM_CALLS_LOG
 
     #making backup of current rules
     [ ! -d "/etc/jelastic" ] && mkdir -p "/etc/jelastic" 2>>$JEM_CALLS_LOG
