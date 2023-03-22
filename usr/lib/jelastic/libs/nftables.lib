@@ -38,7 +38,7 @@ FW_V4_TABLE="ip"
 FW_V6_TABLE="ip6"
 
 #valid values accept,drop
-FW_DEFAULT_POLICY='drop'
+FW_DEFAULT_POLICY='accept'
 FW_JELASTIC_INIT_FILE="/etc/nftables/jelastic.nft"
 FW_RULESET_FILE="/etc/nftables/main.nft"
 FW_JELASTIC_CUSTOM_RULES_FILE="/etc/nftables/jelastic-custom.nft"
@@ -439,9 +439,8 @@ function netfilterStart() {
     nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  iifname "lo" counter accept
     nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ct state related,established  counter accept
 
-    nft add rule ip filter INPUT counter reject with icmp type host-prohibited
-    #TODO:
-    #checkRule "INPUT" "-j REJECT --reject-with icmp-host-prohibited" || $IPTABLES -A INPUT -j REJECT --reject-with icmp-host-prohibited
+
+    nft -a list chain ip filter INPUT | grep -q "reject with icmp type host-prohibited" || nft add rule ip filter INPUT counter reject with icmp type host-prohibited
 }
 
 function netfilterEnable() {
