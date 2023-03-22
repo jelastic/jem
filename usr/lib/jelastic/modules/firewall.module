@@ -434,7 +434,6 @@ function doDisable() {
     if $GREP -q "FIREWALL_ENABLED" ${META_FILE} ; then
         $SED -i -re "s/FIREWALL_ENABLED=([0-9]+)/FIREWALL_ENABLED=0/g" ${META_FILE};
     fi
-    echo "Firewall disabled"
     _setDefaultPolicy "ACCEPT"
     _saveCurrentRules
     writeJSONResponseOut "result=>0" "message=>Firewall has been disabled"

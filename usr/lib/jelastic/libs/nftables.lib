@@ -445,13 +445,13 @@ function netfilterStart() {
 }
 
 function netfilterEnable() {
-    systemctl disable firewalld &> $JEM_CALLS_LOG
-    systemctl enable nftables &> $JEM_CALLS_LOG
-    systemctl start nftables &> $JEM_CALLS_LOG
+    systemctl disable firewalld &>> $JEM_CALLS_LOG
+    systemctl enable nftables &>> $JEM_CALLS_LOG
+    systemctl start nftables &>> $JEM_CALLS_LOG
 
     [[ -e "/etc/sysconfig/nftables.conf" ]] && sed -i -e 's|#include "/etc/nftables/main.nft"|include "/etc/nftables/main.nft"|' "/etc/sysconfig/nftables.conf"
 
-    nft -f "$FW_JELASTIC_INIT_FILE" &> $JEM_CALLS_LOG
+    nft -f "$FW_JELASTIC_INIT_FILE" &>> $JEM_CALLS_LOG
 }
 
 # global variable RULES required see firewall.module
