@@ -326,18 +326,22 @@ function doUpdate(){
                 chown -R ${DATA_OWNER} ${WEBROOT}/${CURRENT_DIR};
             fi
             if which rsync &>>/dev/null; then 
-                rsync -avzh --inplace --quiet --ignore-errors ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1  && _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR} - successful";
+                rsync -alrp --inplace --quiet --ignore-errors ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1;
                 local result=$?;
                 if [ $result -ne 0 ]; then
-                    writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR} (probably because of unsufficient disk space). rsync exit code is $
-result";
+                    writeJSONResponseErr "result=>4075" "message=>Rsync error code $result (probably because of unsufficient disk space)" && _deployLog "Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR} (probably beca
+use of unsufficient disk space). rsync exit code is $result";
                     return 1;
+                else
+                    _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR} - successful";
                 fi    
             else
-                cp -rf ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1  && _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR}";
+                cp -rf ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1;
                 if [ $? -ne 0 ]; then
                     writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR}";
                     return 1;
+                else
+                    _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR}"
                 fi
             fi
         fi
