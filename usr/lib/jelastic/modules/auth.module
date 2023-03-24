@@ -453,11 +453,9 @@ function _addNativeip() {
     local running
     local _createPath=1
     local _isFUSE=0
-    local _UUID=""
     local _done=0
     local _version=$_NFS_VERSION
     local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
-
 
     isContainerRunning ${CTID} ; running=$?
     if [[ $running -ne 0 ]] ; then
@@ -476,7 +474,6 @@ function _addNativeip() {
     local computetype="$( [ -e "$_metainf" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "$_metainf")"
     if [[ "xstorage" == "x$computetype" ]] ; then
         _version=4
-        _UUID=$(cat /proc/sys/kernel/random/uuid)
         if isContainerRunning ${CTID} ; then
             if vzexecRun "grep -q \" $destinationPath fuse\" /proc/mounts" ; then
                 _createPath=0
@@ -549,7 +546,11 @@ function _addNativeip() {
             [[ "x${accessMode}" == "xro" ]] && DEFAULTEXPORTOPT=$($SED -re 's/,rw,/,ro,/g' <<< $DEFAULTEXPORTOPT)
             _opts="$DEFAULTEXPORTOPT"
             if [[ $_version -eq 4 ]] ; then
-                [[ ! -z "$_UUID" ]] && _opts="$DEFAULTEXPORTOPT,fsid=$_UUID"
+                if [ -z "$_UUID" ] ; then
+                    local pathID=$(md5sum <<< "$i:$destinationPath" | cut -d' ' -f1 ) # md5sum of <ipaddress of client>:<path>
+                    _UUID="${pathID::8}-${pathID:8:4}-${pathID:12:4}-${pathID:16:4}-${pathID:20:12}"
+                fi
+                _opts="$DEFAULTEXPORTOPT,fsid=$_UUID"
             fi
 
             if [[ $running -ne 0 ]] ; then
