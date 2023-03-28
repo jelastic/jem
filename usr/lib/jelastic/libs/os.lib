@@ -341,7 +341,7 @@ function installPackageCmd() {
         debian|ubuntu|kali)
                 PM="DEBIAN_FRONTEND=noninteractive apt-get -y --allow-unauthenticated -o Dpkg::Options::=\"--force-confold\""
             ;;
-        centos|redhat|fedora)
+        centos|redhat|fedora|almalinux)
                 PM="yum -y"
             ;;
         alpine)
