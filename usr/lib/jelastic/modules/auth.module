@@ -165,7 +165,7 @@ function dosetupUtils() {
     OS_ver=$(getOSVersion "$issue_string")
     OS_ver=${OS_ver%%.*}
 
-    if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" ] ; then
+    if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xalmalinux" ] ; then
         addPackages="libtirpc"
         [[ "$OS_ver" -eq "7" ]] && addPackages="$addPackages nfs-utils"
     elif [ "x$OS" == "xdebian" -o "x$OS" == "xubuntu" ] ; then
