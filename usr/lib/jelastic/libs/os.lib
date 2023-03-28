@@ -368,7 +368,7 @@ function checkPackageCmd() {
         debian|ubuntu|kali)
             ltpl='dpkg -s %s >/dev/null 2>&1 || echo "%s" ;'
             ;;
-        centos|redhat|fedora|suse)
+        centos|redhat|fedora|suse|almalinux)
             ltpl='rpm -q %s >/dev/null 2>&1 || echo "%s" ;'
             ;;
         alpine)
