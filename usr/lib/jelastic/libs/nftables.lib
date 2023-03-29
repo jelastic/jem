@@ -305,8 +305,6 @@ addRule() {
 }
 
 function netfilterStop() {
-    [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
-
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction flushing ruleset" >>$JEM_CALLS_LOG
     nft flush ruleset
 
