@@ -306,14 +306,14 @@ addRule() {
 
 function netfilterStop() {
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction flushing ruleset" >>$JEM_CALLS_LOG
-    nft flush ruleset
+    nft flush ruleset 2>>$JEM_CALLS_LOG
 
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction generating default ruleset" >>$JEM_CALLS_LOG
     local rulesFile=$(mktemp)
     putShabang > $rulesFile
     initTables >> $rulesFile
     nft -f $rulesFile 2>> $JEM_CALLS_LOG
-    rm $rulesFile
+    rm $rulesFile 2>>$JEM_CALLS_LOG
 
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction default ruleset applied" >>$JEM_CALLS_LOG
 
@@ -413,7 +413,7 @@ function netfilterStart() {
     # process input chain NAT
     for port in ${redirPorts[@]} ; do
         local ruleParams=($($SED 's/:/ /g' <<< ${port}));
-        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME ${ruleParams[0]^^} ip saddr ${ruleParams[1]} ip daddr ${ruleParams[2]} tcp dport ${ruleParams[3]} counter ${ruleParams[5],,} to ${ruleParams[4]}
+        nft add rule $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME ${ruleParams[0]^^} ip saddr ${ruleParams[1]} ip daddr ${ruleParams[2]} tcp dport ${ruleParams[3]} counter ${ruleParams[5],,} to ${ruleParams[4]} 2>>$JEM_CALLS_LOG
     done;
 
     if [ -f "$FW_JELASTIC_STATIC_RULES_FILE" ] ; then
@@ -439,15 +439,15 @@ function netfilterStart() {
     fi
 
     if [ -f /proc/net/if_inet6 ] ; then
-        nft insert rule $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN $FW_DEFAULT_TABLE_TYPE protocol ipv6-icmp counter accept
+        nft insert rule $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN $FW_DEFAULT_TABLE_TYPE protocol ipv6-icmp counter accept 2>>$JEM_CALLS_LOG
     fi
 
-    nft insert rule $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN $FW_DEFAULT_TABLE_TYPE protocol icmp counter accept
-    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  iifname "lo" counter accept
-    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ct state related,established  counter accept
+    nft insert rule $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN $FW_DEFAULT_TABLE_TYPE protocol icmp counter accept 2>>$JEM_CALLS_LOG
+    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  iifname "lo" counter accept 2>>$JEM_CALLS_LOG
+    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ct state related,established  counter accept 2>>$JEM_CALLS_LOG
 
 
-    nft -a list chain ip filter INPUT | grep -q "reject with icmp type host-prohibited" || nft add rule ip filter INPUT counter reject with icmp type host-prohibited
+    nft -a list chain ip filter INPUT | grep -q "reject with icmp type host-prohibited" || nft add rule ip filter INPUT counter reject with icmp type host-prohibited 2>>$JEM_CALLS_LOG
 }
 
 function netfilterEnable() {
@@ -457,7 +457,21 @@ function netfilterEnable() {
 
     [[ -e "/etc/sysconfig/nftables.conf" ]] && sed -i -e 's|#include "/etc/nftables/main.nft"|include "/etc/nftables/main.nft"|' "/etc/sysconfig/nftables.conf"
 
-    nft -f "$FW_JELASTIC_INIT_FILE" &>> $JEM_CALLS_LOG
+    if [ -f "$FW_JELASTIC_INIT_FILE" ] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
+        nft -f "$FW_JELASTIC_INIT_FILE" &>> $JEM_CALLS_LOG
+    fi
+
+    if [ -f "$FW_JELASTIC_STATIC_RULES_FILE" ] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+        nft -c -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+        if [[ $? -gt 0 ]] ; then
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Static netfilter rules not loaded due to errors in $FW_JELASTIC_STATIC_RULES_FILE. See logs for details" >>$JEM_CALLS_LOG
+        else
+            nft -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction rules loaded" >>$JEM_CALLS_LOG
+        fi
+    fi
 }
 
 # global variable RULES required see firewall.module
