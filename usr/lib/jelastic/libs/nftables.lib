@@ -318,6 +318,7 @@ function netfilterStop() {
     local rulesFile=$(mktemp)
     putShabang > $rulesFile
     initTables >> $rulesFile
+    echo "insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ct state related,established counter accept" >> $rulesFile
     nft -f $rulesFile 2>> $JEM_CALLS_LOG
     rm $rulesFile 2>>$JEM_CALLS_LOG
 
