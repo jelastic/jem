@@ -446,7 +446,7 @@ function netfilterStart() {
     fi
 
     if [ -f /proc/net/if_inet6 ] ; then
-        nft insert rule $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN $FW_DEFAULT_TABLE_TYPE protocol ipv6-icmp counter accept 2>>$JEM_CALLS_LOG
+        nft insert rule $FW_V6_TABLE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN meta l4proto ipv6-icmp accept 2>>$JEM_CALLS_LOG
     fi
 
     nft insert rule $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN $FW_DEFAULT_TABLE_TYPE protocol icmp counter accept 2>>$JEM_CALLS_LOG
