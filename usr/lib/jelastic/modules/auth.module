@@ -212,6 +212,8 @@ function dosetupUtils() {
 
     if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] ; then
         VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/deb/22.04/unfsd_0.9.23.deb"
+    elif [ "x$OS" == "xalmalinux" -a "$OS_ver" -eq "9" ] ; then
+            VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/rpm/unfsd-0.9.23-1.el9.x86_64.rpm"
     else
         $TAR hzxf "$MOUNTPACKAGE" -C "$VZ_CTID_ROOT/"
     fi
@@ -227,6 +229,8 @@ function dosetupUtils() {
 
         if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] ; then
             VEExecRun "dpkg --install ./unfsd_0.9.23.deb && rm ./unfsd_0.9.23.deb"
+        elif [ "x$OS" == "xalmalinux" -a "$OS_ver" -eq "9" ] ; then
+            VEExecRun "rpm -i ./unfsd-0.9.23-1.el9.x86_64.rpm && rm ./unfsd-0.9.23-1.el9.x86_64.rpm"
         fi
 
         vzexecRun "eval $checkCmd"
