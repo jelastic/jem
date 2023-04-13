@@ -454,3 +454,31 @@ getOutgoingIp(){
     [[ ! -z "$EXTERNAL_IP" ]] && isValidIP "$EXTERNAL_IP" && { echo "$EXTERNAL_IP"; return 0; }
     { writeJSONResponseErr "result=>4212" "message=>Failed to get external IP" ; return 99; }
 }
+
+detectFirewallBackend() {
+    if [ -z "$DISTRIBUTION_NAME" ] ; then
+        DISTRIBUTION_NAME=$(detectOS "$1")
+    fi
+
+    if [ -z "$DISTRIBUTION_VERSION" ] ; then
+        DISTRIBUTION_VERSION=$(getOSVersion "$1")
+    fi
+    DISTRIBUTION_VERSION=${DISTRIBUTION_VERSION%%.*}
+
+    if [ "x${DISTRIBUTION_NAME,,}" == "xalmalinux" -a "$DISTRIBUTION_VERSION" -ge 9 ] ; then
+        echo "nftables"
+        return 0
+    fi
+
+    vzexecRun "which nft"
+    if [ ! -z "$(vzexecGetLastStdOut)" ] ; then
+        vzexecRun "nft list ruleset"
+        if [ ! -z "$(vzexecGetLastStdOut)" ] ; then
+            echo "nftables"
+            return 0
+        fi
+    fi
+
+    echo "iptables"
+    return 0
+}
