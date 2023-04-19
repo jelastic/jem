@@ -144,7 +144,7 @@ function onModLoadCallback() {
         local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
         issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
 
-        VAP_FIREWALL_BACKEND=$( detectBackend "$issue_string" )
+        VAP_FIREWALL_BACKEND=$( detectFirewallBackend "$issue_string" )
     fi
 }
 
