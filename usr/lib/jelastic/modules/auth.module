@@ -280,9 +280,9 @@ function gatherCTInfo() {
 
     _ctExportsFile="$(vzexecRun "[[ -e $CONTAINER_EXPORTS_FILE ]] && cat $CONTAINER_EXPORTS_FILE || echo \"$CONTAINER_EXPORTS_FILE not found\""; vzexecGetLastStdOut)"
     if [ "x$VAP_FIREWALL_BACKEND" == "xiptables" ] ; then
-        _ctFirewallRules="$(vzexecRun "nft list ruleset"; vzexecGetLastStdOut)"
-    else
         _ctFirewallRules="$(vzexecRun "iptables -S"; vzexecGetLastStdOut)"
+    else
+        _ctFirewallRules="$(vzexecRun "nft list ruleset"; vzexecGetLastStdOut)"
     fi
     _ctIpInfo="$(vzexecRun "ip a l; ip r l" ; vzexecGetLastStdOut)"
 
