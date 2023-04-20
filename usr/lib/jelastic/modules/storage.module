@@ -418,8 +418,8 @@ function processnfs() {
     fi
 
     if ! preparePath "${_DESTINATION}" "${VEID}" ; then
-        echo "Can not create path ${_DESTINATION}"
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Can not create path ${_DESTINATION}. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
+        echo "Cannot create path ${_DESTINATION}"
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Cannot create path ${_DESTINATION}. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
         return 1
     fi
 
@@ -533,14 +533,13 @@ function processgluster() {
     else
         if ! checkUtils $CTID ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - container is not running. Missing utilities" >> $JEM_CALLS_LOG
-            writeJSONResponseErr "result=>4207" "message=>Can not setup gluster native client. Container is stopped"
+            writeJSONResponseErr "result=>4207" "message=>Cannot setup gluster native client. Container is stopped"
             return 2
         fi
     fi
 
     local sourceMountUnEsc=$(sed -re 's/\\(\/|\(|\)|\]|\[|\\)/\1/g' <<< "$sourceMount")
     local destinationEsc=$(sed -re 's/\s/\\\\040/g' <<< "$_DESTINATION" )
-    local running
 
     [[ ! -z "$VEID" ]] && {
         MOUNTS_STORAGE="${VE_ROOT}${CONTAINER_MOUNTS_STORAGE}"
@@ -553,7 +552,7 @@ function processgluster() {
 
     if [[ "x$VZ_VEID_OS" == "xalpine" ]] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Alpine Linux detected. Glusterfs is not supported for it" >> $JEM_CALLS_LOG
-        writeJSONResponseErr "result=>4207" "message=>Can not setup gluster native client"
+        writeJSONResponseErr "result=>4207" "message=>Cannot setup gluster native client"
         return 2
     fi
 
@@ -567,8 +566,8 @@ function processgluster() {
     #cmdRegisterMount="echo -e \"$mntEntry\" >> $MOUNTS_STORAGE"
 
     if ! preparePath "$_DESTINATION" "$VEID" ; then
-        echo "Can not create path $_DESTINATION"
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Can not create path $_DESTINATION. $(gatherCTInfo)" >> $JEM_CALLS_LOG
+        echo "Cannot create path $_DESTINATION"
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Cannot create path $_DESTINATION. $(gatherCTInfo)" >> $JEM_CALLS_LOG
         return 1
     fi
 
@@ -651,11 +650,11 @@ function processlocal() {
     fi
 
     if ! preparePath "${_DESTINATION}" 1 ; then
-        echo "Can not create path ${_DESTINATION}"
+        echo "Cannot create path ${_DESTINATION}"
         return 1
     fi
     if ! preparePath "${sourceMount}" 1 ; then
-        echo "Can not create path ${sourceMount}"
+        echo "Cannot create path ${sourceMount}"
         return 1
     fi
 
@@ -732,7 +731,7 @@ function doRemount() {
 
 function dosetupUtils() {
     if ! isVERunning ${VEID} ; then
-        writeJSONResponseErr "result=>4110" "message=>Can not execute command. Container is not running"
+        writeJSONResponseErr "result=>4110" "message=>Cannot execute command. Container is not running"
         return 1
     fi
 
@@ -800,7 +799,7 @@ function dosetupUtils() {
             installCmd="$(installPackageCmd $OS install nfs-common)"
             checkCmd=$(checkPackageCmd $OS autofs nfs-common)
         fi
-    elif [ "x$OS" == "xcentos" ] ; then
+    elif [[ "$OS" == "centos" || "$OS" == "almalinux" ]] ; then
         if [ "$OS_ver" -eq "8" ]; then
             _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el8.x86_64.rpm"
         fi

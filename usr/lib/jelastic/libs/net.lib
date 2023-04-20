@@ -362,3 +362,11 @@ function inSubnet {
     echo "${rval}"
 }
 
+function detect_http_protocol(){
+   #jelastic.user.requests.ssl.redirect.enabled
+   : ${1:?"Missing param: URL"};
+   local URL="$1"
+   URL=$(sed  -r 's@^http[s]?://@@' <<< $URL)
+   HTTP_PROTOCOL=$(curl -Is http://${URL} | sed -rn 's/^Location:[[:blank:]]+(http[s]?):.*/\1/p')
+   HTTP_PROTOCOL=${HTTP_PROTOCOL:-http}
+}

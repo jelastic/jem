@@ -22,6 +22,8 @@ $PROGRAM 'id';
 $PROGRAM 'awk';
 $PROGRAM 'ssh-keygen';
 
+_DEFAULT_COMMENT="Warning:_Deleting_this_default_SSH_key_may_break_SSH_access_to_the_container"
+
 function fixRights(){
     chown root:root -R /usr/lib/jelastic 2>>"$JEM_CALLS_LOG";
 #    chown root:root -R /var/lib/jelastic ;
@@ -32,7 +34,7 @@ function fixRights(){
 #    chmod 500 /usr/lib/jelastic/libs 2>>"$JEM_CALLS_LOG";
 #    chmod 500 /usr/lib/jelastic/modules 2>>"$JEM_CALLS_LOG";
 #    chmod 500 /usr/lib/jelastic/tpls 2>>"$JEM_CALLS_LOG";
-    chmod 665 /var/log 2>>"$JEM_CALLS_LOG";
+    chmod 775 /var/log 2>>"$JEM_CALLS_LOG";
     chmod 777 /var/log/jem.log 2>>"$JEM_CALLS_LOG";
     [ -f /etc/logrotate.d/jelastic ] && chmod 644 /etc/logrotate.d/jelastic 2>>"$JEM_CALLS_LOG";
     chmod 777 /var/run 2>>"$JEM_CALLS_LOG";
@@ -148,7 +150,7 @@ function postAddReform(){
     log "User key file ${keyfile}";
     [[ "x${_REGENERATE_KEY}" == "xyes" ]] && {
             if [ -f "${keyfile}" ] ; then
-                    tmpauthkey=$($SSH_KEYGEN -y -f $keyfile | $SED 's/\//\\\//g');
+                    tmpauthkey="$($SSH_KEYGEN -y -f $keyfile | $SED 's/\//\\\//g') $_DEFAULT_COMMENT"
                     [ -f "$_User_AuthorizedKeysFile" ] && { $SED -i /"$tmpauthkey"/d "$_User_AuthorizedKeysFile"; }
                     [ -f "$_AuthorizedKeysFile" ] && { $SED -i /"$tmpauthkey"/d "$_AuthorizedKeysFile"; }
 
@@ -157,7 +159,7 @@ function postAddReform(){
 
     }
     [ ! -f "${keyfile}" ] && {
-            response=$(${SSH_KEYGEN} -P "" -q -f $keyfile 2>&1);
+            response=$(${SSH_KEYGEN} -P "" -q -f $keyfile -C "$_DEFAULT_COMMENT" 2>&1);
             result=$?;
             log "ssh-keygen response ${response}";
             [ "$result" -ne 0 ] && { _REFORM_MESSAGE="Error generate key"; return 3; }
@@ -173,7 +175,7 @@ function postAddReform(){
                     cat "$_AuthorizedKeysFile" >> "$_User_AuthorizedKeysFile"
             } || {
                     authkey=$($SSH_KEYGEN -y -f $keyfile);
-                    echo "${authkey} $(whoami)@$(hostname)" > ${_AuthorizedKeysFile} ;
+                    echo "${authkey} $_DEFAULT_COMMENT" > ${_AuthorizedKeysFile} ;
                     cat "$_AuthorizedKeysFile" >> "$_User_AuthorizedKeysFile" 2>/dev/null
             }
 

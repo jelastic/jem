@@ -105,13 +105,17 @@ function updateProject(){
                $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD  >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG};
     }
     echo -n $(date +%D.%k:%M:%S.%N) >> "$VCS_UPDATE_LOG" 2>&1;
-    runNonInterractive "$GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git pull"  > /dev/null 2>&1;
+    runNonInterractive "$GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git pull --rebase"  > /dev/null 2>&1;
     result=$?;
     [ $result -eq 2 ] && return $result;
     [ $result -ne 0 ] && {
         grep -q 'refusing to merge unrelated histories' <<< $ERR_HANDLER && $GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git reset --hard origin >> "$VCS_UPDATE_LOG" 2>&1 &&
         runNonInterractive "$GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git pull"  > /dev/null 2>&1;
         result=$?;
+            grep -q 'Not committing merge' <<< $ERR_HANDLER && $GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git reset --hard origin >> "$VCS_UPDATE_LOG" 2>&1 &&
+            runNonInterractive "$GIT --git-dir=${WEBROOT}/${PROJECT_NAME}/.git pull --rebase"  > /dev/null 2>&1;
+            result=$?;
+
         [ $result -ne 0 ] && return $result;
     }
     updateSubmodules || return $?;

@@ -162,7 +162,21 @@ function doDeploy(){
         ${SUDO_COMMAND} service cartridge deploy;
     fi
 
-    applyHook ${context} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }
+    applyHook ${context} postDeploy || {
+        local hook_error_message="message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}" 
+        if [ "x${atomic_deploy}" == "xtrue" ]; then
+            CURRENT_DIR=$(ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1);
+            PREVIOUS_DIR=$(ls -1 ${WEBROOT}  | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n2|head -n 1);
+            if [ -n "${PREVIOUS_DIR}" ]; then 
+                ln -sfT ${WEBROOT}/${PREVIOUS_DIR} ${WEBROOT}/ROOT
+                hook_error_message="${hook_error_message}. ROOT context now points to directory ${WEBROOT}/${PREVIOUS_DIR}."
+                if [ "${PREVIOUS_DIR}" != "${CURRENT_DIR}" ]; then
+                    rm -rf ${WEBROOT}/${CURRENT_DIR}
+                fi
+            fi
+        fi
+        writeJSONResponseErr "result=>4126" "${hook_error_message}"; return 1; 
+    }
 
     writeJSONResponseOut "result=>0" "message=>Application deployed successfully"
 }

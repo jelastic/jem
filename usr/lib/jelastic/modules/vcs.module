@@ -40,7 +40,7 @@ ROOT_CRONFILE="/var/spool/cron/root";
 AUTOUPDATE_CRON_STRING="* * * * * jem vcs autoupdate";
 REDEPLOY_CONF_FILE="/etc/jelastic/redeploy.conf";
 
-BRANCH_NAME_FILTER="(\.\.|[[:space:]]|[\ []|[]\ ]|[\/\\@\,\"\'\|\~\^:\;\<\>\`\%\?\!\+\{\}\(\)]|\.$|\.lock$)";
+BRANCH_NAME_FILTER="(\.\.|[[:space:]]|[\ []|[]\ ]|[\\@\,\"\'\|\~\^:\;\<\>\`\%\?\!\+\{\}\(\)]|\.$|\.lock$)";
 
 GITSSH_SCRIPT="/var/lib/jelastic/libs/gitssh.sh"
 export GIT_SSH=${GITSSH_SCRIPT};
@@ -311,6 +311,9 @@ function doUpdate(){
             [ -n "${CURRENT_DIR}" ] && { ln -sfT "${WEBROOT}/${CURRENT_DIR}" ${WEBROOT}/ROOT && _deployLog "Swithing the ROOT context to ${CURRENT_DIR}"; updateOwnership ${WEBROOT}/ROOT; }
         fi
         if [[ -d ${WEBROOT}/ROOT && ! -h ${WEBROOT}/ROOT ]] ; then
+            if [ "$UID" == '0' ]; then
+                chown -R ${DATA_OWNER} ${WEBROOT}/ROOT;
+            fi 
             mv -f ${WEBROOT}/ROOT ${WEBROOT}/$NEXT_DIR && _deployLog "Copying content of the ROOT directory to $NEXT_DIR";
         fi
         if [ -z "${PREVIOUS_DIR}" ] ;then
@@ -319,10 +322,27 @@ function doUpdate(){
         fi
         [ -n "${PREVIOUS_DIR}" ] && rm -rf ${WEBROOT}/${PREVIOUS_DIR} && _deployLog "Removing old deprecated context directory ${PREVIOUS_DIR}";
         if [ -n "${CURRENT_DIR}" ] ;then
-            cp -rf ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1  && _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR}";
-            if [ $? -ne 0 ]; then
-                writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR}";
-                return 1;
+            if [ "$UID" == '0' ]; then
+                chown -R ${DATA_OWNER} ${WEBROOT}/${CURRENT_DIR};
+            fi
+            if which rsync &>>/dev/null; then 
+                rsync -alrp --inplace --quiet --ignore-errors ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1;
+                local result=$?;
+                if [ $result -ne 0 ]; then
+                    writeJSONResponseErr "result=>4075" "message=>Rsync error code $result (probably because of unsufficient disk space)" && _deployLog "Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR} (probably beca
+use of unsufficient disk space). rsync exit code is $result";
+                    return 1;
+                else
+                    _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR} - successful";
+                fi    
+            else
+                cp -rf ${WEBROOT}/${CURRENT_DIR}/ ${WEBROOT}/${NEXT_DIR} 2>&1;
+                if [ $? -ne 0 ]; then
+                    writeJSONResponseErr "result=>4075" "message=>No free diskspace" && _deployLog "Not enough disk space. Cannot move application from ${CURRENT_DIR} to ${NEXT_DIR}";
+                    return 1;
+                else
+                    _deployLog "Copying application files from ${CURRENT_DIR} to ${NEXT_DIR}"
+                fi
             fi
         fi
         J_OLD_PROJECT_NAME="${PROJECT_NAME}";
@@ -370,6 +390,9 @@ function doUpdate(){
                     rm -rf ${WEBROOT}/ROOT/* && _deployLog "Removing the content of current ROOT directory";
                     shopt -u dotglob;
                 fi
+		if [ "$UID" == '0' ]; then
+                    chown -R ${DATA_OWNER} "${WEBROOT}/${TARGET_DIR}/";
+                fi 
                 shopt -s dotglob;
                 set +f
                 mv -f ${WEBROOT}/${TARGET_DIR}/* ${WEBROOT}/ROOT;
@@ -412,7 +435,23 @@ function doUpdate(){
     [ "x${COMPUTE_TYPE}" != "xmaven" ]  && isFunction "setContext" && setContext ${PROJECT_NAME};
     [ "x${COMPUTE_TYPE}" == "xcartridge" ] && recoverBrokenMountPoints && service cartridge build >>  $ACTIONS_LOG  2>&1  && service cartridge deploy >> $ACTIONS_LOG  2>&1;
     applyHook ${PROJECT_NAME} postUpdate || { writeJSONResponseErr "result=>4128" "message=>Post-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
-    [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${PROJECT_NAME} postDeploy || { writeJSONResponseErr "result=>4126" "message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
+    [ "x${COMPUTE_TYPE}" != "xmaven" ] && { 
+        applyHook ${PROJECT_NAME} postDeploy || {
+            local hook_error_message="message=>Post-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}" 
+            if [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
+                CURRENT_DIR=$(ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1);
+                PREVIOUS_DIR=$(ls -1 ${WEBROOT}  | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n2|head -n 1);
+                if [ -n "${PREVIOUS_DIR}" ]; then 
+                    ln -sfT ${WEBROOT}/${PREVIOUS_DIR} ${WEBROOT}/ROOT
+                    hook_error_message="${hook_error_message}. ROOT context now points to directory ${WEBROOT}/${PREVIOUS_DIR}."
+                    if [ "${PREVIOUS_DIR}" != "${CURRENT_DIR}" ]; then
+                        rm -rf ${WEBROOT}/${CURRENT_DIR}
+                    fi
+                fi
+            fi 
+            writeJSONResponseErr "result=>4126" "${hook_error_message}"; return 1; 
+        }; 
+    }
     writeJSONResponseOut "result=>0" "message=>Project updated successfully"; return 0; 
 }
 
@@ -423,7 +462,7 @@ function doCallProjectUpdate(){
   getInfraAddresses infraAddr;
 
   [[ -z "${CORE_ADDR}" ]] && {
-    error "Can not obtain core address";
+    error "Cannot obtain core address";
     return 1;
   }
 
@@ -442,14 +481,14 @@ function doAutoUpdate(){
     do
         source ${project}
         enableVCSLibrary;
-        [ $AUTOUPDATE == "true" ] && {
+        [[ "x$AUTOUPDATE" == "xtrue" ]] && {
 	    LastRemoteCommitVal=$(getLastRemoteCommit)
-            [ ${LAST_DEPLOYED_COMMIT} == $LastRemoteCommitVal ] && continue ;
-            [ $LastRemoteCommitVal == "00000000000" ] && continue ;
+            [[ ${LAST_DEPLOYED_COMMIT} == $LastRemoteCommitVal ]] && continue ;
+            [[ $LastRemoteCommitVal == "00000000000" ]] && continue ;
             local next_allowed_update=$(( $LASTUPDATE + $UPDATE_INTERVAL * 60 ));
             local current_timestamp=`date +%s`;
-            [ $next_allowed_update -lt $current_timestamp ] && doUpdate >> $JEM_CALLS_LOG && UPDATE_IS_OK="true" && writeProjectConfig;
-            [ ${COMPUTE_TYPE} == "maven" ] && [ $UPDATE_IS_OK == "true" ] && doCallProjectUpdate $PROJECT_NAME;
+            [[ $next_allowed_update -lt $current_timestamp ]] && doUpdate >> $JEM_CALLS_LOG && UPDATE_IS_OK="true" && writeProjectConfig;
+            [[ "x${COMPUTE_TYPE}" == "xmaven" ]] && [[ "x${UPDATE_IS_OK,,}" == "xtrue" ]] && doCallProjectUpdate $PROJECT_NAME;
         }
 
     done

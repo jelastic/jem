@@ -37,7 +37,7 @@ doApiCall(){
     local i
     getInfraAddresses infraAddr;
     [[ -z "${domain}" ]] && {
-        log  "Can not obtain core address";
+        log  "Cannot obtain core address";
         writeJSONResponseErr "result=>9999" "message=>Cannot get app domain";
         return 1;
     }

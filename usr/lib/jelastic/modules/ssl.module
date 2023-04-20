@@ -93,10 +93,10 @@ function doInstall(){
 		writeJSONResponseOut "result=>4020" "message=>Cannot enable SSL module!"
 	;;
 	4 )
-		writeJSONResponseOut "result=>4004" "message=>Can not save user files!"
+		writeJSONResponseOut "result=>4004" "message=>Cannot save user files!"
 	;;
 	143 )
-		writeJSONResponseOut "result=>4143" "message=>Can not save configuration files!"
+		writeJSONResponseOut "result=>4143" "message=>Cannot save configuration files!"
 	;;
 	39 )
 		writeJSONResponseOut "result=>4039" "message=>SSL config not found!"
@@ -143,10 +143,10 @@ function doRemove(){
 		writeJSONResponseOut "result=>4021" "message=>Cannot disable SSL module!"
 	;;
 	4 )
-		writeJSONResponseOut "result=>4004" "message=>Can not save user files!"
+		writeJSONResponseOut "result=>4004" "message=>Cannot save user files!"
 	;;
 	143 )
-		writeJSONResponseOut "result=>4143" "message=>Can not save configuration files!"
+		writeJSONResponseOut "result=>4143" "message=>Cannot save configuration files!"
 	;;
 	39 )
 		writeJSONResponseOut "result=>4039" "message=>SSL config not found!"
