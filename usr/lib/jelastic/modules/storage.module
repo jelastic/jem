@@ -190,9 +190,9 @@ function onModLoadCallback() {
             die -q;
         fi
 
-        if VEExecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
+        if VEExecRun "sed -rne '/JELASTIC_CHECK_MOUNT=/{s/JELASTIC_CHECK_MOUNT=([0-9])/\1/g;p}' /.jelenv" ; then
             res=$(vzexecGetLastStdOut)
-            [ -n "$res" ] && eval "$res"
+            [ -n "$res" ] && JELASTIC_CHECK_MOUNT=$res
         fi
 
         if [ "x$VZ_VEID_OS" == "xubuntu" -o "x$VZ_VEID_OS" == "xdebian" ] ; then
