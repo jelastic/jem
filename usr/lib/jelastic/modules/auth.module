@@ -129,9 +129,15 @@ function onModLoadCallback() {
         NFS_CONFIG_FILE="$(vzctPath $VZ_CTID_ROOT /etc/exports)"
         EXPORTS_FILE="$(vzctPath $VZ_CTID_ROOT $CONTAINER_EXPORTS_FILE)"
 
-        if vzexecRun "grep JELASTIC_CHECK_MOUNT= /.jelenv" ; then
+        if vzexecRun "sed -rne '/JELASTIC_CHECK_MOUNT=/{s/JELASTIC_CHECK_MOUNT=([0-9])/\1/g;p}' /.jelenv" ; then
             res=$(vzexecGetLastStdOut)
-            [ ! -n "$res" ] && eval "$res"
+            [ ! -n "$res" ] && JELASTIC_CHECK_MOUNT=$res
+        fi
+
+        if vzexecRun "sed -rne '/VAP_FIREWALL_BACKEND=/{s/VAP_FIREWALL_BACKEND=(nftables|iptables)/\1/g;p}' /etc/jelastic/metainf.conf" ; then
+            res=$(vzexecGetLastStdOut)
+            [ ! -n "$res" ] && VAP_FIREWALL_BACKEND=$res
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - Firewall backend from metainf is $VAP_FIREWALL_BACKEND" >> $JEM_CALLS_LOG
         fi
 
 
