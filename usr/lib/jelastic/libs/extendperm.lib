@@ -39,8 +39,10 @@ function ExtendPerm(){
         [ -d /var/lib/jelastic/hooks/ ] && $SETFACL -Rm $dirp,d:${dirp},d:u::xwr "/var/lib/jelastic/hooks/" >>$JEM_CALLS_LOG 2>&1;
         [ -d /var/lib/jelastic/overrides/ ] && $SETFACL -Rm $dirp,d:${dirp},d:u::xwr "/var/lib/jelastic/overrides/" >>$JEM_CALLS_LOG 2>&1;
         [ -d /var/lib/jelastic/customizations/ ] && $SETFACL -Rm $dirp,d:${dirp},d:u::xwr "/var/lib/jelastic/customizations/" >>$JEM_CALLS_LOG 2>&1;
-	[ -d /var/run/screen/ ] && { chmod 775 /var/run/screen/; } >>$JEM_CALLS_LOG 2>&1;
+	[ -d /var/run/screen/ ] && chmod 775 /var/run/screen/  >>$JEM_CALLS_LOG 2>&1;
         [ -f /etc/rc.d/rc.local ] && $SETFACL -m $filep /etc/rc.d/rc.local >>$JEM_CALLS_LOG 2>&1;
+        [ -f /etc/nftables/jelastic-custom.nft ] && $SETFACL -m $filep /etc/nftables/jelastic-custom.nft >>$JEM_CALLS_LOG 2>&1;
+        [ -f /etc/nftables/static-rules.nft ] && $SETFACL -m $filep /etc/nftables/static-rules.nft >>$JEM_CALLS_LOG 2>&1;
 
         if [ -x "$SETFACL" ] ; then
             $SETFACL -m $dirp /var/spool/cron  >>$JEM_CALLS_LOG 2>&1;
