@@ -65,12 +65,12 @@ function ensureDiskSpaceIsOK() {
 
 function ensureFileCanBeUncompressed(){
     VERBOSE=1;
-    local fileToUncompress=$1;
+    local fileToUncompress="$1";
     local uncompressed_zip_size=0;
     [ -z "${resource_data_dize}" ] && { resource_data_dize=0; freebytesleft=$(( 1024 *  $(df -l / 2>/dev/null | tail -1 | $AWK '{ print $4 }' )-1024*1024)); }
     local uncompressed_size;
 
-    mimeType=$($FILE --mime-type "${fileToUncompress}" | $AWK '{print $2}')
+    mimeType=$($FILE --mime-type "${fileToUncompress}" -b)
 
     case ${mimeType} in
         "application/x-bzip2")
