@@ -164,7 +164,7 @@ function _saveCurrentRules() {
 }
 
 function doSave() {
-    _saveCurrentRules 2>>$ACTIONS_LOG && writeJSONResponseOut "result=>0" "message=>Firewall has been saveed" || writeJSONResponseErr "result=>4143" "message=>Can not save configuration files!"
+    _saveCurrentRules 2>>$ACTIONS_LOG && writeJSONResponseOut "result=>0" "message=>Firewall has been saved" || writeJSONResponseErr "result=>4143" "message=>Cannot save configuration files!"
 }
 
 function describeSave() {
