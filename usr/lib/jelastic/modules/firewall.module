@@ -163,6 +163,14 @@ function _saveCurrentRules() {
     saveCurrentRules
 }
 
+function doSave() {
+    _saveCurrentRules 2>>$ACTIONS_LOG && writeJSONResponseOut "result=>0" "message=>Firewall has been saved" || writeJSONResponseErr "result=>4143" "message=>Cannot save configuration files!"
+}
+
+function describeSave() {
+    echo "save firewall rules";
+}
+
 function doUsage() {
     showUsageMessage
 }
