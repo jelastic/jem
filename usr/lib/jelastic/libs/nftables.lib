@@ -38,7 +38,7 @@ FW_V4_TABLE="ip"
 FW_V6_TABLE="ip6"
 
 #valid values accept,drop
-FW_DEFAULT_POLICY='accept'
+FW_DEFAULT_POLICY='drop'
 FW_JELASTIC_INIT_FILE="/etc/nftables/jelastic.nft"
 FW_RULESET_FILE="/etc/nftables/main.nft"
 FW_JELASTIC_CUSTOM_RULES_FILE="/etc/nftables/jelastic-custom.nft"
@@ -309,6 +309,8 @@ function netfilterStop() {
     systemctl enable nftables &>> $JEM_CALLS_LOG
     systemctl start nftables &>> $JEM_CALLS_LOG
 
+    FW_DEFAULT_POLICY='accept'
+
     [[ -e "/etc/sysconfig/nftables.conf" ]] && sed -i -e 's|#include "/etc/nftables/main.nft"|include "/etc/nftables/main.nft"|' "/etc/sysconfig/nftables.conf"
 
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction flushing ruleset" >>$JEM_CALLS_LOG
@@ -469,6 +471,8 @@ function netfilterEnable() {
         nft -f "$FW_JELASTIC_INIT_FILE" &>> $JEM_CALLS_LOG
     else
         #init required tables
+        FW_DEFAULT_POLICY='accept'
+
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction $FW_JELASTIC_INIT_FILE not found" >>$JEM_CALLS_LOG
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction generating default ruleset" >>$JEM_CALLS_LOG
         local rulesFile=$(mktemp)
