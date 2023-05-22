@@ -31,11 +31,14 @@ foreach my $p ( @params) {
     $tmpVal =~ s/\//_/g;
     $tmpVal =~ s/\./_/g;
     $$tmpVal=$cfg->val('require', $p);
-    if ( $pVal =~ /;/ ) {
-	   my @tmpArr = split /;/, $pVal ;
-	   $dataHash{$tmpVal}=\@tmpArr;
+    if ( $pVal =~ /^('|").*('|@")$/ ) {
+        $pVal =~ s/(^'|'$)//g;
+        $dataHash{$tmpVal}=$pVal;
+    } elsif ( $pVal =~ /;/ ) {
+        my @tmpArr = split /;/, $pVal ;
+        $dataHash{$tmpVal}=\@tmpArr;
     }else {
-        $dataHash{$tmpVal}=$cfg->val('require', $p);
+        $dataHash{$tmpVal}=$pVal;
     }
 }
 
