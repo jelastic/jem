@@ -328,11 +328,11 @@ function netfilterStop() {
 
     if [ -f "$FW_JELASTIC_STATIC_RULES_FILE" ] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
-        nft -c -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+        nft -c -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG 2>&1
         if [[ $? -gt 0 ]] ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Static netfilter rules not loaded due to errors in $FW_JELASTIC_STATIC_RULES_FILE. See logs for details" >>$JEM_CALLS_LOG
         else
-            nft -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+            nft -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG 2>&1
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction rules loaded" >>$JEM_CALLS_LOG
         fi
     fi
@@ -360,7 +360,7 @@ function netfilterStart() {
     #test rule files
 
     if [ -f "$FW_JELASTIC_INIT_FILE" ] ; then
-        nft -c -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
+        nft -c -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG 2>&1
         if [[ $? -gt 0 ]] ; then
             echo "Current iptables rules not modified due to errors in new rule-files" >>$JEM_CALLS_LOG
             return 2
@@ -372,7 +372,7 @@ function netfilterStart() {
 
     if [ -f "$FW_JELASTIC_INIT_FILE" ] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
-        nft -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG
+        nft -f "$FW_JELASTIC_INIT_FILE" >>$JEM_CALLS_LOG 2>&1
     fi
 
     #exports
@@ -427,22 +427,22 @@ function netfilterStart() {
 
     if [ -f "$FW_JELASTIC_STATIC_RULES_FILE" ] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
-        nft -c -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+        nft -c -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG 2>&1
         if [[ $? -gt 0 ]] ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Static netfilter rules not loaded due to errors in $FW_JELASTIC_STATIC_RULES_FILE. See logs for details" >>$JEM_CALLS_LOG
         else
-            nft -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+            nft -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG 2>&1
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction rules loaded" >>$JEM_CALLS_LOG
         fi
     fi
 
     if [ -f "$FW_JELASTIC_CUSTOM_RULES_FILE" ] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_CUSTOM_RULES_FILE" >>$JEM_CALLS_LOG
-        nft -c -f "$FW_JELASTIC_CUSTOM_RULES_FILE" >>$JEM_CALLS_LOG
+        nft -c -f "$FW_JELASTIC_CUSTOM_RULES_FILE" >>$JEM_CALLS_LOG 2>&1
         if [[ $? -gt 0 ]] ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Custom netfilter rules not loaded due to errors in $FW_JELASTIC_CUSTOM_RULES_FILE. See logs for details" >>$JEM_CALLS_LOG
         else
-            nft -f "$FW_JELASTIC_CUSTOM_RULES_FILE" >>$JEM_CALLS_LOG
+            nft -f "$FW_JELASTIC_CUSTOM_RULES_FILE" >>$JEM_CALLS_LOG 2>&1
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction rules loaded" >>$JEM_CALLS_LOG
         fi
     fi
@@ -486,11 +486,11 @@ function netfilterEnable() {
 
     if [ -f "$FW_JELASTIC_STATIC_RULES_FILE" ] ; then
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction loading rules from $FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
-        nft -c -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+        nft -c -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG 2>&1
         if [[ $? -gt 0 ]] ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction Static netfilter rules not loaded due to errors in $FW_JELASTIC_STATIC_RULES_FILE. See logs for details" >>$JEM_CALLS_LOG
         else
-            nft -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG
+            nft -f "$FW_JELASTIC_STATIC_RULES_FILE" >>$JEM_CALLS_LOG 2>&1
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction rules loaded" >>$JEM_CALLS_LOG
         fi
     fi
