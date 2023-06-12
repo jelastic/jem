@@ -42,9 +42,9 @@ function ExtendPerm(){
 	[ -d /var/run/screen/ ] && chmod 775 /var/run/screen/  >>$JEM_CALLS_LOG 2>&1;
         [ -f /etc/rc.d/rc.local ] && $SETFACL -m $filep /etc/rc.d/rc.local >>$JEM_CALLS_LOG 2>&1;
         [ -d /etc/nftables/ ] && $SETFACL -m $dirp,d:${dirp},d:u::xwr /etc/nftables >>$JEM_CALLS_LOG 2>&1;
-        [ -f /etc/nftables/jelastic.nft ] && { $SETFACL -b /etc/nftables/jelastic.nft >>$JEM_CALLS_LOG 2>&1; chmod 600 /etc/nftables/jelastic.nft >>$JEM_CALLS_LOG 2>&1; }
-        [ -f /etc/nftables/jelastic-custom.nft ] && $SETFACL -m $filep /etc/nftables/jelastic-custom.nft >>$JEM_CALLS_LOG 2>&1;
-        [ -f /etc/nftables/static-rules.nft ] && $SETFACL -m $filep /etc/nftables/static-rules.nft >>$JEM_CALLS_LOG 2>&1;
+        [ -f /etc/nftables/platform-defined.nft ] && { $SETFACL -b /etc/nftables/platform-defined.nft >>$JEM_CALLS_LOG 2>&1; chmod 600 /etc/nftables/platform-defined.nft >>$JEM_CALLS_LOG 2>&1; }
+        [ -f /etc/nftables/user-defined.nft ] && $SETFACL -m $filep /etc/nftables/user-defined.nft >>$JEM_CALLS_LOG 2>&1;
+        [ -f /etc/nftables/container-defined.nft ] && $SETFACL -m $filep /etc/nftables/container-defined.nft >>$JEM_CALLS_LOG 2>&1;
 
         if [ -x "$SETFACL" ] ; then
             $SETFACL -m $dirp /var/spool/cron  >>$JEM_CALLS_LOG 2>&1;
