@@ -261,7 +261,7 @@ function netfilterEnable() {
 }
 
 function saveCurrentRules() {
-    savefile="${1:=""}"
+    savefile="${1:-""}"
     if [ ! -z "$savefile" ] ; then
         [ ! -d "/etc/jelastic" ] && mkdir -p "/etc/jelastic" 2>>$JEM_CALLS_LOG
         $IPTABLES_SAVE > $BACKUP_IPV4 2>>$JEM_CALLS_LOG

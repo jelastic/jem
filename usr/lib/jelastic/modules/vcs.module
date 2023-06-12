@@ -296,7 +296,7 @@ function doUpdate(){
     enableVCSLibrary;
     applyHook ${PROJECT_NAME} preUpdate || { writeJSONResponseErr "result=>4127" "message=>Pre-update hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; };
     [ "x${COMPUTE_TYPE}" != "xmaven" ] && { applyHook ${PROJECT_NAME} preDeploy || { writeJSONResponseErr "result=>4125" "message=>Pre-deploy hook execution failed. See hooks log for details: ${HOOKS_LOG}"; return 1; }; }
-    if [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" -o "x${COMPUTE_TYPE}" == "xlitespeed" -o "x${COMPUTE_TYPE}" == "xlemp" ] && [ "x${PROJECT_NAME}" == "xROOT" ] && [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
+    if [ "x${COMPUTE_TYPE}" == "xapache-php" -o "x${COMPUTE_TYPE}" == "xnginx-php" -o "x${COMPUTE_TYPE}" == "xlitespeed" -o "x${COMPUTE_TYPE}" == "xlemp" -o "x${COMPUTE_TYPE}" == "xllsmp" ] && [ "x${PROJECT_NAME}" == "xROOT" ] && [ "x${ATOMIC_DEPLOY}" == "xtrue" ]; then
         local NEXT_DIR=ROOT_`date +%Y.%m.%d-%H.%M.%S`;
         if [ -h ${WEBROOT}/ROOT ] ; then
             local CURRENT_DIR=`readlink ${WEBROOT}/ROOT | $GREP -o "ROOT_[0-9.-]*"`;
@@ -442,7 +442,8 @@ use of unsufficient disk space). rsync exit code is $result";
                 CURRENT_DIR=$(ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n1);
                 PREVIOUS_DIR=$(ls -1 ${WEBROOT}  | grep "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$" | tail -n2|head -n 1);
                 if [ -n "${PREVIOUS_DIR}" ]; then 
-                    ln -sfT ${WEBROOT}/${PREVIOUS_DIR} ${WEBROOT}/ROOT
+                    ln -sfT ${WEBROOT}/${PREVIOUS_DIR} ${WEBROOT}/ROOT && _deployLog "Switching the ROOT context back to ${PREVIOUS_DIR} directory due to failed postDeploy hook execution.";
+                    chown -R ${DATA_OWNER} ${WEBROOT}/ROOT;
                     hook_error_message="${hook_error_message}. ROOT context now points to directory ${WEBROOT}/${PREVIOUS_DIR}."
                     if [ "${PREVIOUS_DIR}" != "${CURRENT_DIR}" ]; then
                         rm -rf ${WEBROOT}/${CURRENT_DIR}
