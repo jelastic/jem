@@ -310,3 +310,13 @@ function getNumberOfActiveSets() {
 function setExists() {
     ipset -L -n 2>>$JEM_CALLS_LOG | grep -q "$1"
 }
+
+function netfilterList() {
+    echo "IPTABLES rules ($@)"
+    echo "--------------------"
+    $IPTABLES -L -t $@
+    echo
+    echo "IP6TABLES rules ($@)"
+    echo "--------------------"
+    $IP6TABLES -L -t $@
+}

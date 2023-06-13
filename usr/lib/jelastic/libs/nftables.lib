@@ -516,3 +516,7 @@ firewallSet() {
     done
 
 }
+
+function netfilterList() {
+    nft list ruleset $@
+}

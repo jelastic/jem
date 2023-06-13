@@ -475,6 +475,9 @@ function doPanic() {
     return 0
 }
 
+function doList() {
+    netfilterList $@
+}
 
 function dofwset() {
     running=1
