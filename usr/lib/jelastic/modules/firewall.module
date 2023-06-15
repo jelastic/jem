@@ -248,8 +248,8 @@ function onModLoadCallback() {
         fi
 
         FTPPort=$($NETSTAT -tnlp | $SED -n -re '/ftp/{s/((\S+)\s+){3}(\S+)\s+((\S+)\s+)+/\3/;s/[^:]+:([0-9]+)/\1/;s/://g;p}');
-        NFSPort=$($RPCINFO 127.0.0.1 -p 2>/dev/null | $SED -n -re '/nfs/{s/\s+(\S+\s+)+([0-9]+)\s+nfs.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
-        RPCPort=$($RPCINFO 127.0.0.1 -p 2>/dev/null | $SED -n -re '/(portmapper|nlockmgr|mountd)/{s/\s+(\S+\s+)+([0-9]+)\s+.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
+        NFSPort=$($RPCINFO -p 127.0.0.1 2>/dev/null | $SED -n -re '/nfs/{s/\s+(\S+\s+)+([0-9]+)\s+nfs.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
+        RPCPort=$($RPCINFO -p 127.0.0.1 2>/dev/null | $SED -n -re '/(portmapper|nlockmgr|mountd)/{s/\s+(\S+\s+)+([0-9]+)\s+.*/\2/g;p}' | uniq | $SED -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | $SED -e 's/ /,/g' )
 
         if [ "x$OS" == "xcentos" -a "$OS_ver" -ge "7" ] ; then
             IPTABLES="$IPTABLES -w"
