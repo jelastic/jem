@@ -334,6 +334,10 @@ function installPackageCmd() {
     : ${1:?"Missing param: OS"};
     local OS=$1; shift
     local pmaction=$1; shift
+    local isCertified=""
+    if [ ! -z "${1##*[!0-9]*}" ]; then
+        isCertified=$1; shift
+    fi
     local _apk_wait_timeout=${APK_WAIT_TIMEOUT:="10"}
     local proxy_env="export http_proxy=\"$(printenv http_proxy)\"; export https_proxy=\"$(printenv https_proxy)\"; export ftp_proxy=\"$(printenv ftp_proxy)\"; export no_proxy=\"$(printenv no_proxy)\"";
     for arg do PKGS="$arg $PKGS"; done
@@ -344,8 +348,15 @@ function installPackageCmd() {
         debian|ubuntu|kali)
                 PM="$proxy_env; DEBIAN_FRONTEND=noninteractive apt-get -y --allow-unauthenticated -o Dpkg::Options::=\"--force-confold\""
             ;;
-        centos|redhat|fedora|vzlinux|almalinux)
+        centos|redhat|fedora|vzlinux)
                 PM="$proxy_env; yum -y"
+            ;;
+        almalinux)
+                if [[ -z "$isCertified" ]]; then
+                    PM="$proxy_env; yum -y"
+                else
+                    PM="$proxy_env; microdnf -y"
+                fi
             ;;
         alpine)
                 PM="$proxy_env; apk --wait $_apk_wait_timeout"

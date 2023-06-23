@@ -68,8 +68,15 @@ function doInstall(){
 		writeJSONResponseErr "result=>4097" "message=>Cannot detect OS version" ;
                 exit 1
 	fi
+	local _metainf="/vz/root/${CTID}/etc/jelastic/metainf.conf"
+	local _isCertified=0
+	if [ -e "$_metainf" ] ; then
+	     eval "$(grep CERTIFIED_VERSION $_metainf 2>/dev/null)"
+	     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - certified template version $_isCertified" >> ${JEM_CALLS_LOG};
+	     _isCertified="$CERTIFIED_VERSION"
+	fi
 
-        installCmd=$(installPackageCmd $OS install ${PACKAGES})
+        installCmd=$(installPackageCmd $OS install $_isCertified ${PACKAGES})
 	vzexecSetCTID ${CTID} && vzexecRun "$installCmd";
 }
 
