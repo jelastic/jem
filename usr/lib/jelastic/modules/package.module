@@ -70,14 +70,18 @@ function doInstall(){
 	fi
 	local _metainf="/vz/root/${CTID}/etc/jelastic/metainf.conf"
 	local _isCertified=0
+	vzexecSetCTID ${CTID}
 	if [ -e "$_metainf" ] ; then
-	     eval "$(grep CERTIFIED_VERSION $_metainf 2>/dev/null)"
-	     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - certified template version $_isCertified" >> ${JEM_CALLS_LOG};
-	     _isCertified="$CERTIFIED_VERSION"
+	    if vzexecRun "sed -rne '/CERTIFIED_VERSION=/{s/CERTIFIED_VERSION=([0-9]{1,})/\1/g;p}' /etc/jelastic/metainf.conf" ; then
+	        res=$(vzexecGetLastStdOut)
+	        CERTIFIED_VERSION=$res
+	        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - certified template version $_isCertified" >> ${JEM_CALLS_LOG};
+	        _isCertified="$CERTIFIED_VERSION"
+	    fi
 	fi
 
         installCmd=$(installPackageCmd $OS install $_isCertified ${PACKAGES})
-	vzexecSetCTID ${CTID} && vzexecRun "$installCmd";
+	vzexecRun "$installCmd";
 }
 
 function describePackage() {
