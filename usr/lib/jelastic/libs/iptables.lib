@@ -112,6 +112,12 @@ function netfilterStop() {
     $IPTABLES -X -t nat;
     $IPTABLES -F;
     $IPTABLES -F -t nat;
+
+    $IP6TABLES -X;
+    $IP6TABLES -X -t nat;
+    $IP6TABLES -F;
+    $IP6TABLES -F -t nat;
+
     setDefaultPolicy "ACCEPT"
 }
 
