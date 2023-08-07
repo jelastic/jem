@@ -158,3 +158,20 @@ function addAlmalinuxRoute(){
 function delAlmalinuxRoute(){
     delCentosRoute;
 }
+
+function getCentosRoute(){
+    VZ_NET_DEVICE='venet0'
+    ROUTECFG="/vz/root/${CTID}/etc/sysconfig/network-scripts/route-${VZ_NET_DEVICE}";
+    echo $(sed -re 's/([0-9./]{1,})\svia\s([0-9.]{1,}).*/\1_via_\2/' $ROUTECFG 2>/dev/null)
+}
+
+function getAlpineRoute(){
+    ROUTECFG="/vz/root/${CTID}/etc/route.conf" ;
+    echo $(sed -re 's/.*\s([0-9./]{1,})\sgw\s([0-9.]{1,}).*/\1_via_\2/' $ROUTECFG 2>/dev/null)
+}
+
+function getDebianRoute(){
+    ROUTEDIR="/vz/root/${CTID}/etc/network/if-up.d/";
+    ROUTECFG="${ROUTEDIR}/jelnet";
+    echo $(sed -nre 's/.*\s([0-9./]{1,})\svia\s([0-9.]{1,}).*/\1_via_\2/p' $ROUTECFG 2>/dev/null)
+}
