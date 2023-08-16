@@ -800,19 +800,27 @@ function dosetupUtils() {
             checkCmd=$(checkPackageCmd $OS autofs nfs-common)
         fi
     elif [[ "$OS" == "centos" || "$OS" == "almalinux" ]] ; then
+        _isCertified=0
         if [ "$OS_ver" -eq "8" ]; then
             _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el8.x86_64.rpm"
         elif  [ "$OS_ver" -eq "9" ]; then
-            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.8-1j.el9.x86_64.rpm"
+            _autofspkg=""
+            vzexecRun="rpm -ivh http://repository.jelastic.com/pub/autofs-5.1.8-1j.el9.x86_64.rpm"
+            if vzexecRun "sed -rne '/CERTIFIED_VERSION=/{s/CERTIFIED_VERSION=([0-9]{1,})/\1/g;p}' /etc/jelastic/metainf.conf" ; then
+                res=$(vzexecGetLastStdOut)
+                CERTIFIED_VERSION=$res
+                _isCertified="$CERTIFIED_VERSION"
+                echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - certified template version $_isCertified" >> ${JEM_CALLS_LOG};
+            fi
         fi
         if [ "$OS_ver" -eq "7" ]; then
             _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el7.x86_64.rpm"
         fi
 
         if [[ "$STORAGE_BACKEND" == "gluster" ]] ; then
-            installCmd=$(installPackageCmd $OS install $_autofspkg glusterfs-fuse)
+            installCmd=$(installPackageCmd $OS install $_isCertified $_autofspkg glusterfs-fuse)
         else
-            installCmd=$(installPackageCmd $OS install $_autofspkg nfs-utils)
+            installCmd=$(installPackageCmd $OS install $_isCertified $_autofspkg nfs-utils)
         fi
         checkCmd=$(checkPackageCmd $OS $_packages)
     else
