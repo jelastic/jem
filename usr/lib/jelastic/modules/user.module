@@ -296,6 +296,7 @@ function doAdd() {
 			echo "{\"result\":\"0\",\"message\":\"${_SSH_PRIVATE_KEY}\", \"homedir\":\"${_homedir}\", \"data_owner\":\"${_UID}:${_GUID}\"}"
 		else
 			writeJSONResponseErr "result=>4106" "message=>${_REFORM_MESSAGE}"
+			return 1
 		fi
 	else
 		forceLog "No postAddReform" ;

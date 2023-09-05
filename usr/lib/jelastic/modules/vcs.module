@@ -603,7 +603,8 @@ function doEditProject(){
         writeJSONResponseOut "result=>0" "message=>Project edited successfully" ${VAL} ;
 
   else
-        writeJSONResponseErr "result=>4017" "message=>Project edit failed";
+        writeJSONResponseErr "result=>4017" "message=>Project edit failed"
+        return 1
  fi
 }
 

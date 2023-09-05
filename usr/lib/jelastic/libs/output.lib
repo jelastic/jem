@@ -84,7 +84,9 @@ function writeJSONResponseOut(){
 
 #### Usage:  writeJSONResponseErr "key1=>value1" "key2=>value2" "key3=>value3"
 function writeJSONResponseErr(){
-    echo "$(writeJSONResponseOut "$@")" 1>&2;
+    echo "$(writeJSONResponseOut "$@")" 1>&2
+    # JE-64455
+    return 1
 }
 
 function escapeJSONSymbols() {

@@ -277,7 +277,7 @@ function doUnbind() {
             service iptables save | $GRAB_OUTPUT;
             writeJSONResponseOut "result=>0" "message=>Port binding has been removed"; return 0 ;
         else
-            writeJSONResponseOut "result=>4093" "message=>Port binding has not been removed"; return 1 ;
+            writeJSONResponseErr "result=>4093" "message=>Port binding has not been removed"; return 1 ;
         fi
 
     else

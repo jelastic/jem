@@ -66,8 +66,8 @@ function verifyUnpackedContent(){
             content_size_step2=$(du -s $content_path);
             [[ $content_size_step1 == $content_size_step2 ]] && return 0;
         } || let $(( attempt_num ++ ));
-    sleep $pull_inverval_for_directory;
-    [ $attempt_num -gt $attempt_amount ] && writeJSONResponseErr "result=>4071" "message=>Cannot unpack pakage" && exit 1;
+        sleep $pull_inverval_for_directory;
+        [ $attempt_num -gt $attempt_amount ] && writeJSONResponseErr "result=>4071" "message=>Cannot unpack pakage" && exit 1;
     done
 }
 

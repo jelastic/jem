@@ -47,6 +47,9 @@ function doInstall(){
         $(enableSSL) ; sslresult=$?;
 
    case $sslresult in
+	0 )
+		writeJSONResponseOut "result=>0" "message=>SSL installed successfully"
+	;;
 	209 ) 
 		writeJSONResponseErr "result=>4009" "message=>Could not detect valid domain for uploaded certificate"
 	;;
@@ -90,19 +93,16 @@ function doInstall(){
 		writeJSONResponseErr "result=>4147" "message=>Service reload failed";
 	;;
 	220 )
-		writeJSONResponseOut "result=>4020" "message=>Cannot enable SSL module!"
+		writeJSONResponseErr "result=>4020" "message=>Cannot enable SSL module!"
 	;;
 	4 )
-		writeJSONResponseOut "result=>4004" "message=>Cannot save user files!"
+		writeJSONResponseErr "result=>4004" "message=>Cannot save user files!"
 	;;
 	143 )
-		writeJSONResponseOut "result=>4143" "message=>Cannot save configuration files!"
+		writeJSONResponseErr "result=>4143" "message=>Cannot save configuration files!"
 	;;
 	39 )
-		writeJSONResponseOut "result=>4039" "message=>SSL config not found!"
-	;;
-	0 )
-		writeJSONResponseOut "result=>0" "message=>SSL installed successfully"
+		writeJSONResponseErr "result=>4039" "message=>SSL config not found!"
 	;;
 	* )
 		writeJSONResponseErr "result=>4022" "message=>SSL installed with Error!"
@@ -121,12 +121,15 @@ function doRemove(){
                   then 
                       source "${CARTRIDGE_HOME}/jelastic/scripts/ssl_manager.sh" && $( _disableSSL ) && { writeJSONResponseOut "result=>0" "message=>SSL removed successfully"; return 0; } || { writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"; return 1; };
                   else 
-                      { writeJSONResponseErr "result=>4116" "message=>SSL remove is not implemented!"; return 0; }
+                      { writeJSONResponseErr "result=>4116" "message=>SSL remove is not implemented!"; return 1; }
                fi                                          
         fi
 
 	$(disableSSL)  ; sslresult=$?;
 	case $sslresult in
+	0)
+		writeJSONResponseOut "result=>0" "message=>SSL removed successfully"
+	;;
 	182 )
 		writeJSONResponseErr "result=>4182" "Service restart failed"
 	;;
@@ -140,19 +143,16 @@ function doRemove(){
 		writeJSONResponseErr "result=>4147" "message=>Service reload failed"
 	;;
 	221 )
-		writeJSONResponseOut "result=>4021" "message=>Cannot disable SSL module!"
+		writeJSONResponseErr "result=>4021" "message=>Cannot disable SSL module!"
 	;;
 	4 )
-		writeJSONResponseOut "result=>4004" "message=>Cannot save user files!"
+		writeJSONResponseErr "result=>4004" "message=>Cannot save user files!"
 	;;
 	143 )
-		writeJSONResponseOut "result=>4143" "message=>Cannot save configuration files!"
+		writeJSONResponseErr "result=>4143" "message=>Cannot save configuration files!"
 	;;
 	39 )
-		writeJSONResponseOut "result=>4039" "message=>SSL config not found!"
-	;;
-	0)
-		writeJSONResponseOut "result=>0" "message=>SSL removed successfully" 
+		writeJSONResponseErr "result=>4039" "message=>SSL config not found!"
 	;;
 	*)
 		writeJSONResponseErr "result=>4023" "message=>SSL removed with Error!"

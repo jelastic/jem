@@ -32,9 +32,11 @@ function doStop(){
     local result=$?;
     local resultCode="${result}"
     if [[ "${result}" -ne "0" ]]; then
-        result="4184" #Pre-defined error code for non-successul stop
+        writeJSONResponseErr "result=>4184" "message=>Service been stopped with code $resultCode"
+        return 1
     fi 
-    writeJSONResponseOut "result=>${result}" "message=>Service been stopped with code ${resultCode}";
+    writeJSONResponseOut "result=>0" "message=>Service been stopped with code $resultCode"
+    return 0
 }
 
 function doRestart(){
@@ -96,10 +98,11 @@ function doRestart(){
     fi
     if [[ "${result}" -ne "0" ]]; then
         local resultMessage="result ${result} "
-        result="4182" #Pre-defined error code for non-successul restart
+        writeJSONResponseErr "result=>4182" "message=>${resultMessage}${message}"
+        return 1
     fi
-    writeJSONResponseOut "result=>${result}" "message=>${resultMessage}${message}";
-    return 0;
+    writeJSONResponseOut "result=>0" "message=>${resultMessage}${message}"
+    return 0
 }
 
 function doStart(){
@@ -108,9 +111,10 @@ function doStart(){
     local result=$?;
     local resultCode="${result}"
     if [[ "${result}" -ne "0" ]]; then
-        result="4183" #Pre-defined error code for non-successul start
+        writeJSONResponseErr "result=>4183" "message=>Service been started with code ${resultCode}"
+        return 1
     fi 
-    writeJSONResponseOut "result=>${result}" "message=>Service been started with code ${resultCode}";
+    writeJSONResponseOut "result=>${result}" "message=>Service been started with code ${resultCode}"
 }
 
 function doReload(){
@@ -119,15 +123,22 @@ function doReload(){
     local result=$?;
     local resultCode="${result}"
     if [[ "${result}" -ne "0" ]]; then
-        result="4185" #Pre-defined error code for non-successul reload
+        writeJSONResponseErr "result=>4185" "message=>Service been reloaded with code ${resultCode}"
+        return 1
     fi 
-    writeJSONResponseOut "result=>${result}" "message=>Service been reloaded with code ${resultCode}";
+    writeJSONResponseOut "result=>${result}" "message=>Service been reloaded with code ${resultCode}"
 }
 
 function doEnable(){
     [ ! -z "$1" ] && SERVICE=$1;
     include sendmailextip ; isFunction "SendmailExtIp" && SendmailExtIp ;
-    enableService "$SERVICE" 2345 0 >> "$ACTIONS_LOG"  2>&1 ; writeJSONResponseOut "result=>$?" "message=>Service been started with code $?";
+    enableService "$SERVICE" 2345 0 >> "$ACTIONS_LOG"  2>&1 ;
+    res=$?
+    if [[ "$res" -ne "0" ]] ; then
+        writeJSONResponseErr "result=>$res" "message=>Service been started with code $res"
+        return 1
+    fi
+    writeJSONResponseOut "result=>$res" "message=>Service been started with code $res"
 }
 
 function postRestartCallback(){
