@@ -449,9 +449,9 @@ function isValidShare()
 
 getRealExternalIp(){
     local extip
-    local services=( 'http://ifconfig.co' 'http://ifconfig.io' 'http://ipecho.net/plain' )
+    local services=( 'http://ifconfig.co' 'http://ifconfig.io' 'http://ipecho.net/plain' 'http://ipinfo.io/ip' )
     for i in ${services[@]}; do
-        extip=$(curl -m 3 --connect-timeout 2 -Lkq --silent "$i")
+        extip=$(curl -4 -m 3 --connect-timeout 2 -Lkq --silent "$i")
         [[ ! -z "$extip" ]] && isValidIP "$extip" && { echo "$extip"; return 0; }
     done
     which dig &>/dev/null || yum -y install bind-utils &>>${JEM_CALLS_LOG}
