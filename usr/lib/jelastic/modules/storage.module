@@ -319,7 +319,8 @@ function checkMount() {
     while [[ $retries -gt 0 ]] ; do
         #get IPs from remote storage
         VEExecRun $cmdShowmount
-        sharedIPs=($(awk '{split($2,a,",") ; if (a[1] != $0) { for (k in a) { if (a[k] != "") { print a[k] } } } else {print $2}}' <<< "$(VEexecGetLastStdOut)"))
+        ipsWODir="$(VEexecGetLastStdOut)"
+        sharedIPs=($(awk '{split($1,a,",") ; if (a[1] != $0) { for (k in a) { if (a[k] != "") { print a[k] } } } else {print $2}}' <<< "${ipsWODir//$2/}"))
 
         #is local IP in remote network range
         for lIP in ${localCIPs[@]} ; do
@@ -344,12 +345,12 @@ function checkMount() {
 function processnfs4() {
     _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,soft,timeo=30,retrans=2,_netdev"
     [[ $NOLOCK -eq 1 ]] && _DEFAULT_NFS_MOUNT_OPTS="$_DEFAULT_NFS_MOUNT_OPTS,nolock"
-    processnfs $*
+    processnfs "$@"
 }
 
 function processnfs3() {
     _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,udp,soft,timeo=120,retrans=20,_netdev"
-    processnfs $*
+    processnfs "$@"
 }
 
 function processnfs() {
