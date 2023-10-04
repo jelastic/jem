@@ -239,6 +239,9 @@ function netfilterStart() {
     $IPTABLES -I INPUT -i lo -j ACCEPT
     $IPTABLES -I INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 
+    #JE-67929
+    $IPTABLES -I INPUT -p icmp -m icmp --icmp-type 13 -j DROP
+
     #Add reject only if there was no problem while loading rules
     if [[ "$_loadRes" -gt 0 ]] ; then
         echo "Not saving rules due to errors above" >>$JEM_CALLS_LOG

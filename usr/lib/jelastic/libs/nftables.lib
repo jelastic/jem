@@ -455,6 +455,9 @@ function netfilterStart() {
     nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  iifname "lo" counter accept 2>>$JEM_CALLS_LOG
     nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ct state related,established  counter accept 2>>$JEM_CALLS_LOG
 
+    #JE-67929
+    nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN icmp type timestamp-request counter drop 2>>$JEM_CALLS_LOG
+
 
     nft -a list chain ip filter INPUT | grep -q "reject with icmp type host-prohibited" || nft add rule ip filter INPUT counter reject with icmp type host-prohibited 2>>$JEM_CALLS_LOG
 }
