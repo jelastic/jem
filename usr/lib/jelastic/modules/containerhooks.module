@@ -94,6 +94,23 @@ function apache_phpPostUpdate() {
     fi
 }
 
+function proxysqlPreUpdate() {
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - current tag:$CURRENT_TAG, target tag:$TARGET_TAG" >> ${JEM_CALLS_LOG}
+    if [[ ! $CURRENT_TAG =~ almalinux-9 && $TARGET_TAG =~ almalinux-9 ]]; then
+        vzexecRun "mysqld -V 2>/dev/null | sed -re '/mysqld/s/.*Ver ([0-9])\.([0-9]).*/\1\2/'"
+        local mysqlVersion=$(vzexecGetLastStdOut)
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - MySQL version: $mysqlVersion" >> ${JEM_CALLS_LOG}
+        if [[ ! -z "$mysqlVersion" && $mysqlVersion -lt 57 ]]; then
+            vzexecRun "rpm --import http://repo.mysql.com/RPM-GPG-KEY-mysql-2022 && yum update mysql --enablerepo=mysql57-community-dmr -y"
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - $(vzexecGetLastStdOut)" >> ${JEM_CALLS_LOG}
+            vzexecRun "grep -E 'user\s*=\s*mysql' /etc/my.cnf || sed -i -re '/\[mysqld\]/auser = mysql' /etc/my.cnf ; \
+            grep -E 'authentication_policy\s*=\s*caching_sha2_password' /etc/my.cnf || sed -i -re '/\[mysqld\]/aauthentication_policy = caching_sha2_password' /etc/my.cnf; \
+            sed -n '/mysqld\]/{:a;n;/\[mysqld_safe/q;p;ba}' /etc/my.cnf | grep ^log_error || sed -i -re '/\[mysqld\]/alog_error = /var/log/mysqld.log' /etc/my.cnf"
+        fi
+    fi
+    return 0
+}
+
 function describePreUpdate() {
     echo "Pre Update hook"
 }
