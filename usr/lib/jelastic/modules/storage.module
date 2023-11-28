@@ -349,7 +349,22 @@ function processnfs4() {
 }
 
 function processnfs3() {
-    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,udp,soft,timeo=120,retrans=20,_netdev"
+    OS=$VZ_VEID_OS
+    OS_ver=$VZ_VEID_OS_VER
+    local lproto="udp"
+
+    if [ -n "$OS" -a -n "$OS_ver" ] ; then
+        case "$OS" in
+            centos|almalinux)
+                [[ $OS_ver -ge 9 ]] && lproto="tcp"
+                ;;
+            ubuntu)
+                [[ $OS_ver -ge 22 ]] && lproto="tcp"
+                ;;
+        esac
+    fi
+
+    _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,$lproto,soft,timeo=120,retrans=20,_netdev"
     processnfs "$@"
 }
 
