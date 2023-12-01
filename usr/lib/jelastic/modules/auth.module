@@ -182,6 +182,11 @@ function dosetupUtils() {
     if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xalmalinux" ] ; then
         addPackages="libtirpc"
         [[ "$OS_ver" -eq "7" ]] && addPackages="$addPackages nfs-utils"
+
+        #perform repos update
+        local repo="updates,base"
+        [[ "${OS_ver/.*}" == "9" ]] && repo="appstream"
+        vzexecRun "$proxy_env; yum update -y ca-certificates --disablerepo=* --enablerepo=${repo}"
     elif [ "x$OS" == "xdebian" -o "x$OS" == "xubuntu" ] ; then
         addPackages="libtirpc1 nfs-common"
         [[ "$OS_ver" -eq "10" || "$OS_ver" -eq "11" || "$OS_ver" -eq "12" || "$OS_ver" -eq "20" || "$OS_ver" -eq "22" ]] && addPackages="libtirpc-common nfs-common"
@@ -199,8 +204,15 @@ function dosetupUtils() {
          fi
         done
 
+        #perform repos update
+        [[ "$OS_ver" == "10" || "$OS_ver" == "11" ]] && ric="--allow-releaseinfo-change" || ric=""
+        vzexecRun "$proxy_env; apt-get $ric update -y"
     elif [ "x$OS" == "xvzlinux" ] ; then
         addPackages="libtirpc nfs-utils"
+
+        #perform repos update
+        local repo="updates,base"
+        vzexecRun "$proxy_env; yum update -y ca-certificates --disablerepo=* --enablerepo=${repo}"
     fi
 
     installCmd=$(installPackageCmd $OS install rpcbind $addPackages)
