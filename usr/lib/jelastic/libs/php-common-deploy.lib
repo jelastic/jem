@@ -217,9 +217,7 @@ function undeploy(){
     [ -h $APPWEBROOT ] && { rm -f $APPWEBROOT; cd ${WEBROOT}; ROOT_DIRS=$(ls ${WEBROOT} | $GREP "^ROOT_[0-9]\{4\}.[0-9]\{2\}.[0-9]\{2\}-[0-9]\{2\}.[0-9]\{2\}.[0-9]\{2\}$"); rm -rf ${ROOT_DIRS} && deployLog "Removing ROOT context and all the related directories: ${ROOT_DIRS}"; }
         if [[ -d "$APPWEBROOT" ]]
         then
-                shopt -s dotglob;
-                rm -Rf $APPWEBROOT/* && deployLog "Content of $APPWEBROOT directory deleted";
-                shopt -u dotglob;
+                rm -Rf $APPWEBROOT && deployLog "Content of $APPWEBROOT directory deleted";
         else
                 mkdir $APPWEBROOT;
                 updateOwnership $APPWEBROOT;
