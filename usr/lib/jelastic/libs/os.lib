@@ -360,13 +360,13 @@ function installPackageCmd() {
             ;;
         alpine)
                 PM="$proxy_env; apk --wait $_apk_wait_timeout"
-            case $pmaction in
-                install)
+                case $pmaction in
+                    install)
                         pmaction="add -f"
-                    ;;
-                remove)
-                    pmaction="del -f"
-            esac
+                        ;;
+                    remove)
+                        pmaction="del -f"
+                esac
             ;;
     esac
     echo "$PM $pmaction $PKGS"
