@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Jelastic, Inc.
+# Copyright: 2023 Virtuozzo International GmbH
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,18 +40,19 @@ function setPassword() {
 
     local domain="domain1";
 
-	[ -z "$password" ] && {
-		writeJSONResponseErr "result=>4063" "message=>Password did not set";
-	}
+    [ -z "$password" ] && {
+	writeJSONResponseErr "result=>4063" "message=>Password did not set";
+	return 1
+    }
 
-	admin_key_file="/opt/glassfish${COMPUTE_TYPE_VERSION}/glassfish/domains/$domain/config/admin-keyfile";
+    admin_key_file="/opt/glassfish${COMPUTE_TYPE_VERSION}/glassfish/domains/$domain/config/admin-keyfile";
 	
-	$SED -i "/admin.*asadmin/d" $admin_key_file;
-	echo $EMPTY_PASS >> $admin_key_file;
+    $SED -i "/admin.*asadmin/d" $admin_key_file;
+    echo $EMPTY_PASS >> $admin_key_file;
 
-	echo -e "AS_ADMIN_PASSWORD=\nAS_ADMIN_NEWPASSWORD=$password" >> "/tmp/$$";
-	$AS_ADMIN -u admin -W "/tmp/$$" change-admin-password > /dev/null 2>&1;
-	echo -e "AS_ADMIN_PASSWORD=$password" > "/tmp/$$";
-	$AS_ADMIN -u admin -W "/tmp/$$" enable-secure-admin > /dev/null 2>&1;
-	rm "/tmp/$$" 2>&1;
+    echo -e "AS_ADMIN_PASSWORD=\nAS_ADMIN_NEWPASSWORD=$password" >> "/tmp/$$";
+    $AS_ADMIN -u admin -W "/tmp/$$" change-admin-password > /dev/null 2>&1;
+    echo -e "AS_ADMIN_PASSWORD=$password" > "/tmp/$$";
+    $AS_ADMIN -u admin -W "/tmp/$$" enable-secure-admin > /dev/null 2>&1;
+    rm "/tmp/$$" 2>&1;
 }

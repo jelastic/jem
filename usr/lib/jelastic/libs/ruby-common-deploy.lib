@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Jelastic, Inc.
+# Copyright: 2023 Virtuozzo International GmbH
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -94,10 +94,10 @@ function renameContext(){
     local newContext=$1;
     local oldContext=$2;
     if ! $GREP -q ${oldContext} <<< "development production test" ;then
-            writeJSONResponseErr "result=>4079" "message=>Invalid context name specified: ${oldContext}" ; exit 4079;
+            writeJSONResponseErr "result=>4079" "message=>Invalid context name specified: ${oldContext}" ; exit 1;
     fi
     if ! $GREP -q ${newContext} <<< "development production test" ; then
-            writeJSONResponseErr "result=>4079" "message=>Invalid context name specified: ${newContext}" ; exit 4079;
+            writeJSONResponseErr "result=>4079" "message=>Invalid context name specified: ${newContext}" ; exit 1;
     fi
 
     echo "${newContext}" > /var/lib/jelastic/env;

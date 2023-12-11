@@ -1,4 +1,4 @@
-![JEM](https://download.jelastic.com/index.php/apps/files_sharing/publicpreview?file=%2F%2FJEM%20Core.jpg&x=1906&a=true&t=d696e3e65cdf33969472e5679d9a3d09&scalingup=0)
+![JEM](https://download.jelastic.com/index.php/apps/files_sharing/publicpreview?file=%2F%2Fjem_public.jpeg&x=2880&a=true&t=acd71d2e5280b4953a13090fef2b59e6&scalingup=0)
 
 # **JEM**
 **JEM** is an open source platform component, intended for injection of smart logic into containers. It gives extra abilities and extra automation for applications, designed to be run inside Linux containers.
@@ -47,7 +47,7 @@ _**svn.lib**_ - library, that implements SVN management stuff
 _**git.lib**_ - library, that implements GIT management stuff
 
 ## **Application Layer Modules**  (green-colored)
-**Application Layer Modules** are designed for managing different application stacks inside containers. Such operations can be performed by Jelastic Platform Core or manually, with the help of command line interface. Each application module usually has functions, that are externally available from JEM. In case a module has a list of implementations, needed for different kinds of stacks, it includes specific extra libraries (each of which have unique implementation recipes, created specifically for a particular stack). Functions inside stack libraries are internal and cannot be called other than by parent module of this library.
+**Application Layer Modules** are designed for managing different application stacks inside containers. Such operations can be performed by the Platform Core or manually, with the help of command line interface. Each application module usually has functions, that are externally available from JEM. In case a module has a list of implementations, needed for different kinds of stacks, it includes specific extra libraries (each of which have unique implementation recipes, created specifically for a particular stack). Functions inside stack libraries are internal and cannot be called other than by parent module of this library.
 
 The list of application modules includes:
 
@@ -210,7 +210,7 @@ _**uninterract.lib**_ - manages interactive command-line applications in non-int
 
 _**user-common.lib**_ - common library, that is responsible for users’ management inside a container.
 
-_**user-gate.lib**_ - handles users’ management via SSH gateway, a proprietary *Jelastic® Infrastructure Component*.
+_**user-gate.lib**_ - handles users’ management via SSH gateway, a proprietary *Virtuozzo Application Platform infrastructure component*.
 
 _**virtuozzo.lib**_ - implements a set of functions, related to Virtuozzo containers’ management.
 

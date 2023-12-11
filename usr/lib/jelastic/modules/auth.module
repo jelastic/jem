@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2021 Jelastic, Inc.
+# Copyright: 2023 Virtuozzo International GmbH
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -184,7 +184,7 @@ function dosetupUtils() {
         [[ "$OS_ver" -eq "7" ]] && addPackages="$addPackages nfs-utils"
     elif [ "x$OS" == "xdebian" -o "x$OS" == "xubuntu" ] ; then
         addPackages="libtirpc1 nfs-common"
-        [[ "$OS_ver" -eq "10" || "$OS_ver" -eq "11" || "$OS_ver" -eq "20" || "$OS_ver" -eq "22" ]] && addPackages="libtirpc-common nfs-common"
+        [[ "$OS_ver" -eq "10" || "$OS_ver" -eq "11" || "$OS_ver" -eq "12" || "$OS_ver" -eq "20" || "$OS_ver" -eq "22" ]] && addPackages="libtirpc-common nfs-common"
 
         waitCounter=90
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - waiting until dpkg lock is released" >> ${JEM_CALLS_LOG};
@@ -224,7 +224,7 @@ function dosetupUtils() {
         return $FALSE
     fi
 
-    if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] ; then
+    if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] || [ "x$OS" == "xdebian" -a "$OS_ver" -eq "12" ]; then
         VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/deb/22.04/unfsd_0.9.23.deb"
     elif [ "x$OS" == "xalmalinux" -a "$OS_ver" -eq "9" ] ; then
             VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/rpm/unfsd-0.9.23-1.el9.x86_64.rpm"
@@ -241,7 +241,7 @@ function dosetupUtils() {
         #log output from package manager
         echo "CTID:$CTID Detected OS: $OS package manager response: $(vzexecGetLastStdOut) $(vzexecGetLastStdErr)" >> $ACTIONS_LOG
 
-        if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] ; then
+        if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] || [ "x$OS" == "xdebian" -a "$OS_ver" -eq "12" ] ; then
             VEExecRun "dpkg --install ./unfsd_0.9.23.deb && rm ./unfsd_0.9.23.deb"
         elif [ "x$OS" == "xalmalinux" -a "$OS_ver" -eq "9" ] ; then
             VEExecRun "rpm -i ./unfsd-0.9.23-1.el9.x86_64.rpm && rm ./unfsd-0.9.23-1.el9.x86_64.rpm"

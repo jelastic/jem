@@ -1,8 +1,6 @@
 #!/bin/bash
-inherit default config;
-include os output;
 
-# Copyright 2015 Jelastic, Inc.
+# Copyright: 2023 Virtuozzo International GmbH
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +14,8 @@ include os output;
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+inherit default config;
+include os output;
 
 DESCRIPTION="Manipulate iptables rules   <<<<--------------";
 VERSION="1"

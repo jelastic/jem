@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Jelastic, Inc.
+# Copyright: 2023 Virtuozzo International GmbH
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -277,7 +277,7 @@ function doUnbind() {
             service iptables save | $GRAB_OUTPUT;
             writeJSONResponseOut "result=>0" "message=>Port binding has been removed"; return 0 ;
         else
-            writeJSONResponseOut "result=>4093" "message=>Port binding has not been removed"; return 1 ;
+            writeJSONResponseErr "result=>4093" "message=>Port binding has not been removed"; return 1 ;
         fi
 
     else

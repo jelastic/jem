@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 Jelastic, Inc.
+# Copyright: 2023 Virtuozzo International GmbH
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,8 +73,8 @@ function doInstall(){
 	if vzexecRun "sed -rne '/CERTIFIED_VERSION=/{s/CERTIFIED_VERSION=([0-9]{1,})/\1/g;p}' /etc/jelastic/metainf.conf" ; then
 	    res=$(vzexecGetLastStdOut)
 	    CERTIFIED_VERSION=$res
-	    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - certified template version $_isCertified" >> ${JEM_CALLS_LOG};
 	    _isCertified="$CERTIFIED_VERSION"
+	    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - certified template version $_isCertified" >> ${JEM_CALLS_LOG};
 	fi
 
         installCmd=$(installPackageCmd $OS install $_isCertified ${PACKAGES})
