@@ -114,10 +114,10 @@ function doList(){
     fi
     if ! dirExists "$FS_PATH"; then
         if ! fileExists "$FS_PATH"; then
-            writeJSONResponseErr "result=>4035" "message=>Path '$FS_PATH' not exists";
+            writeJSONResponseErr "result=>4035" "message=>Path '${FS_PATH//\"/\\\"}' not exists"
             return 35;
         else
-            writeJSONResponseErr "result=>4102" "message=>'$FS_PATH' is not directory";
+            writeJSONResponseErr "result=>4102" "message=>'${FS_PATH//\"/\\\"}' is not directory"
             return 35;
         fi
     fi
@@ -142,7 +142,7 @@ function doRead() {
     else
 	result=$?;
 	if [ $result -eq 2 ] ; then
-	    writeJSONResponseErr "result=>4035" "message=>Path $FS_PATH not exists";
+	    writeJSONResponseErr "result=>4035" "message=>Path ${FS_PATH//\"/\\\"} not exists"
 	    return 35;
 	else
 	    writeJSONResponseErr "result=>4037" "message=>Permission denied";
@@ -172,7 +172,7 @@ function doWrite() {
 		    return 0
 		else
 		    if [ $result -eq 2 ] ; then
-			writeJSONResponseErr "result=>4035" "message=>Path $FS_PATH not exists";
+			writeJSONResponseErr "result=>4035" "message=>Path ${FS_PATH//\"/\\\"} not exists"
 			return 35;
 		    else
 			writeJSONResponseErr "result=>4037" "message=>Permission denied";
@@ -198,7 +198,7 @@ function doCreate() {
     unitRes=$?;
     if [ $unitRes -eq 0 -a "x${FS_OVERWRITE}" != "xtrue" ]; then
 
-        writeJSONResponseErr "result=>4036" "message=>Path $FS_PATH already exists";
+        writeJSONResponseErr "result=>4036" "message=>Path ${FS_PATH//\"/\\\"} already exists"
         return 36;
     fi
     local parent_dir=$(dirname "$FS_PATH") ;
@@ -226,7 +226,7 @@ function doDelete() {
         return $result_code;
     fi
     if ! checkUnit "$FS_PATH"; then
-        writeJSONResponseErr "result=>4035" "message=>Path $FS_PATH not exists";
+        writeJSONResponseErr "result=>4035" "message=>Path ${FS_PATH//\"/\\\"} not exists"
         return 35;
     fi
     local parent_dir=$(dirname "$FS_PATH");
@@ -248,7 +248,7 @@ function doDelete() {
     else
 	result=$?;
 	if [ $result -eq 2 ] ; then
-	    writeJSONResponseErr "result=>4035" "message=>Path $FS_PATH not exists";
+	    writeJSONResponseErr "result=>4035" "message=>Path ${FS_PATH//\"/\\\"} not exists"
 	    return 35;
 	else
 	    writeJSONResponseErr "result=>4037" "message=>Permission denied";
@@ -267,7 +267,7 @@ function doCopy() {
     fi
 
     if ! checkUnit "$FS_SOURCE"; then
-        writeJSONResponseErr "result=>4046" "message=>Source path '$FS_SOURCE' not exists";
+        writeJSONResponseErr "result=>4046" "message=>Source path '${FS_SOURCE//\"/\\\"}' not exists"
         return 46;
     fi
     if [ -z "$FS_DESTINATION" ]; then
@@ -282,14 +282,14 @@ function doCopy() {
     fi
 
     if fileExists "$FS_DESTINATION"; then
-        writeJSONResponseErr "result=>4047" "message=>Destination directory $FS_DESTINATION already exists";
+        writeJSONResponseErr "result=>4047" "message=>Destination directory ${FS_DESTINATION//\"/\\\"} already exists"
         return 47;
     fi
 
     if [ "${FS_DESTINATION:(-1)}" == "/" ]; then
     #${FS_DESTINATION} - directory
         if ! dirExists "$FS_DESTINATION"; then
-            writeJSONResponseErr "result=>4042" "message=>Destination directory $FS_DESTINATION not exists";
+            writeJSONResponseErr "result=>4042" "message=>Destination directory ${FS_DESTINATION//\"/\\\"} not exists"
             return 42;
         else
             if ! $( su - "$FS_USER" -c "${JPERM} $(printf '%q' "${FS_DESTINATION}") 'w' 'x'" >>${JEM_CALLS_LOG} 2>&1) ; then
@@ -298,7 +298,7 @@ function doCopy() {
 	    fi
             local file=$(basename "$FS_SOURCE");
             if fileExists "$FS_DESTINATION/$file"; then
-                writeJSONResponseErr "result=>4041" "message=>Destination file $FS_DESTINATION/$file already exists";
+                writeJSONResponseErr "result=>4041" "message=>Destination file ${FS_DESTINATION//\"/\\\"}/$file already exists"
                 return 41;
             fi
         fi
