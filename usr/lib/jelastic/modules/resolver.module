@@ -31,6 +31,7 @@ ZONE_TYPE='both';
 $PROGRAM 'grep'
 $PROGRAM 'curl'
 $PROGRAM 'sed'
+$PROGRAM 'pdns_control'
 
 function checkParams() {
     local params=($*)
@@ -73,7 +74,7 @@ function onModLoadCallback() {
 }
 
 function reload_zones(){
-    if rec_control ping &>/dev/null; then 
+    if rec_control ping &>/dev/null; then
         rec_control reload-zones;
         result=$?;
     else
@@ -144,4 +145,13 @@ function doDelUpstream() {
 
     msg=$($CURL -X DELETE "http://127.0.0.1:8666/upstream/${ZONE_NAME}")
     return 0
+}
+
+function doRediscover() {
+    local msg=$($PDNS_CONTROL rediscover)
+    log "Rediscovered: response=$msg}"
+
+    msg=$($PDNS_CONTROL --config-name=external rediscover)
+    log "Rediscovered external: response=$msg}"
+ return 0;
 }
