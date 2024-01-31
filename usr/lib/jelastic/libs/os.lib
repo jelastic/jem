@@ -352,10 +352,10 @@ function installPackageCmd() {
                 PM="$proxy_env; yum -y"
             ;;
         almalinux)
-                if [[ -z "$isCertified" ]]; then
-                    PM="$proxy_env; yum -y"
-                else
+                if [[ "$isCertified" -gt 0 ]]; then
                     PM="$proxy_env; microdnf -y"
+                else
+                    PM="$proxy_env; yum -y"
                 fi
             ;;
         alpine)

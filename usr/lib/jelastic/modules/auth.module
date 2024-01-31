@@ -171,7 +171,7 @@ function dosetupUtils() {
         echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error installing unfsd. $MOUNTPACKAGE not found" >> ${JEM_CALLS_LOG}
         return 1
     fi
-
+    local proxy_env="export http_proxy=\"$(printenv http_proxy)\"; export https_proxy=\"$(printenv https_proxy)\"; export ftp_proxy=\"$(printenv ftp_proxy)\"; export no_proxy=\"$(printenv no_proxy)\"";
     local addPackages=""
 
     issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
@@ -179,9 +179,8 @@ function dosetupUtils() {
     OS_ver=$(getOSVersion "$issue_string")
     OS_ver=${OS_ver%%.*}
 
-    if [ "x$OS" == "xcentos" -o "x$OS" == "xfedora" -o "x$OS" == "xalmalinux" ] ; then
-        addPackages="libtirpc"
-        [[ "$OS_ver" -eq "7" ]] && addPackages="$addPackages nfs-utils"
+    if [ "x$OS" == "xcentos" -o "x$OS" == "xalmalinux" ] ; then
+        addPackages="libtirpc nfs-utils"
 
         #perform repos update
         local repo="updates,base"

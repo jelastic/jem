@@ -824,13 +824,13 @@ function dosetupUtils() {
         if [ "$OS_ver" -eq "8" ]; then
             _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.6-1j.el8.x86_64.rpm"
         elif  [ "$OS_ver" -eq "9" ]; then
-            _autofspkg=""
-            vzexecRun "rpm -ivh http://repository.jelastic.com/pub/autofs-5.1.8-1j.el9.x86_64.rpm"
+            _autofspkg="http://repository.jelastic.com/pub/autofs-5.1.8-1j.el9.x86_64.rpm"
             if vzexecRun "sed -rne '/CERTIFIED_VERSION=/{s/CERTIFIED_VERSION=([0-9]{1,})/\1/g;p}' /etc/jelastic/metainf.conf" ; then
                 res=$(vzexecGetLastStdOut)
                 CERTIFIED_VERSION=$res
                 _isCertified="$CERTIFIED_VERSION"
                 echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - certified template version $_isCertified" >> ${JEM_CALLS_LOG};
+                [[ _isCertified -ge 3 ]] && { vzexecRun "rpm -ivh $_autofspkg"; _autofspkg=""; }
             fi
         fi
         if [ "$OS_ver" -eq "7" ]; then
