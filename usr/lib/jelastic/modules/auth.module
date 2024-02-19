@@ -123,11 +123,17 @@ function onModLoadCallback() {
         esac;
     done;
     [[ ! -z "${CTID}" ]] && {
-        vzIsContainerExists $CTID || { writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"; die -q; };
-        VZ_CTID_ROOT=$(vzlist -Ho root $CTID )
-        NFS_CONFIG_DIR="$(vzctPath $VZ_CTID_ROOT /etc)"
-        NFS_CONFIG_FILE="$(vzctPath $VZ_CTID_ROOT /etc/exports)"
-        EXPORTS_FILE="$(vzctPath $VZ_CTID_ROOT $CONTAINER_EXPORTS_FILE)"
+        populateVEVarsVZ $CTID
+        res=$?
+        if [[ "$res" -eq 3 ]] ; then
+            writeJSONResponseErr "result=>4003" "message=>ctid $CTID not found"
+            die -q;
+        fi
+
+        VZ_CTID_ROOT=$VZ_VEID_ROOT
+        NFS_CONFIG_DIR="$(vzctPath $VZ_VEID_ROOT /etc)"
+        NFS_CONFIG_FILE="$(vzctPath $VZ_VEID_ROOT /etc/exports)"
+        EXPORTS_FILE="$(vzctPath $VZ_VEID_ROOT $CONTAINER_EXPORTS_FILE)"
 
         if vzexecRun "sed -rne '/JELASTIC_CHECK_MOUNT=/{s/JELASTIC_CHECK_MOUNT=([0-9])/\1/g;p}' /.jelenv" ; then
             res=$(vzexecGetLastStdOut)
@@ -146,8 +152,8 @@ function onModLoadCallback() {
     }
 
     if [ -z "$VAP_FIREWALL_BACKEND" ] ; then
-        local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-        local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
+        local issue_file="$(vzctPath $VZ_VEID_ROOT /etc/issue )"
+        local release_files="$(vzctPath $VZ_VEID_ROOT /etc/)/*-release"
         issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
 
         VAP_FIREWALL_BACKEND=$( detectFirewallBackend "$issue_string" )
@@ -155,96 +161,128 @@ function onModLoadCallback() {
 }
 
 function dosetupUtils() {
-    local issue_file="$(vzctPath $VZ_CTID_ROOT /etc/issue )"
-    local release_files="$(vzctPath $VZ_CTID_ROOT /etc/)/*-release"
-    local _metainf="$(vzctPath $VZ_CTID_ROOT $METAINFOFILE)"
 
     isContainerRunning ${CTID} && {
         local computetype="$( [ -e "$_metainf" ] && $SED -nre '/COMPUTE_TYPE=/{s/COMPUTE_TYPE=(\S+)/\1/g;p}' "$_metainf")"
         if [[ "xstorage" == "x$computetype" ]] ; then
             vzexecRun "systemctl enable nfs-server"
-            return $TRUE
+            return 0
         fi
     }
 
     if [[ ! -e "$MOUNTPACKAGE" ]] ; then
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error installing unfsd. $MOUNTPACKAGE not found" >> ${JEM_CALLS_LOG}
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error installing unfsd. $MOUNTPACKAGE not found" >> $JEM_CALLS_LOG
         return 1
     fi
     local proxy_env="export http_proxy=\"$(printenv http_proxy)\"; export https_proxy=\"$(printenv https_proxy)\"; export ftp_proxy=\"$(printenv ftp_proxy)\"; export no_proxy=\"$(printenv no_proxy)\"";
     local addPackages=""
 
-    issue_string=$(set +f; cat $release_files $issue_file 2>/dev/null);
-    OS=$(detectOS "$issue_string")
-    OS_ver=$(getOSVersion "$issue_string")
-    OS_ver=${OS_ver%%.*}
+    #install nfs-utils
+    case $VZ_VEID_OS in
+        almalinux|centos|fedora|vzlinux )
 
-    if [ "x$OS" == "xcentos" -o "x$OS" == "xalmalinux" ] ; then
-        addPackages="libtirpc nfs-utils"
+            if [ "x$VZ_VEID_OS" == "xcentos" -a "$VZ_VEID_OS_VER" -eq 5 ] ; then
+                writeJSONResponseErr "result=>4112" "message=>NFS: CentOS 5 is not supported"
+                return 1
+            fi
+            if [ "x$VZ_VEID_OS" == "xcentos" -a "$VZ_VEID_OS_VER" -eq 6 ] ; then
+                writeJSONResponseErr "result=>4112" "message=>NFS: CentOS 6 is not supported"
+                return 1
+            fi
 
-        #perform repos update
-        local repo="updates,base"
-        [[ "${OS_ver/.*}" == "9" ]] && repo="appstream"
-        vzexecRun "$proxy_env; yum update -y ca-certificates --disablerepo=* --enablerepo=${repo}"
-    elif [ "x$OS" == "xdebian" -o "x$OS" == "xubuntu" ] ; then
-        addPackages="libtirpc1 nfs-common"
-        [[ "$OS_ver" -eq "10" || "$OS_ver" -eq "11" || "$OS_ver" -eq "12" || "$OS_ver" -eq "20" || "$OS_ver" -eq "22" ]] && addPackages="libtirpc-common nfs-common"
+            addPackages="libtirpc"
 
-        waitCounter=90
-        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - waiting until dpkg lock is released" >> ${JEM_CALLS_LOG};
-        for apt_lock_file in "/var/lib/dpkg/lock" "/var/lib/dpkg/lock-frontend"; do
-         if [ -f "$(vzctPath $VZ_CTID_ROOT $apt_lock_file)" ]; then
-            while [ -n "$(vzexecRun "pgrep 'apt|dpkg' | tr '[:cntrl:]' ' '"; vzexecGetLastStdOut;)" ]; do
-                waitCounter=$((waitCounter-1));
-                [[ $waitCounter -eq 0 ]] && break
-                sleep 3;
+            if [ "$VZ_VEID_OS_VER" -eq 7 -o "x$VZ_VEID_OS" == "xvzlinux" ]; then
+                addPackages="$addPackages nfs-utils"
+            fi
+
+            #perform repos update
+            local repo="updates,base"
+
+            [[ "${VZ_VEID_OS_VER/.*}" == "9" ]] && repo="appstream"
+            vzexecRun "$proxy_env; yum update -y ca-certificates --disablerepo=* --enablerepo=$repo"
+            ;;
+
+        debian|ubuntu )
+
+            if [ "x$VZ_VEID_OS" == "xdebian" -a "$VZ_VEID_OS_VER" -eq 6 ] ; then
+                writeJSONResponseErr "result=>4112" "message=>NFS: Debian 6 is not supported"
+                return 1
+            fi
+
+            addPackages="libtirpc1 nfs-common"
+            case $VZ_VEID_OS_VER in
+                10|11|12|20|22)
+                    addPackages="libtirpc-common nfs-common"
+                    ;;
+            esac
+
+            waitCounter=90
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - waiting until dpkg lock is released" >> $JEM_CALLS_LOG;
+            for apt_lock_file in "/var/lib/dpkg/lock" "/var/lib/dpkg/lock-frontend"; do
+                if [ -f "$(vzctPath $VZ_VEID_ROOT $apt_lock_file)" ]; then
+                    while [ -n "$(vzexecRun "pgrep 'apt|dpkg' | tr '[:cntrl:]' ' '"; vzexecGetLastStdOut;)" ]; do
+                        waitCounter=$((waitCounter-1));
+                        [[ $waitCounter -eq 0 ]] && break
+                        sleep 3;
+                    done
+                    rm -f "$(vzctPath $VZ_VEID_ROOT $apt_lock_file)"
+                fi
             done
-           rm -f "$(vzctPath $VZ_CTID_ROOT $apt_lock_file)"
-         fi
-        done
 
-        #perform repos update
-        [[ "$OS_ver" == "10" || "$OS_ver" == "11" ]] && ric="--allow-releaseinfo-change" || ric=""
-        vzexecRun "$proxy_env; apt-get $ric update -y"
-    elif [ "x$OS" == "xvzlinux" ] ; then
-        addPackages="libtirpc nfs-utils"
+            case $VZ_VEID_OS_VER in
+                10|11)
+                    ric="--allow-releaseinfo-change"
+                    ;;
+                *)
+                    ric=""
+                    ;;
+            esac
 
-        #perform repos update
-        local repo="updates,base"
-        vzexecRun "$proxy_env; yum update -y ca-certificates --disablerepo=* --enablerepo=${repo}"
-    fi
+            #perform repos update
+            vzexecRun "$proxy_env; apt-get $ric update -y"
+            ;;
+        alpine)
+            writeJSONResponseErr "result=>4112" "message=>NFS: Alpine Linux is not supported"
+            return 1
+            ;;
+    esac
 
+    echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - installing rpcbind $addPackages" >> $JEM_CALLS_LOG
     installCmd=$(installPackageCmd $OS install rpcbind $addPackages)
     checkCmd=$(checkPackageCmd $OS rpcbind )
 
-    #JE-25896
-    if [ "x$OS" == "xalpine" ] ; then
-        writeJSONResponseErr "result=>4112" "message=>NFS: Alpine Linux is not supported"
-        return $FALSE
-    fi
-    if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "5" ] ; then
-        writeJSONResponseErr "result=>4112" "message=>NFS: CentOS 5 is not supported"
-        return $FALSE
-    fi
-    if [ "x$OS" == "xcentos" -a "$OS_ver" -eq "6" ] ; then
-        writeJSONResponseErr "result=>4112" "message=>NFS: CentOS 6 is not supported"
-        return $FALSE
-    fi
-    if [ "x$OS" == "xdebian" -a "$OS_ver" -eq "6" ] ; then
-        writeJSONResponseErr "result=>4112" "message=>NFS: Debian 6 is not supported"
-        return $FALSE
+    #the installFromTAR indicates whether unfsd will be unpacked from TAR or we use package
+    installFromTAR=1
+    case $VZ_VEID_OS in
+        ubuntu)
+            if [ $VZ_VEID_OS_VER -ge 22 ] ; then
+                installFromTAR=0
+                VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/deb/22.04/unfsd_0.9.23.deb"
+            fi
+            ;;
+        debian)
+            if [ $VZ_VEID_OS_VER -ge 12 ] ; then
+                installFromTAR=0
+                VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/deb/22.04/unfsd_0.9.23.deb"
+            fi
+            ;;
+        almalinux)
+            if [ $VZ_VEID_OS_VER -ge 12 ] ; then
+                installFromTAR=0
+                VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/rpm/unfsd-0.9.23-1.el9.x86_64.rpm"
+            fi
+            ;;
+    esac
+
+    if [[ $installFromTAR -eq 1 ]] ; then
+        echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - unpacking $MOUNTPACKAGE" >> $JEM_CALLS_LOG
+        $TAR hzxf "$MOUNTPACKAGE" -C "$VZ_VEID_ROOT/"
     fi
 
-    if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] || [ "x$OS" == "xdebian" -a "$OS_ver" -eq "12" ]; then
-        VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/deb/22.04/unfsd_0.9.23.deb"
-    elif [ "x$OS" == "xalmalinux" -a "$OS_ver" -eq "9" ] ; then
-            VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/rpm/unfsd-0.9.23-1.el9.x86_64.rpm"
-    else
-        $TAR hzxf "$MOUNTPACKAGE" -C "$VZ_CTID_ROOT/"
-    fi
 
     # install systemD unit
-    [[ -d "$(vzctPath $VZ_CTID_ROOT /lib/systemd/system)" ]] && echo "$SystemDUnit" > "$(vzctPath $VZ_CTID_ROOT /lib/systemd/system/unfsd.service)"
+    [[ -d "$(vzctPath $VZ_VEID_ROOT/lib/systemd/system)" ]] && echo "$SystemDUnit" > "$(vzctPath $VZ_VEID_ROOT /lib/systemd/system/unfsd.service)"
 
     isContainerRunning $CTID && {
         vzexecRun "$installCmd"
@@ -252,10 +290,23 @@ function dosetupUtils() {
         #log output from package manager
         echo "CTID:$CTID Detected OS: $OS package manager response: $(vzexecGetLastStdOut) $(vzexecGetLastStdErr)" >> $ACTIONS_LOG
 
-        if [ "x$OS" == "xubuntu" -a "$OS_ver" -eq "22" ] || [ "x$OS" == "xdebian" -a "$OS_ver" -eq "12" ] ; then
-            VEExecRun "dpkg --install ./unfsd_0.9.23.deb && rm ./unfsd_0.9.23.deb"
-        elif [ "x$OS" == "xalmalinux" -a "$OS_ver" -eq "9" ] ; then
-            VEExecRun "rpm -i ./unfsd-0.9.23-1.el9.x86_64.rpm && rm ./unfsd-0.9.23-1.el9.x86_64.rpm"
+        # if not installed from TAR-package use the package manager
+        if [[ $installFromTAR -eq 0 ]] ; then
+            PMInstallCmd=""
+            case $VZ_VEID_OS in
+                debian|ubuntu)
+                    PMInstallCmd="dpkg --install ./unfsd_0.9.23.deb && rm ./unfsd_0.9.23.deb"
+                ;;
+                almalinux)
+                    PMInstallCmd="rpm -i ./unfsd-0.9.23-1.el9.x86_64.rpm && rm ./unfsd-0.9.23-1.el9.x86_64.rpm"
+                ;;
+            esac
+
+            if ! VEExecRun "$PMInstallCmd" ; then
+                stdout=$(vzexecGetLastStdOut)
+                writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $stdout"
+                return 1
+            fi
         fi
 
         vzexecRun "eval $checkCmd"
@@ -265,14 +316,15 @@ function dosetupUtils() {
             return 1
         fi
 
-        if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" -o "x$OS" == "xsuse" ] ; then
-            vzexecRun 'ln -s "/etc/rc.d/init.d/unfsd.jelastic" "/etc/init.d/unfsd.jelastic"'
+
+        if [ "x$VZ_VEID_OS" == "xubuntu" -o "x$VZ_VEID_OS" == "xdebian" -o "x$VZ_VEID_OS" == "xsuse" ] ; then
+            vzexecRun '[ -d /etc/conf.d1 ] && ln -s "/etc/rc.d/init.d/unfsd.jelastic" "/etc/init.d/unfsd.jelastic"'
         fi
 
-        if [ "x$OS" == "xubuntu" -o "x$OS" == "xdebian" ] ; then
+        if [ "x$VZ_VEID_OS" == "xubuntu" -o "x$VZ_VEID_OS" == "xdebian" ] ; then
             vzexecRun 'update-rc.d unfsd.jelastic defaults'
-            if [ "x$OS" == "xdebian" ] ; then
-                if [ "$OS_ver" -ge "8" ] ; then
+            if [ "x$VZ_VEID_OS" == "xdebian" ] ; then
+                if [ "$VZ_VEID_OS_VER" -ge "8" ] ; then
                     vzexecRun "systemctl enable unfsd"
                 else
                     vzexecRun 'sed -i -r "/^#/!s/exit\s+0/service rpcbind start;\n\/etc\/init.d\/unfsd.jelastic start;\nexit 0/g" /etc/rc.local'
@@ -282,7 +334,7 @@ function dosetupUtils() {
 
 
         if ! vzexecRun "$_INSTALLUNFSDCMD" ; then
-            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error installing unfsd." >> ${JEM_CALLS_LOG}
+            echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - error installing unfsd." >> $JEM_CALLS_LOG
             return 1
         fi
     }
