@@ -268,7 +268,7 @@ function dosetupUtils() {
             fi
             ;;
         almalinux)
-            if [ $VZ_VEID_OS_VER -ge 12 ] ; then
+            if [ $VZ_VEID_OS_VER -ge 9 ] ; then
                 installFromTAR=0
                 VEExecRun "curl -sLO http://repository.jelastic.com/pub/unfsd/rpm/unfsd-0.9.23-1.el9.x86_64.rpm"
             fi
