@@ -312,7 +312,7 @@ function checkMount() {
     esac
 
     retries=5
-    cmdShowmount='showmount -e '$1' | grep "'$2'"'
+    cmdShowmount='showmount -e '$1' | grep -P "^'$2'\s" | head -n1'
 
     localCIPs=($(getTargetIPs))
 
