@@ -109,15 +109,15 @@ function setDefaultPolicy() {
 
 function netfilterStop() {
     [[ "${FIREWALL_ENABLED}" -eq "0" ]] || [ -z "${FIREWALL_ENABLED+xxx}" ] || [ -z "${FIREWALL_ENABLED}" -a "${FIREWALL_ENABLED+xxx}" = "xxx" ] && return 0;
-    $IPTABLES -X;
-    $IPTABLES -X -t nat;
-    $IPTABLES -F;
-    $IPTABLES -F -t nat;
+    $IPTABLES -F &>>$JEM_CALLS_LOG
+    $IPTABLES -F -t nat &>>$JEM_CALLS_LOG
+    $IPTABLES -X &>>$JEM_CALLS_LOG
+    $IPTABLES -X -t nat &>>$JEM_CALLS_LOG
 
-    $IP6TABLES -X;
-    $IP6TABLES -X -t nat;
-    $IP6TABLES -F;
-    $IP6TABLES -F -t nat;
+    $IP6TABLES -F &>>$JEM_CALLS_LOG
+    $IP6TABLES -F -t nat &>>$JEM_CALLS_LOG
+    $IP6TABLES -X &>>$JEM_CALLS_LOG
+    $IP6TABLES -X -t nat &>>$JEM_CALLS_LOG
 
     setDefaultPolicy "ACCEPT"
 }
