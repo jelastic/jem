@@ -111,19 +111,23 @@ function doAddZone() {
 
 function doFixZones() {
     $PROGRAM 'mysql'
+    $PROGRAM 'awk'
     _QUERY='select DISTINCT(name) from hivext_jelastic.dns_internal where rdtype="SOA";'
     OLD_IFS=$IFS; IFS=$'\n';
-    ZONES=($(${MYSQL} -uroot -BNse "${_QUERY}")) || return $?
-    IFS=$OLD_IFS
-    > $SLB_ZONES_CONFIG_PATH
-    for zone in ${ZONES[*]} ; do
-        ZONE_NAME=$zone
-        echo "Adding zone ${ZONE_NAME}"
-        out=$(doAddZone)
-        log $out
-    done
-    reload_zones;
-    return $?
+    ZONES_DB=($(${MYSQL} -uroot -BNse "${_QUERY}")) || return $?
+    if ! diff <(for z in ${ZONES_DB[*]}; do echo $z; done | sort) <($AWK '{print $1}' $SLB_ZONES_CONFIG_PATH 2>/dev/null | sort) &>/dev/null; then
+        > $SLB_ZONES_CONFIG_PATH
+        for zone in ${ZONES_DB[*]} ; do
+            ZONE_NAME=$zone
+            echo "Adding zone ${ZONE_NAME}"
+            out=$(doAddZone)
+            log $out
+        done
+        reload_zones;
+        return $?
+    else
+        return 0
+    fi
 }
 
 function doRemoveZone() {
