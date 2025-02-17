@@ -46,13 +46,13 @@ FW_CONTAINER_DEFINED_FILE="/etc/nftables/container-defined.nft"
 
 # $1 - type
 listTables() {
-    nft list tables $1 | sed -E 's/table $1[[:space:]]+//g'
+    nft list tables $1 2>/dev/null | sed -E 's/table $1[[:space:]]+//g'
 }
 
 # $1 - type
 # $2 - name
 removeTable() {
-    nft delete table $1 $2
+    nft delete table $1 $2 2>/dev/null
 }
 
 clearTables() {
@@ -75,7 +75,7 @@ putShabang() {
 
 setExists() {
     : ${1:?"Missing param: name"};
-    out=$(nft -j list sets inet | jq '.nftables[] | select(.set) | select(.set.name|test($var))' --arg var $1)
+    out=$(nft -j list sets inet 2>/dev/null | jq '.nftables[] | select(.set) | select(.set.name|test($var))' --arg var $1)
     [[ -n "$out" ]]
 }
 
@@ -83,7 +83,7 @@ setExists() {
 getNumberOfActiveSets() {
     local mask="${1:='.*'}"
     local re='^[0-9]+$'
-    out=$(nft -j list sets | jq 'def count(s): reduce s as $i  (0; .+1); count(.nftables[].set| select(.!=null) | select(.name|test($var)))' --arg var $mask)
+    out=$(nft -j list sets 2>/dev/null | jq 'def count(s): reduce s as $i  (0; .+1); count(.nftables[].set| select(.!=null) | select(.name|test($var)))' --arg var $mask)
     if ! [[ $out =~ $re ]] ; then
         echo "0"
     else
@@ -96,7 +96,7 @@ getNumberOfActiveSets() {
 tableExists() {
     local ttype="${1:=$FW_DEFAULT_TABLE_TYPE}"
     local tname="${2:=$FW_FILTER_TABLE_NAME}"
-    out=$(nft -j list tables | jq '.nftables[].table | select(.!=null) | select(.family|test($fam)) | select(.name|test($name))' --arg fam $ttype --arg name $tname)
+    out=$(nft -j list tables 2>/dev/null | jq '.nftables[].table | select(.!=null) | select(.family|test($fam)) | select(.name|test($name))' --arg fam $ttype --arg name $tname)
     [[ -n "$out" ]]
 }
 
@@ -108,7 +108,7 @@ chainExists() {
     local ttype="${1:=$FW_DEFAULT_TABLE_TYPE}"
     local tname="${2:=$FW_FILTER_TABLE_NAME}"
     local cname="${3:="FORWARD"}"
-    out=$(nft -j list tables | jq '.nftables[].chain | select(.!=null) | select(.table|test($tname)) | select (.name|test($cname)) | select(.family|test($ttype))' --arg ttype $ttype --arg tname $tname --arg cname $cname)
+    out=$(nft -j list tables 2>/dev/null | jq '.nftables[].chain | select(.!=null) | select(.table|test($tname)) | select (.name|test($cname)) | select(.family|test($ttype))' --arg ttype $ttype --arg tname $tname --arg cname $cname)
     [[ -n "$out" ]]
 }
 
@@ -367,7 +367,7 @@ function netfilterRedirect() {
 }
 
 function getUsedPorts() {
-    echo $(nft -a list chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN | grep -E 'dnat' | cut -d' ' -f 3 | awk '!seen[$0]++')
+    echo $(nft -a list chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN 2>/dev/null | grep -E 'dnat' | cut -d' ' -f 3 | awk '!seen[$0]++')
 }
 
 function netfilterForward() {
@@ -387,7 +387,7 @@ function netfilterForward() {
         exit 1
     fi
 
-    local port=$(nft -a list chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN | grep -E "$__PROTO dport $__SPORT dnat to $__IP:$__PORT")
+    local port=$(nft -a list chain $FW_DEFAULT_TABLE_TYPE $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN 2>/dev/null | grep -E "$__PROTO dport $__SPORT dnat to $__IP:$__PORT")
     if [[ ! -z "$port" ]] ; then
         writeJSONResponseErr "result=>4092" "message=>This pair IP:PORT already bind to port $port" "port=>$port"
         exit 1
@@ -399,7 +399,7 @@ function netfilterForward() {
         exit 1
     fi
 
-    if nft add rule $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN ip protocol $__PROTO $__PROTO dport $freeport dnat to $__IP:$__PORT ; then
+    if nft add rule $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN ip protocol $__PROTO $__PROTO dport $freeport dnat to $__IP:$__PORT 2>/dev/null ; then
         echo "add rule $FW_NAT_TABLE_NAME $FW_NAT_PREROUTING_CHAIN ip protocol $__PROTO $__PROTO dport $freeport dnat to $__IP:$__PORT" >> "$rules_file"
         writeJSONResponseOut "result=>0" "message=>Port has been added" "port=>$freeport"
         return 0
@@ -416,7 +416,7 @@ function netfilterSNAT() {
     fi
 
     # Check if binding already exists {{{
-    local port=$(nft -a list chain $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN | grep -E "ip protocol $__PROTO ip daddr $__NETWORK snat to $__IP")
+    local port=$(nft -a list chain $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN 2>/dev/null | grep -E "ip protocol $__PROTO ip daddr $__NETWORK snat to $__IP")
 
     if [[ ! -z $port ]] ; then
                 writeJSONResponseErr "result=>4092" "message=>This pair IP:NETWORK ($__IP:$__PROTO) already bind"
@@ -425,7 +425,7 @@ function netfilterSNAT() {
     # }}}
 
 
-    if nft add rule $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN ip protocol $__PROTO ip daddr $__NETWORK snat to $__IP ; then
+    if nft add rule $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN ip protocol $__PROTO ip daddr $__NETWORK snat to $__IP 2>/dev/null ; then
         echo "add rule $FW_NAT_TABLE_NAME $FW_NAT_POSTROUTING_CHAIN ip protocol $__PROTO ip daddr $__NETWORK snat to $__IP" >> "$rules_file"
         writeJSONResponseOut "result=>0" "message=>SNAT has been added"; return 0 ;
     fi
@@ -555,7 +555,7 @@ function netfilterStart() {
     nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN icmp type timestamp-request counter drop 2>>$JEM_CALLS_LOG
 
 
-    nft -a list chain ip filter INPUT | grep -q "reject with icmp host-prohibited" || nft add rule ip filter INPUT counter reject with icmp type host-prohibited 2>>$JEM_CALLS_LOG
+    nft -a list chain ip filter INPUT 2>>/dev/null | grep -q "reject with icmp host-prohibited" || nft add rule ip filter INPUT counter reject with icmp type host-prohibited 2>>$JEM_CALLS_LOG
 }
 
 function netfilterEnable() {
