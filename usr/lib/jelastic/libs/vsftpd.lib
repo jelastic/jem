@@ -29,8 +29,9 @@ FTP_PROCESS_NAME="vsftpd"
 
 function setvsFtpCert(){
         APPSERVER_USER_UID=$(id -u jelastic 2>/dev/null || echo 700 )
-        [[ "x${COMPUTE_TYPE,,}" == "xstorage" ]] || chown -R  $APPSERVER_USER_UID $MOUNT_DIR 2>/dev/null;
-
+        [[ "x${COMPUTE_TYPE,,}" == "xstorage" ]] || {
+            find $MOUNT_DIR -not -uid $APPSERVER_USER_UID -print0 | xargs -0 -n1000 -r chown -R $APPSERVER_USER_UID 2>/dev/null;
+        }
         [ -d "/var/ftp/pub" ]  && rmdir "/var/ftp/pub/" >/dev/null 2>&1;
         if [ -f /usr/lib/systemd/system/vsftpd.service ]; then
             [ -f /etc/rc.d/init.d/vsftpd ] && rm -f /etc/rc.d/init.d/vsftpd;
