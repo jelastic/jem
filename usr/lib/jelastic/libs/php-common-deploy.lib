@@ -18,6 +18,7 @@
 PHPCOMMONDEPLOYLIB_VERSION="0.1";
 
 inherit default exceptor;
+$PROGRAM 'awk';
 $PROGRAM 'grep';
 $PROGRAM 'unzip';
 $PROGRAM 'bzip2';
@@ -153,9 +154,13 @@ function shiftContentFromSubdirectory(){
 function updateOwnership(){
     shopt -s dotglob;
     APPWEBROOT=$1;
-    chown -Rf "$DATA_OWNER" "$APPWEBROOT" 2>>"$JEM_CALLS_LOG"  && deployLog "${APPWEBROOT} owner is set to ${DATA_OWNER}" || deployLog "${APPWEBROOT} ownership set failed";
-    chmod -Rf a+r "$APPWEBROOT" 2>>"$JEM_CALLS_LOG" && deployLog "Added read permissions for all to ${APPWEBROOT}" || deployLog "Setting read permissions for all to ${APPWEBROOT} failed";
-    chmod -Rf u+w "$APPWEBROOT" 2>>"$JEM_CALLS_LOG" && deployLog "Added write permissions for ${DATA_OWNER} to ${APPWEBROOT}" || deployLog "Adding write permissions to ${APPWEBROOT} failed";
+    APPUSER=$($AWK  -F ":" '{ print $1 }' <<< $DATA_OWNER );
+    APPGROUP=$($AWK  -F ":" '{ print $2 }' <<< $DATA_OWNER );
+    find "$APPWEBROOT" -not -user "$APPUSER" -not -group "$APPGROUP" -print0 | xargs -0 -r chown -f "$DATA_OWNER" 2>>"$JEM_CALLS_LOG" && \
+    deployLog "${APPWEBROOT} owner is set to ${DATA_OWNER}" || deployLog "${APPWEBROOT} ownership set failed";
+    chmod -Rf a+r,u+w "$APPWEBROOT" 2>>"$JEM_CALLS_LOG" && \
+    deployLog "Added read permissions for all, write permissions for ${DATA_OWNER} to ${APPWEBROOT}" || \
+    deployLog "Setting read permissions for all, write permissions for ${DATA_OWNER} to ${APPWEBROOT} failed";
     shopt -u dotglob;
 }
 
