@@ -106,15 +106,11 @@ function doSetos(){
                         setvsFtpCert;
                 else
                         [ -z "$homeDirectory" ] && { writeJSONResponseErr "result=>4099" "message=>Missing param" ; return 99; }
-                        response=$($GREP -q "^${user}:" /etc/passwd);
-                        userExists=$?;
-                        if [ ${userExists} -eq 0 ]; then
-                            writeJSONResponseOut "result=>4045" "message=>ERROR adding user!"; die -q;
-                        else
-                            /usr/bin/mkdir -p $homeDirectory;
+                        /usr/bin/mkdir -p $homeDirectory
+                        if ! $GREP -q "^${user}:" /etc/passwd ; then
                             /usr/sbin/adduser --home-dir $homeDirectory --shell /bin/false $user 2>/dev/null;
-                            /usr/bin/chown -R $user:$user $homeDirectory;
                         fi
+                        /usr/bin/chown -R $user:$user $homeDirectory
                 fi
 
  		echo "$user:$password" | $CHPASSWD > /dev/null 2>&1 && writeJSONResponseOut "result=>0" "message=>Password set successfully" || { writeJSONResponseErr "result=>4051" "message=>Could not set password!"; return 1; };
