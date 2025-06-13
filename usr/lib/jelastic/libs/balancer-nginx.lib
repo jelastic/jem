@@ -743,10 +743,14 @@ function setConfigVariables(){
 }
 
 function setSSLforLB(){
-    [ -f "$NGINX_SSL_CONFIG" ] &&
+    [ -f "$NGINX_SSL_CONFIG" ] && {
 	$SED -i -re 's/^\s*include\s*conf.d\/ssl.upstreams.inc/#include conf.d\/ssl.upstreams.inc/' $NGINX_SSL_CONFIG ;
-    [ -f "${NGINX_SSL_CONFIG}.disabled" ] &&
+	grep -q 'set $group common;' $NGINX_SSL_CONFIG ||  sed -i -e '/SRVGROUP/i\\t\tset \$group common;' $NGINX_SSL_CONFIG;
+    }
+    [ -f "${NGINX_SSL_CONFIG}.disabled" ] && {
         $SED -i -re 's/^\s*include\s*conf.d\/ssl.upstreams.inc/#include conf.d\/ssl.upstreams.inc/' "${NGINX_SSL_CONFIG}.disabled" ;
+        grep -q 'set $group common;' "${NGINX_SSL_CONFIG}.disabled" ||  sed -i -e '/SRVGROUP/i\\t\tset \$group common;' "${NGINX_SSL_CONFIG}.disabled";
+    }
 }
 
 function unsetSSLforLB(){
