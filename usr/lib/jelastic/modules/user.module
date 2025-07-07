@@ -171,7 +171,7 @@ function __injected_not_vds_add() {
         fi
         bashRestricts 2>>"$JEM_CALLS_LOG" && vzexecGetLastStdOut && return 0 || { writeJSONResponseErr "result=>4119" "message=>Cannot fix user rights"; return 4119; }
     else
-        writeJSONResponseErr "result=>4045" "message=>${vzexecGetLastStdErr}"
+        writeJSONResponseErr "result=>4045" "message=>$(vzexecGetLastStdErr)"
     fi
 }
 
