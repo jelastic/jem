@@ -369,6 +369,9 @@ use of unsufficient disk space). rsync exit code is $result";
             if [[ $result == 2 ]]; then
                     writeJSONResponseErr "result=>4211" "message=>Token required";
                     die -q;
+            elif [[ $result == 5 ]]; then
+                writeJSONResponseErr "result=>4050" "message=>Branch name is not valid!";
+                die -q;
             elif [[ $result != 0 ]]; then
                 writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect";
                 die -q;
@@ -426,6 +429,8 @@ use of unsufficient disk space). rsync exit code is $result";
             result=$?
             if [[ $result == 2 ]]; then
                 writeJSONResponseErr "result=>4211" "message=>Token required"; die -q;
+            elif [[ $result == 5 ]]; then
+                writeJSONResponseErr "result=>4050" "message=>Branch name is not valid!"; die -q;
             elif [[ $result != 0 ]]; then
                 writeJSONResponseErr "result=>4000" "message=>Authentication failed or url is incorrect"; die -q;
             fi

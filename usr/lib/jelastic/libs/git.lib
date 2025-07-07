@@ -62,7 +62,12 @@ function doCheckout(){
             echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
             cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
         }
-        [ ! -z $BRANCH ] && cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1 && cd - >> $JEM_CALLS_LOG 2>&1;       ###### we removed --git-dir directive because of bug in GIT
+        [ ! -z $BRANCH ] && {
+            cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1
+            _res=$?
+            cd - >> $JEM_CALLS_LOG 2>&1;       ###### we removed --git-dir directive because of bug in GIT
+            if [[ $_res != 0 ]]; then return 5; fi
+            }
         REPO_PATH=$(dirname ${URL})
         cd "${WEBROOT}/${PROJECT_NAME}" && submodule_list=($($GIT submodule | $AWK '{print $2}'))
         for submodule_name in "${submodule_list[@]}"; do
@@ -87,7 +92,12 @@ function doCheckout(){
             echo -n "$(date) " >> ${VCS_AUTORESOLVE_LOG};
             cd "${WEBROOT}/${PROJECT_NAME}" && $GIT --git-dir="${WEBROOT}/${PROJECT_NAME}/.git" reset --hard HEAD  >> ${VCS_AUTORESOLVE_LOG} 2>>${VCS_AUTORESOLVE_LOG} && cd - > /dev/null 2>&1;
         }
-        [ ! -z $BRANCH ] && cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1 && cd - > /dev/null 2>&1;      ###### we removed --git-dir directive because of bug in GIT
+        [ ! -z $BRANCH ] && {
+            cd  "${WEBROOT}/${PROJECT_NAME}" &&  $GIT checkout $BRANCH > /dev/null 2>&1
+            _res=$?
+            cd - > /dev/null 2>&1;      ###### we removed --git-dir directive because of bug in GIT
+            if [[ $_res != 0 ]]; then return 5; fi
+        }
         [ "${COMPUTE_TYPE}" == "apache-ruby" -o "${COMPUTE_TYPE}" ==  "nginx-ruby" ] && {
             inherit ruby-common;
             bundleInstall;
