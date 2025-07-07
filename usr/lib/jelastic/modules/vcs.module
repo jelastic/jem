@@ -218,8 +218,8 @@ function readProjectConfig(){
 function enableVCSLibrary(){
 
   [ -z $VCS_TYPE ] && {
-    echo "Unknown VCS type!";
-    return 1;
+    writeJSONResponseErr "result=>4088" "message=>Unknown VCS type!"
+    die -q
   }
 
   case ${VCS_TYPE} in
