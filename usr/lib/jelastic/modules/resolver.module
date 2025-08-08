@@ -86,7 +86,7 @@ function reload_zones(){
 
 
 function doAddZone() {
-    local INTERNALIPS="${region_pdns_internal_ips}"
+    local PDNS_IPS="${region_pdns_internal_ips}"
     local requiredParqams=("ZONE_NAME" "PDNS_IPS")
     local msg=$(checkParams ${requiredParqams[@]})
     [[ ! -z "${msg}" ]] && { writeJSONResponseErr "result=>4099" "message=>Missing param $msg" ; return 99; }
