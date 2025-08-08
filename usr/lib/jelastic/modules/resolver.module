@@ -112,9 +112,17 @@ function doAddZone() {
 function doFixZones() {
     $PROGRAM 'mysql'
     $PROGRAM 'awk'
-    _QUERY='select DISTINCT(name) from hivext_jelastic.dns_internal where rdtype="SOA";'
+    _QUERY="select DISTINCT(name) from hivext_jelastic.dns_internal where rdtype='SOA';"
     OLD_IFS=$IFS; IFS=$'\n';
-    ZONES_DB=($(${MYSQL} -uroot -BNse "${_QUERY}")) || return $?
+
+    MYSQL_CNF="/etc/jelastic/mysql.conf"
+    if [ -f "$MYSQL_CNF" ]; then
+        MYSQL_CMD="${MYSQL} --defaults-extra-file=${MYSQL_CNF} -BNse \"${_QUERY}\""
+        ZONES_DB=($(eval $MYSQL_CMD)) || return $?
+    else
+        ZONES_DB=($(${MYSQL} -uroot -BNse "${_QUERY}")) || return $?
+    fi
+
     if ! diff <(for z in ${ZONES_DB[*]}; do echo $z; done | sort) <($AWK '{print $1}' $SLB_ZONES_CONFIG_PATH 2>/dev/null | sort) &>/dev/null; then
         > $SLB_ZONES_CONFIG_PATH
         for zone in ${ZONES_DB[*]} ; do
