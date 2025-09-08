@@ -87,7 +87,11 @@ function reload_zones(){
 
 function doAddZone() {
     local PDNS_IPS="${region_pdns_internal_ips}"
-    local requiredParqams=("ZONE_NAME" "PDNS_IPS")
+    local requiredParqams=("ZONE_NAME")
+    [[ "$ZONE_NAME" = 'cluster.local' ]] && {
+        PDNS_IPS="${jelastic_k8s_coredns_clusterip}"
+    }
+    local requiredParqams=("PDNS_IPS") 
     local msg=$(checkParams ${requiredParqams[@]})
     [[ ! -z "${msg}" ]] && { writeJSONResponseErr "result=>4099" "message=>Missing param $msg" ; return 99; }
     [[ ! -e "$SLB_ZONES_CONFIG_PATH" ]] && {
@@ -108,7 +112,7 @@ function doAddZone() {
 function doFixZones() {
     $PROGRAM 'mysql'
     $PROGRAM 'awk'
-    _QUERY="select DISTINCT(name) from hivext_jelastic.dns_internal where rdtype='SOA';"
+    _QUERY="select DISTINCT(name) from hivext_jelastic.dns_internal where rdtype='SOA' UNION SELECT 'cluster.local' ;"
     OLD_IFS=$IFS; IFS=$'\n';
 
     MYSQL_CNF="/etc/jelastic/mysql.conf"
