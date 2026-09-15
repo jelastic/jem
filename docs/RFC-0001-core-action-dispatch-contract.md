@@ -66,3 +66,10 @@ with `cker`. A direct call to `ckerContainerRootForId` was rejected as an
 unknown action. CT and Docker container inventories remained empty. Temporary
 uploads were removed; the tested source overlay and rollback copies remain on
 the canary.
+
+The same public gate passed independently on control node `10.136.20.118`
+after installing the base JEM package and applying the identical source
+overlay. Missing OSTEMPLATE returned one JSON document, exit `99`, and result
+`4099`; disposable CTID `990204` did not exist before or after. Docker Help
+exposed zero `cker*` action lines, and direct pseudo-action dispatch was
+rejected. The control node had no CTs or Docker containers after validation.
