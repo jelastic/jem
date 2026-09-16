@@ -119,17 +119,21 @@ target toolchains remain observable even when their file content is equal.
 
 ## 6. Signing and Publication Contract
 
-The JEM Core pipeline must use the same two inputs as JEM-HN and `resolvepath`:
+The JEM Core pipeline must use the same inputs as JEM-HN and `resolvepath`:
 
 - secured `RPM_SIGNING_PRIVATE_KEY_B64`;
+- secured `RPM_SIGNING_KEY_PASSPHRASE`;
 - non-secret full primary-key fingerprint
   `RPM_SIGNING_KEY_FINGERPRINT`.
 
 Only version-branch and manual release pipelines may access the private key.
 The signing step must use an ephemeral OpenPGP home, require the primary secret
-key to match the configured fingerprint, force a SHA-256 RPM signature digest,
-and verify every binary RPM and SRPM in an isolated RPM database. The publisher
-must independently validate the exported public key, fingerprint, digest, and
+key to match the configured fingerprint, and unlock it through an isolated GPG
+agent. The passphrase must be removed from the child-process environment and
+sent to `gpg-preset-passphrase` over stdin rather than through process
+arguments. The step must force a SHA-256 RPM signature digest and verify every
+binary RPM and SRPM in an isolated RPM database. The publisher must
+independently validate the exported public key, fingerprint, digest, and
 signature and must not use `rhnpush --nosig`.
 
 The matching public key must be deployed to Spacewalk/mrepo metadata and the
