@@ -319,7 +319,10 @@ function dump_active_ips_expanded(){
 }
 
 dump_active_ips_vms_expanded(){
-   prlctl list --vmtype vm -H -i -j | \
+   local prlctl_command="${NET_PRLCTL_COMMAND:-prlctl}"
+
+   command -v "$prlctl_command" >/dev/null 2>&1 || return 0
+   "$prlctl_command" list --vmtype vm -H -i -j | \
       jq -r ".[] | select(.State == \"running\" ) | .Hardware | \
         (select(.net0 != null)| .net0), (select(.net1 != null)| .net1), (select(.net2 != null)| .net2) | \
         select (.type == \"routed\" ) | select (.ips != null ) | .ips" |\
