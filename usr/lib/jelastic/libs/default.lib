@@ -55,7 +55,7 @@ function showUsageMessage() {
 
     echo -e "\nExtra actions:";
 
-    for action in $(set | $SED -n -e '/^do\S\+ ()\s*$/s/^do\(\S\+\).*/\1/p' | $GREP -v 'Action' | sort); do
+    while IFS= read -r action; do
         case "${action}" in
             help|usage|version)
                 continue;
@@ -71,7 +71,7 @@ function showUsageMessage() {
 
                 ;;
         esac;
-    done;
+    done < <(listPublicActions | sort);
     true;
 }
 
@@ -90,11 +90,11 @@ function doHelp() {
         showUsageMessage;
         echo -e "\nActions options:";
         local ifs_save="${IFS}" options
-        for action in $(set | $SED -n -e '/^do\S\+ ()\s*$/s/^do\(\S\+\).*/\1/p' | $GREP -v 'Action' | sort); do
+        while IFS= read -r action; do
             if isFunction "describe${action}Options"; then
                 options=$(echo "$options"; describe${action}Options);
             fi
-        done
+        done < <(listPublicActions | sort)
         options="$(sort -u <<< "$options")"
         IFS=$'\n'
         for line in ${options}; do

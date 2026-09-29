@@ -49,6 +49,64 @@ function checkDo() {
     fi;
 }
 
+function isPublicActionFunction() {
+    local function_name="$1"
+
+    [[ "$function_name" =~ ^do[A-Z][a-zA-Z0-9_]*$ ]] && [[ "$function_name" != "doAction" ]] && return 0
+    case "$function_name" in
+        dofwset|dogetPCSTemplate|doisEnabled|dosetupUtils|dousage)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+function listPublicActions() {
+    local declaration function_name
+
+    while read -r declaration _ function_name; do
+        isPublicActionFunction "$function_name" || continue
+        printf '%s\n' "${function_name#do}"
+    done < <(declare -F)
+}
+
+function resolvePublicAction() {
+    local requested_action="$1"
+    local candidate resolved_action=
+
+    while IFS= read -r candidate; do
+        [[ "${candidate,,}" == "${requested_action,,}" ]] || continue
+        [[ -z "$resolved_action" ]] || return 1
+        resolved_action="$candidate"
+    done < <(listPublicActions)
+
+    [[ -n "$resolved_action" ]] || return 1
+    printf '%s\n' "$resolved_action"
+}
+
+function executeActionLifecycle() {
+    local action_name="$1"
+    local lifecycle_result=0
+    shift
+
+    if isFunction "pre${action_name}Callback"; then
+        "pre${action_name}Callback" "$@"
+        lifecycle_result=$?
+    fi
+
+    if [[ $lifecycle_result -eq 0 ]]; then
+        checkDo "do${action_name}" "$@"
+        lifecycle_result=$?
+    fi
+
+    if [[ $lifecycle_result -eq 0 ]] && isFunction "post${action_name}Callback"; then
+        "post${action_name}Callback" "$@"
+        lifecycle_result=$?
+    fi
+
+    return "$lifecycle_result"
+}
+
 # defineBigInline
 # Example of usage:
 #       defineBigInline myVar <<'EOF'
@@ -421,9 +479,7 @@ function doAction() {
             [[ -z ${subaction} ]] && {
                 checkDo "do${DEFAULT_ACTION:-usage}" "$@";
             } || {
-                isFunction "do${subaction}" || subaction=$(sed 's/\([a-zA-Z0-9]\)\([a-zA-Z0-9]*\)/\u\1\2/g' <<< ${subaction});
-                isFunction "do${subaction}" || subaction=$(declare -F | grep -iom 1 "${subaction}");
-                [[ -z ${subaction} ]] && {
+                subaction=$(resolvePublicAction "$subaction") || {
                     local message="Action ${_subaction} unknown";
                     >&2 echo "$message";
                     die -q "$message";
@@ -431,15 +487,8 @@ function doAction() {
                 # [[ "$@" == "help" ]] && { "showActionHelp" "$subaction"; return 0; }
                 [[ "$@" == "help" ]] && { isFunction "showActionHelp" && "showActionHelp" "$subaction"; return 0; }
                 sourceOverride;
-                isFunction "pre${subaction}Callback" && "pre${subaction}Callback" "$@";
-                checkDo "do${subaction}" "$@";
+                executeActionLifecycle "$subaction" "$@";
                 result=$?;
-                if [[ $result -eq 0 ]] ; then
-                    if isFunction "post${subaction}Callback" ; then
-                        "post${subaction}Callback" "$@" ;
-                        result=$?;
-                    fi
-                fi
                 [ -w "$resultFile" -a -n "$result" ] && {
                     echo $result >$resultFile
                 }
