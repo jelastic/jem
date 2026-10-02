@@ -152,6 +152,7 @@ function __processVDS(){
 
 function __injected_not_vds_add() {
     CTID=$1
+    local containerHomedir
     if [ "x$_DISABLE_PASS_AUTH" == "xtrue" ] ; then
         local DISABLE_PASS_FLAG="-d";
     fi
@@ -161,7 +162,11 @@ function __injected_not_vds_add() {
     #vzctl exec ${_CTID} "jem user add"
     vzexecRun jem user add ${DISABLE_PASS_FLAG}
     if [ "$(vzexecGetLastErrCode)" -eq 0 ]; then
-        _homedir=$(vzreadlink --vzroot="${prefix}" $(vzexecGetLastStdOut | $SED -rn 's/.*["]homedir["]:[[:blank:]]*["]([^"]+)["].*/\1/p'))
+        containerHomedir=$(vzexecGetLastStdOut | $SED -rn 's/.*["]homedir["]:[[:blank:]]*["]([^"]+)["].*/\1/p')
+        _homedir=$(resolveUserContainerPath "$prefix" "$containerHomedir") || {
+            writeJSONResponseErr "result=>4025" "message=>Cannot get homedir!"
+            return 4025
+        }
         DATA_OWNER="$(vzexecGetLastStdOut | $SED -rn 's/.*["]data_owner["]:[[:blank:]]*["]([^"]+)["].*/\1/p')"
         _UID=${DATA_OWNER/:*}
         _GUID=${DATA_OWNER/*:}
@@ -181,6 +186,63 @@ function __processNotVDS(){
     inject getAppUserInfo 3i "return 0;"
     inject doAdd 3i "__injected_not_vds_add $CTID;"
     return 0
+}
+
+function validateUserContainerEid() {
+    local eid="$1"
+    [[ -n "$eid" && ${#eid} -le 255 && "$eid" =~ ^[a-zA-Z0-9._:-]+$ ]]
+}
+
+function resolveUserContainerPath() {
+    local containerRoot="$1"
+    local containerPath="$2"
+
+    [[ -n "$containerRoot" && -n "$containerPath" ]] || return 1
+    vzctPath "$containerRoot" "$containerPath"
+}
+
+function userPvaConfigPath() {
+    printf '/var/opt/pva/agent/etc/configs/%s\n' "$1"
+}
+
+# Resolve the Jelastic environment identifier while preserving PVA ownership
+# on legacy hosts. VZ10 without PVA stores the same opaque identifier in the
+# container private area instead of publishing a PVA configuration file.
+function resolveUserContainerByEid() {
+    local eid="$1"
+    local pvaConfig
+    local inventory
+    local candidateCtid
+    local privatePath
+    local metadataPath
+    local candidateEid
+    local resolvedCtid=
+    local matchCount=0
+
+    validateUserContainerEid "$eid" || return 1
+    pvaConfig=$(userPvaConfigPath "$eid") || return 1
+
+    if [[ -f "$pvaConfig" ]]; then
+        candidateCtid=$($SED -nr '/^<ns1:veid>([[:digit:]]+)<[/]ns1:veid>$/{s//\1/p; q}' "$pvaConfig" 2>/dev/null) || return 1
+        [[ "$candidateCtid" =~ ^[0-9]+$ ]] || return 1
+        printf '%s\n' "$candidateCtid"
+        return 0
+    fi
+
+    inventory=$($VZLIST -a -H -o ctid,private 2>>"${JEM_CALLS_LOG}") || return 1
+    while read -r candidateCtid privatePath; do
+        [[ "$candidateCtid" =~ ^[0-9]+$ && -n "$privatePath" ]] || continue
+        metadataPath="${privatePath}/.vza/eid.conf"
+        [[ -r "$metadataPath" ]] || continue
+        candidateEid=$(<"$metadataPath")
+        validateUserContainerEid "$candidateEid" || continue
+        [[ "$candidateEid" == "$eid" ]] || continue
+        resolvedCtid="$candidateCtid"
+        matchCount=$((matchCount + 1))
+    done <<< "$inventory"
+
+    [[ "$matchCount" -eq 1 ]] || return 1
+    printf '%s\n' "$resolvedCtid"
 }
 
 function preAddCallback(){
@@ -206,7 +268,7 @@ function preAddCallback(){
     _SUPPLEMENTARY_GROUPS="$_SSH_ACCESS_GROUP";
 
     if [ ! -z "${_EID}" ]; then
-        _CTID=$($SED -nr '/^<ns1:veid>([[:digit:]]+)<[/]ns1:veid>$/{s//\1/p; q}' "/var/opt/pva/agent/etc/configs/${_EID}" 2>/dev/null || :)
+        _CTID=$(resolveUserContainerByEid "$_EID" || :)
         [[ -z "${_CTID}" ]] && {
             writeJSONResponseErr "result=>4105" "message=>Container not found"
             die -q
@@ -254,6 +316,7 @@ function preAddCallback(){
 
     isFunction "getAppUserInfo" && { log "Call getAppUserInfo"; "getAppUserInfo" "${_USER_NAME}"; } || {  writeJSONResponseErr "result=>4048" "message=>Cannot get user info!"; die -q; };
     [ -z "$_UID" -o -z "$_GUID" ] && {  writeJSONResponseErr "result=>4026" "message=>Cannot get UID!"; die -q; };
+    return 0
 }
 
 function doAdd() {

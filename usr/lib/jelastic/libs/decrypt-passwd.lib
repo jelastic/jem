@@ -22,6 +22,27 @@ VZ_VERSION="$(cat /etc/*release /etc/issue | grep -i "virtuozzo\|parallels" | aw
 include virtuozzo;
 
 declare -a JEM_PARAMS
+
+# envId passwords are keyed with the Jelastic environment identifier.  Modern
+# JEM-HN keeps that identifier in the same private metadata location as VZ7.
+# Some early libvirt installations do not have this metadata, therefore CTID
+# remains the compatibility fallback for those containers.
+function getEnvIdPasswordKey(){
+        local privatePath metadataPath
+
+        privatePath=$(vzlist "$__CTID" -Ho private 2>/dev/null) || return 1
+        metadataPath="${privatePath}/.vza/eid.conf"
+        if [ -r "$metadataPath" ]; then
+                IFS= read -r keyString < "$metadataPath" || return 1
+                [ -n "$keyString" ] && {
+                        printf '%s' "$keyString"
+                        return 0
+                }
+        fi
+
+        printf '%s' "$__CTID"
+}
+
 function getPassword(){
         if [ -z "$1" ] ; then
                 log "empty password string.";
@@ -51,11 +72,10 @@ function getPassword(){
                                 log "unknown __CTID. Please set it via vzexecSetCTID first";
                                 return 99;
                         fi
-                        if [[ "$VZ_VERSION" == "7" ]]; then
-                            keyString=$(cat $(vzlist $__CTID -Ho private)/.vza/eid.conf 2>/dev/null)
-                        else
-                            keyString="$__CTID"
-                        fi
+                        keyString=$(getEnvIdPasswordKey) || {
+                                log "Cannot determine envId password key. CTID:$__CTID";
+                                return 99;
+                        }
 
                         ;;
                 * )
