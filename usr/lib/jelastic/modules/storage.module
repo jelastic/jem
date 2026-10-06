@@ -252,8 +252,48 @@ function getTargetIPs() {
     isUUID $VEID && {
         VEExecRunInteractive "ip -o addr" | awk '!/^[0-9]*: ?lo|link\/ether/ {split($4,a,"/"); print a[1]}'
     } || {
-        $AWK '/[ \t]*'${VEID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo
+        local ips
+        ips=$($AWK '/[ \t]*'${VEID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo 2>/dev/null)
+        if [[ -n "$ips" ]] ; then
+            printf '%s\n' "$ips"
+        else
+            VEExecRunInteractive "ip -o -4 addr show scope global" | awk '!/^[0-9]*: ?lo/ {split($4,a,"/"); print a[1]}'
+        fi
     }
+}
+
+function parseStorageSource() {
+    local source="$1"
+    local protocol
+
+    atype=""
+    mtype="nfs"
+    sourceIP=""
+    sourceMount=""
+
+    case "$source" in
+        [Rr][Oo]:*)
+            atype="ro"
+            source=$(sed 's/^[^:]*://' <<< "$source")
+            ;;
+        [Rr][Ww]:*)
+            atype="rw"
+            source=$(sed 's/^[^:]*://' <<< "$source")
+            ;;
+    esac
+
+    if [[ "$source" =~ ^([Nn][Ff][Ss]3?4?|[Ll][Oo][Cc][Aa][Ll]|[Ww][Ee][Bb][Dd][Aa][Vv]|[Gg][Ll][Uu][Ss][Tt][Ee][Rr]): ]] ; then
+        protocol=$(cut -d: -f1 <<< "$source")
+        mtype=$(tr '[:upper:]' '[:lower:]' <<< "$protocol")
+        source=$(sed -e 's/^[^:]*://' -e 's#^//*##' <<< "$source")
+    fi
+
+    if [[ "$source" == *:* ]] ; then
+        sourceIP=$(cut -d: -f1 <<< "$source")
+        sourceMount=$(cut -d: -f2- <<< "$source")
+    else
+        sourceIP="$source"
+    fi
 }
 
 function preparePath() {
@@ -443,7 +483,7 @@ function processnfs() {
     if [[ $running -eq 0 ]] ; then
         if ! checkMount $sourceIP "$sourceMountUnEsc" ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID : Destination NFS server is not reachable. $(gatherCTInfo)" >> ${JEM_CALLS_LOG}
-            echo "Destination NFS server is not reachable. Server IP: $(VEExecRunInteractive host ${sourceIP} 2>/dev/null), Client IP: $($AWK '/[ \t]*'${VEID}'/{$1=$2=$3="";gsub(/^[ \t]+/,"",$0);print $0}' /proc/vz/veinfo )"
+            echo "Destination NFS server is not reachable. Server IP: $(VEExecRunInteractive host ${sourceIP} 2>/dev/null), Client IP: $(getTargetIPs | tr '\n' ' ')"
             return 1
         fi
     fi
@@ -970,6 +1010,8 @@ function doMount() {
         VEExecRun " [ -e \"/etc/autofs.conf\" ] && sed -i $SED_COPY_OPTION -e \"s/^timeout = ${DEFAULT_AUTOFS_TIMEOUT}/timeout = ${JELASTIC_AUTOFS_TIMEOUT}/g\" \"/etc/autofs.conf\""
     fi
 
+    : <<'LEGACY_STORAGE_SOURCE_PARSER'
+    # Replaced by parseStorageSource below. Kept temporarily as migration context.
     # parse connection string
     _SOURCE="$($SED -re 's/(\[|\]|\*|\(|\)|\$|\?|\|)/\\\1/g' <<< "$_SOURCE")"
     availProtos="[Ll][Oo][Cc][Aa][Ll]|[Nn][Ff][Ss]3?4?|[Ww][Ee][Bb][Dd][Aa][Vv]|[Gg][Ll][Uu][Ss][Tt][Ee][Rr]"
@@ -983,8 +1025,11 @@ function doMount() {
     mtype=${mtype,,}
     atype=${atype,,}
     atype=$($SED -re 's/;//g' <<< $atype)
+LEGACY_STORAGE_SOURCE_PARSER
+
+    # Parse legacy <host>:<path> and explicit [ro|rw:]<protocol>:<host>:<path> forms.
+    parseStorageSource "$_SOURCE"
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction VEID:$VEID - protocol=${mtype} source=${sourceIP} sourceMount=${sourceMount}" >> ${JEM_CALLS_LOG}
-    [[ -z "${mtype}" ]] && mtype="nfs"
 
     # for local mounts (bind)
     if [ "${mtype}" == "local" -a "x${sourceMount}" == "x" ] ; then
@@ -1239,4 +1284,3 @@ defineBigInline _ENABLEAUTOFSCMD <<'EOF'
         fi
     fi;
 EOF
-
