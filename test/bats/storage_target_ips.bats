@@ -59,3 +59,29 @@ EOF
     [ "$sourceIP" = '192.0.2.11' ]
     [ "$sourceMount" = '/explicit' ]
 }
+
+@test "storage export delegates the selected CT path and clients to auth" {
+    CTID=999
+    _SOURCE='/opt/exported'
+    _IPLIST='192.0.2.10'
+    jem() { printf '%s\n' "$*" > "$TEST_ROOT/jem.args"; }
+    VEExecRun() { return 0; }
+    writeJSONResponseOut() { :; }
+
+    run doExport
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$TEST_ROOT/jem.args")" = 'auth add --ctid 999 --type ip --list 192.0.2.10 --path rw:/opt/exported' ]
+}
+
+@test "NFS autofs maps do not pass uid or gid mount options" {
+    ! grep -Fq '$_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID}' "$BATS_TEST_DIRNAME/../../usr/lib/jelastic/modules/storage.module"
+}
+
+@test "NFS autofs defaults to TCP transport" {
+    grep -Fq 'declare _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,tcp,' "$BATS_TEST_DIRNAME/../../usr/lib/jelastic/modules/storage.module"
+}
+
+@test "storage list serializes multiple mount records as one JSON-safe line" {
+    grep -Fq "| paste -sd ';' -" "$BATS_TEST_DIRNAME/../../usr/lib/jelastic/modules/storage.module"
+}

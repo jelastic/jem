@@ -37,7 +37,7 @@ declare -i _MOVEDATA=0
 declare CLUSTER="false"
 declare _SOURCE=""
 declare _DESTINATION=""
-declare _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,udp,soft,timeo=120,retrans=20,_netdev"
+declare _DEFAULT_NFS_MOUNT_OPTS="-fstype=nfs,nfsvers=3,nolock,tcp,soft,timeo=120,retrans=20,_netdev"
 declare _DEFAULT_GLUSTER_MOUNT_OPTS="-fstype=glusterfs"
 declare CONTAINER_MOUNTS_STORAGE="/etc/autofs.jelastic"
 declare _IPLIST
@@ -476,7 +476,9 @@ function processnfs() {
         fi
 
         autofsdest="$($SED -e 's/\s/\\ /g' <<< $_DESTINATION)"
-        mntEntry="$autofsdest ${_DEFAULT_NFS_MOUNT_OPTS},uid=${USERID},gid=${GROUPID} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
+        # uid/gid are not valid mount.nfs options on current VZ10 guests.
+        # NFS ownership is defined by the server export, not the client map.
+        mntEntry="$autofsdest ${_DEFAULT_NFS_MOUNT_OPTS} ${sourceIP}:$($SED -re 's/\\\$/$/g' <<< "${sourceMountUnEsc}")"
         #cmdRegisterMount="echo -e \"$mntEntry\" >> ${MOUNTS_STORAGE}"
     fi
 
@@ -1152,7 +1154,7 @@ function doUmount() {
 }
 
 function doList() {
-    msg=$($EXEC "mount | $SED -nre '/nfs(3|4)?/{s/(.*)\s+type.*/\1/g;p}';")
+    msg=$($EXEC "mount | $SED -nre '/nfs(3|4)?/{s/(.*)\s+type.*/\1/g;p}' | paste -sd ';' -")
     writeJSONResponseOut "result=>0" "message=>$msg"
     return 0
 }
@@ -1164,9 +1166,12 @@ function doExport() {
         return 1;
     }
 
-    if ! VEExecRun "jem auth add -t ip -l ${_IPLIST};" ; then
-        writeJSONResponseErr "result=>4030" "message=>$(VEexecGetLastStdErr)";
-        return $(VEexecGetLastErrCode);
+    local authOutput authResult
+    authOutput=$(jem auth add --ctid "$CTID" --type ip --list "$_IPLIST" --path "rw:$_SOURCE" 2>&1)
+    authResult=$?
+    if [[ $authResult -ne 0 ]] ; then
+        writeJSONResponseErr "result=>4030" "message=>$authOutput";
+        return $authResult;
     fi
     if ! VEExecRun "mkdir -p '${_SOURCE}'; chmod 0777 '${_SOURCE}';" ; then
         writeJSONResponseErr "result=>4030" "message=>$(VEexecGetLastStdErr)";

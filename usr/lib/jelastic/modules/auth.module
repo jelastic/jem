@@ -203,11 +203,7 @@ function dosetupUtils() {
                 return 1
             fi
 
-            addPackages="libtirpc"
-
-            if [ "$VZ_VEID_OS_VER" -eq 7 -o "x$VZ_VEID_OS" == "xvzlinux" ]; then
-                addPackages="$addPackages nfs-utils"
-            fi
+            addPackages="libtirpc nfs-utils"
 
             #perform repos update
             local repo="updates,base"
@@ -284,6 +280,7 @@ function dosetupUtils() {
 
                 if [[ $de -ne 0 ]] ; then
                     writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $packageName. Downloading error!"
+                    return 1
                 fi
             fi
             ;;
@@ -303,6 +300,7 @@ function dosetupUtils() {
 
                 if [[ $de -ne 0 ]] ; then
                     writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $packageName. Downloading error!"
+                    return 1
                 fi
             fi
             ;;
@@ -322,6 +320,7 @@ function dosetupUtils() {
 
                 if [[ $de -ne 0 ]] ; then
                     writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $packageName. Downloading error!"
+                    return 1
                 fi
             fi
             ;;
@@ -347,10 +346,10 @@ function dosetupUtils() {
             PMInstallCmd=""
             case $VZ_VEID_OS in
                 debian|ubuntu)
-                    PMInstallCmd="dpkg --install ./unfsd_0.9.23.deb && rm ./unfsd_0.9.23.deb"
+                    PMInstallCmd="if dpkg -s unfsd >/dev/null 2>&1; then rm -f ./unfsd_0.9.23.deb; else dpkg --install ./unfsd_0.9.23.deb && rm -f ./unfsd_0.9.23.deb; fi"
                 ;;
                 almalinux)
-                    PMInstallCmd="rpm -i ./unfsd-0.9.23-1.el9.x86_64.rpm && rm ./unfsd-0.9.23-1.el9.x86_64.rpm"
+                    PMInstallCmd="if rpm -q --quiet unfsd; then rm -f ./unfsd-0.9.23-1.el9.x86_64.rpm; else rpm -i ./unfsd-0.9.23-1.el9.x86_64.rpm && rm -f ./unfsd-0.9.23-1.el9.x86_64.rpm; fi"
                 ;;
             esac
 
@@ -431,30 +430,37 @@ function _adjustNFSFirewall() {
             local __allnetwork=0
             IPT="iptables"
 
+            for nfsip in ${NFSIPS[@]} ; do
+                if [ "$nfsip" == "*" ] ; then
+                    __allnetwork=1
+                    break
+                fi
+            done
+
+            if [[ "$__allnetwork" -eq 0 ]] ; then
+                # Keep the default deny rules below the source-specific allows.
+                vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -j DROP 2>/dev/null || true; $IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j DROP 2>/dev/null || true"
+                vzexecRun "$IPT -I INPUT 1 -p udp -m multiport --dports 111,2049 -j DROP; $IPT -I INPUT 1 -p tcp -m multiport --dports 111,2049 -j DROP"
+            fi
+
             if [[ "${#NFSIPS[@]}" -gt 0 ]] ; then
                 for nfsip in ${NFSIPS[@]} ; do
                     if [ "$nfsip" == "*" ] ; then
                         # whole network requested
-                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j ACCEPT; $IPT -D INPUT -p udp -m multiport --dports 111,2049 -j ACCEPT; $IPT -I INPUT -p tcp -m multiport --dports 111,2049 -j ACCEPT; $IPT -I INPUT -p udp -m multiport --dports 111,2049 -j ACCEPT"
+                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j ACCEPT 2>/dev/null || true; $IPT -D INPUT -p udp -m multiport --dports 111,2049 -j ACCEPT 2>/dev/null || true; $IPT -I INPUT 1 -p tcp -m multiport --dports 111,2049 -j ACCEPT; $IPT -I INPUT 1 -p udp -m multiport --dports 111,2049 -j ACCEPT"
 
                         #all network exported
                         __allnetwork=1
                         break
                     else
                         #remove rule if already exists
-                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT; $IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                        vzexecRun "$IPT -D INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT 2>/dev/null || true; $IPT -D INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT 2>/dev/null || true"
                         #add new rule for selected IP
-                        vzexecRun "$IPT -I INPUT -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT; $IPT -I INPUT -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
+                        vzexecRun "$IPT -I INPUT 1 -p tcp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT; $IPT -I INPUT 1 -p udp -m multiport --dports 111,2049 -s $nfsip -j ACCEPT"
                     fi
                 done
             fi
-            vzexecRun "$IPT -D INPUT -i lo -j ACCEPT; $IPT -I INPUT -i lo -j ACCEPT"
-
-            if [[ "$__allnetwork" -eq 0 ]] ; then
-                #DROP ALL OTHER SOURCES
-                vzexecRun "$IPT -D INPUT -p udp -m multiport --dports 111,2049 -j DROP; $IPT -D INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
-                vzexecRun "$IPT -A INPUT -p udp -m multiport --dports 111,2049 -j DROP; $IPT -A INPUT -p tcp -m multiport --dports 111,2049 -j DROP"
-            fi
+            vzexecRun "$IPT -D INPUT -i lo -j ACCEPT 2>/dev/null || true; $IPT -I INPUT 1 -i lo -j ACCEPT"
 
             vzexecRun "service iptables save"
             #JE-26417
@@ -463,35 +469,40 @@ function _adjustNFSFirewall() {
         else
             inherit nftables
             local __allnetwork=0
+            # unfsd serves NFS and mountd on 2049; rpcbind is required on 111.
+            # These variables used to be unset, preventing client-specific
+            # nftables rules from being created at all.
+            local NFSPort="2049"
+            local RPCPort="111"
 
             for nfsip in ${NFSIPS[@]} ; do
                 if [[ "${#NFSPort}" -gt 0 ]] ; then
                     if [ "$nfsip" == "*" ] ; then
-                        vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip daddr $ip tcp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
-                        vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip daddr $ip udp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
+                        vzexecRun "nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp tcp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
+                        vzexecRun "nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp udp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
                         __allnetwork=1
                     else
                         if [[ "$__allnetwork" -eq 0 ]] ; then
-                            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
-                            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
+                            vzexecRun "nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip saddr $nfsip tcp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
+                            vzexecRun "nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip saddr $nfsip udp dport { $NFSPort} counter accept" 2>>$JEM_CALLS_LOG
                         fi
                     fi
                 fi
                 if [[ "${#RPCPort}" -gt 0 ]] ; then
                     if [ "$nfsip" == "*" ] ; then
-                        vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip daddr $ip tcp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
-                        vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip daddr $ip udp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
+                        vzexecRun "nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp tcp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
+                        vzexecRun "nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp udp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
                         __allnetwork=1
                     else
                         if [[ "$__allnetwork" -eq 0 ]] ; then
-                            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip saddr $nfsip ip daddr $ip tcp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
-                            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip saddr $nfsip ip daddr $ip udp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
+                            vzexecRun "nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol tcp ip saddr $nfsip tcp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
+                            vzexecRun "nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN ip protocol udp ip saddr $nfsip udp dport { $RPCPort} counter accept" 2>>$JEM_CALLS_LOG
                         fi
                     fi
                 fi
             done
 
-            vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_TABLE_NAME $FW_FILTER_INPUT_CHAIN iifname \"lo\" accept"
+            vzexecRun "nft insert rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN iifname \"lo\" accept"
 
             if [[ "$__allnetwork" -eq 0 ]] ; then
                 #DROP ALL OTHER SOURCES
@@ -510,8 +521,8 @@ function _adjustNFSFirewall() {
                     vzexecRun "nft delete rule ip filter INPUT handle $h"
                 fi
 
-                vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  ip protocol ip udp dport { 111,2049} counter accept"
-                vzexecRun "nft add rule $FW_DEFAULT_TABLE_TYPE $FW_FILTER_TABLE_NAME $FW_FILTER_INPUT_CHAIN  ip protocol ip tcp dport { 111,2049} counter accept"
+                # The source-specific rules above are inserted before the container's
+                # terminal deny rule.  Do not add an unrestricted NFS/RPC allow here.
             fi
 
             vzexecRun "nft -s list ruleset >> \"$FW_RULESET_FILE\" 2>> $JEM_CALLS_LOG"
@@ -1101,7 +1112,8 @@ function doList() {
     fi
 
     echo '{"result":"0", "shares":['
-    while read l ; do
+    while IFS= read -r l ; do
+        [[ -z ${l//[[:space:]]/} || "$l" =~ ^[[:space:]]*# ]] && continue
         [[ $_first -eq 0 ]] && _first=1  || echo ","
         name=$($SED -nre 's/^"?([^"]+)"?\s+.*/\1/p' <<< "$l")
         fsid=$($SED -nre 's/.*fsid=([^,\)]+).*/\1/p' <<< "$l")
@@ -1115,6 +1127,8 @@ function doList() {
 }
 
 function doClean() {
+    # Clean has no --type parameter. Native exports are IP-based by default.
+    [[ -z "$ATYPE" ]] && ATYPE="ip"
     _clean${NFS_BACKEND}${ATYPE};
     return $?
 }
@@ -1205,7 +1219,11 @@ if [ -d /run/systemd/system ] ; then
     systemctl restart rpcbind
     systemctl restart rpcbind.socket
     systemctl enable unfsd
-    systemctl start unfsd
+    if pgrep unfsd >/dev/null ; then
+        kill -HUP $(pidof -s unfsd)
+    else
+        systemctl start unfsd
+    fi
 else
     [ -f /etc/init.d/rpcbind ] && /etc/init.d/rpcbind restart
     sed -i "s/\/usr\/sbin\/unfsd/\/sbin\/unfsd/g" /etc/init.d/unfsd.jelastic
