@@ -139,9 +139,37 @@ function doRemoveZone() {
 }
 
 function doDelUpstream() {
-    local requiredParqams=("ZONE_NAME")
-    local msg=$(checkParams ${requiredParqams[@]})
+    if [[ -z "${ZONE_NAME:-}" ]]; then
+        writeJSONResponseErr "result=>4099" "message=>Missing param ZONE_NAME"
+        return 99
+    fi
 
-    msg=$($CURL -X DELETE "http://127.0.0.1:8666/upstream/${ZONE_NAME}")
-    return 0
+    local attempts=5
+    local curl_status http_status
+    while (( attempts > 0 )); do
+        http_status=$($CURL --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            -X DELETE "http://127.0.0.1:8666/upstream/${ZONE_NAME}")
+        curl_status=$?
+        if (( curl_status != 0 )); then
+            log "Failed to delete resolver upstream ${ZONE_NAME}: curl status=${curl_status}"
+            return $curl_status
+        fi
+
+        case "$http_status" in
+            200|202|404)
+                return 0
+                ;;
+            409)
+                attempts=$((attempts - 1))
+                (( attempts > 0 )) && sleep 0.2
+                ;;
+            *)
+                log "Failed to delete resolver upstream ${ZONE_NAME}: HTTP status=${http_status}"
+                return 1
+                ;;
+        esac
+    done
+
+    log "Failed to delete resolver upstream ${ZONE_NAME}: lock conflict persisted after retries"
+    return 1
 }
