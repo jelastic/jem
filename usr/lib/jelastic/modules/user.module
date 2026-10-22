@@ -46,6 +46,7 @@ declare _ACCESS_TYPE;
 declare _ACCESS_ACTION;
 _SSH_ACCESS_GROUP="ssh-access";
 declare -r _JELASTIC_SHELL="/opt/jsh/jsh"
+USER_OS_RELEASE="${USER_OS_RELEASE:-/etc/os-release}"
 
 VERBOSE=1;
 function onModLoadCallback() {
@@ -205,9 +206,25 @@ function userPvaConfigPath() {
     printf '/var/opt/pva/agent/etc/configs/%s\n' "$1"
 }
 
+function userHostOsGeneration() {
+    [ -r "$USER_OS_RELEASE" ] || return 1
+    $AWK -F= '
+        $1 == "VERSION_ID" {
+            gsub(/^[[:space:]"]+|[[:space:]"]+$/, "", $2)
+            split($2, version, ".")
+            print version[1]
+            exit
+        }
+    ' "$USER_OS_RELEASE"
+}
+
+function userUsesUuidEidFallback() {
+    [[ "$(userHostOsGeneration 2>/dev/null)" == 10 ]]
+}
+
 # Resolve the Jelastic environment identifier while preserving PVA ownership
-# on legacy hosts. VZ10 without PVA stores the same opaque identifier in the
-# container private area instead of publishing a PVA configuration file.
+# on legacy hosts. VZ10 uses the native UUID when private EID metadata is not
+# available.
 function resolveUserContainerByEid() {
     local eid="$1"
     local pvaConfig
@@ -215,9 +232,11 @@ function resolveUserContainerByEid() {
     local candidateCtid
     local privatePath
     local metadataPath
+    local nativeUuid
     local candidateEid
     local resolvedCtid=
     local matchCount=0
+    local useUuidFallback=0
 
     validateUserContainerEid "$eid" || return 1
     pvaConfig=$(userPvaConfigPath "$eid") || return 1
@@ -229,13 +248,28 @@ function resolveUserContainerByEid() {
         return 0
     fi
 
-    inventory=$($VZLIST -a -H -o ctid,private 2>>"${JEM_CALLS_LOG}") || return 1
-    while read -r candidateCtid privatePath; do
+    if userUsesUuidEidFallback; then
+        useUuidFallback=1
+        inventory=$($VZLIST -a -H -o ctid,uuid,private 2>>"${JEM_CALLS_LOG}") || return 1
+    else
+        inventory=$($VZLIST -a -H -o ctid,private 2>>"${JEM_CALLS_LOG}") || return 1
+    fi
+    while read -r candidateCtid nativeUuid privatePath; do
+        if [[ "$useUuidFallback" != 1 ]]; then
+            privatePath="$nativeUuid${privatePath:+ $privatePath}"
+            nativeUuid=
+        fi
         [[ "$candidateCtid" =~ ^[0-9]+$ && -n "$privatePath" ]] || continue
         metadataPath="${privatePath}/.vza/eid.conf"
-        [[ -r "$metadataPath" ]] || continue
-        candidateEid=$(<"$metadataPath")
-        validateUserContainerEid "$candidateEid" || continue
+        candidateEid=
+        if [[ -r "$metadataPath" ]]; then
+            candidateEid=$(<"$metadataPath")
+            validateUserContainerEid "$candidateEid" || candidateEid=
+        fi
+        if [[ -z "$candidateEid" && "$useUuidFallback" == 1 ]]; then
+            validateUserContainerEid "$nativeUuid" && candidateEid="$nativeUuid"
+        fi
+        [[ -n "$candidateEid" ]] || continue
         [[ "$candidateEid" == "$eid" ]] || continue
         resolvedCtid="$candidateCtid"
         matchCount=$((matchCount + 1))
