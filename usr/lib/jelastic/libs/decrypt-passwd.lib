@@ -18,6 +18,7 @@
 [ -n "${DECPASSWDLIB_VERSION:-}" ] && return 0;
 DECPASSWDLIB_VERSION="0.1";
 VZ_VERSION="$(cat /etc/*release /etc/issue | grep -i "virtuozzo\|parallels" | awk '{ for (i=1; i<NF; i++ ) {if ($i ~ "release" ) print $(i+1) }}' | awk -F'.' '{print $1}' | head -n 1)";
+DECPASSWD_OS_RELEASE="${DECPASSWD_OS_RELEASE:-/etc/os-release}"
 
 include virtuozzo;
 
@@ -25,10 +26,22 @@ declare -a JEM_PARAMS
 
 # envId passwords are keyed with the Jelastic environment identifier.  Modern
 # JEM-HN keeps that identifier in the same private metadata location as VZ7.
-# Some early libvirt installations do not have this metadata, therefore CTID
-# remains the compatibility fallback for those containers.
+# On VZ10 without metadata the native container UUID is the effective EID.
+# Older platforms retain CTID as their compatibility fallback.
+function getPasswordHostOsGeneration(){
+        [ -r "$DECPASSWD_OS_RELEASE" ] || return 1
+        awk -F= '
+                $1 == "VERSION_ID" {
+                        gsub(/^[[:space:]"]+|[[:space:]"]+$/, "", $2)
+                        split($2, version, ".")
+                        print version[1]
+                        exit
+                }
+        ' "$DECPASSWD_OS_RELEASE"
+}
+
 function getEnvIdPasswordKey(){
-        local privatePath metadataPath
+        local privatePath metadataPath osGeneration nativeUuid
 
         privatePath=$(vzlist "$__CTID" -Ho private 2>/dev/null) || return 1
         metadataPath="${privatePath}/.vza/eid.conf"
@@ -38,6 +51,15 @@ function getEnvIdPasswordKey(){
                         printf '%s' "$keyString"
                         return 0
                 }
+        fi
+
+        osGeneration=$(getPasswordHostOsGeneration) || osGeneration=
+        if [ "$osGeneration" = 10 ]; then
+                nativeUuid=$(vzlist -a -H -o uuid "$__CTID" 2>/dev/null) || return 1
+                nativeUuid=$(awk 'NF { print $1; exit }' <<< "$nativeUuid")
+                [[ "$nativeUuid" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || return 1
+                printf '%s' "$nativeUuid"
+                return 0
         fi
 
         printf '%s' "$__CTID"
