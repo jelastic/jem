@@ -2,8 +2,8 @@
 set -euo pipefail
 
 fail() { printf 'error: %s\n' "$*" >&2; exit 2; }
-branch="${BITBUCKET_BRANCH:-}"
-tag="${BITBUCKET_TAG:-}"
+branch="${CI_BRANCH_NAME:-${BITBUCKET_BRANCH:-}}"
+tag="${CI_TAG_NAME:-${BITBUCKET_TAG:-}}"
 kind="${RPM_BUILD_KIND:-auto}"
 
 if [[ -n "$tag" ]]; then
@@ -35,7 +35,7 @@ case "$kind" in
         ;;
     ci)
         [[ -z "$tag" ]] || fail 'generic CI builds are not allowed from tags'
-        release="${BITBUCKET_BUILD_NUMBER:-1}"
+        release="${CI_BUILD_NUMBER:-${BITBUCKET_BUILD_NUMBER:-1}}"
         [[ "$release" =~ ^[1-9][0-9]*$ ]] || fail 'CI build number must be positive'
         ;;
     *) fail "unsupported RPM build kind: $kind" ;;
