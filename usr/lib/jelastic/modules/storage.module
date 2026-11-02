@@ -923,11 +923,15 @@ function dosetupUtils() {
         installCmd=$(installPackageCmd $OS install $_packages)
         checkCmd=$(checkPackageCmd $OS $_packages)
     fi
-    VEExecRun "$installCmd"
-    echo "$(VEexecGetLastStdOut)" >> ${ACTIONS_LOG}
-
     VEExecRun "eval $checkCmd"
     stdout=$(VEexecGetLastStdOut)
+    if [[ -n "$stdout" ]] ; then
+        VEExecRun "$installCmd"
+        echo "$(VEexecGetLastStdOut)" >> ${ACTIONS_LOG}
+
+        VEExecRun "eval $checkCmd"
+        stdout=$(VEexecGetLastStdOut)
+    fi
     if [[ -n "$stdout" ]] ; then
         writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $stdout"
         return 1
