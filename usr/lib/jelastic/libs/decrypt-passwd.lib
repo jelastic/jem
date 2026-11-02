@@ -41,12 +41,12 @@ function getPasswordHostOsGeneration(){
 }
 
 function getEnvIdPasswordKey(){
-        local privatePath metadataPath osGeneration nativeUuid
+        local privatePath metadataPath osGeneration nativeUuid keyString=
 
         privatePath=$(vzlist "$__CTID" -Ho private 2>/dev/null) || return 1
         metadataPath="${privatePath}/.vza/eid.conf"
         if [ -r "$metadataPath" ]; then
-                IFS= read -r keyString < "$metadataPath" || return 1
+                IFS= read -r keyString < "$metadataPath" || [ -n "$keyString" ] || return 1
                 [ -n "$keyString" ] && {
                         printf '%s' "$keyString"
                         return 0

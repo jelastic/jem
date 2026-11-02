@@ -25,6 +25,17 @@ $PROGRAM 'awk';
 $PROGRAM 'ip';
 $PROGRAM 'sed';
 
+function getSendmailRouteSourceIp() {
+    $IP route get 1 | $AWK '{
+        for (i = 1; i < NF; i++) {
+            if ($i == "src") {
+                print $(i + 1);
+                exit;
+            }
+        }
+    }'
+}
+
 function SendmailExtIp() {
     SM_ENABLED=1;
     [[ -n "${META_FILE}" ]] && [ -e "${META_FILE}" ] && source ${META_FILE} ;
@@ -36,7 +47,7 @@ function SendmailExtIp() {
         [ $UID -eq 0 ] && {
             chmod g+s /usr/sbin/sendmail.sendmail 2>/dev/null
         }
-        myip=$($IP route get 1 | $AWK '{print $NF;exit}')
+        myip=$(getSendmailRouteSourceIp)
         if isLANIP $myip &&  [ ${SENDMAIL_ENABLED} -eq 0 ] ; then
             SM_ENABLED=0;
         fi
