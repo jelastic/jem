@@ -357,14 +357,16 @@ function dosetupUtils() {
         local install_stdout
         local install_stderr
         local install_details
+        local install_log
 
         vzexecRun "$installCmd"
         install_status=$?
         install_stdout=$(vzexecGetLastStdOut)
         install_stderr=$(vzexecGetLastStdErr)
+        install_log=$(setupUtilsFailureDetails "$install_stdout $install_stderr")
 
         #log output from package manager
-        echo "CTID:$CTID Detected OS: $VZ_VEID_OS package manager response: $install_stdout $install_stderr" >> $ACTIONS_LOG
+        echo "CTID:$CTID Detected OS: $VZ_VEID_OS package manager response: $install_log" >> $ACTIONS_LOG
 
         if [[ $install_status -ne 0 ]] ; then
             install_details="${install_stderr:-$install_stdout}"
