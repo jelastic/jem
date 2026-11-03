@@ -160,6 +160,22 @@ function onModLoadCallback() {
     fi
 }
 
+function writeSetupUtilsSuccessResponse() {
+    if [[ "${subaction,,}" == "setuputils" ]] ; then
+        writeJSONResponseOut "result=>0" "message=>NFS utilities have been set up successfully"
+    fi
+}
+
+function setupUtilsFailureDetails() {
+    local details="$1"
+
+    details="${details//$'\r'/ }"
+    details="${details//$'\n'/ }"
+    details="${details//$'\t'/ }"
+    details=$(sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//' <<< "$details")
+    printf '%s' "${details:0:1024}"
+}
+
 function dosetupUtils() {
 
     if [[ "x$CTID" == "x" ]] ; then
@@ -179,6 +195,7 @@ function dosetupUtils() {
         if [[ "xstorage" == "x$computetype" ]] ; then
             echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - The node is a shared storage. Enabling nfs server" >> $JEM_CALLS_LOG
             vzexecRun "systemctl enable nfs-server"
+            writeSetupUtilsSuccessResponse
             return 0
         fi
     fi
@@ -259,7 +276,7 @@ function dosetupUtils() {
 
     echo "`date +%D.%k:%M:%S.%N`:   $action:$subaction CTID:$CTID - installing rpcbind $addPackages" >> $JEM_CALLS_LOG
     installCmd=$(installPackageCmd $VZ_VEID_OS install rpcbind $addPackages)
-    checkCmd=$(checkPackageCmd $VZ_VEID_OS rpcbind )
+    checkCmd=$(checkPackageCmd $VZ_VEID_OS rpcbind $addPackages)
 
     #the installFromTAR indicates whether unfsd will be unpacked from TAR or we use package
     installFromTAR=1
@@ -336,10 +353,26 @@ function dosetupUtils() {
     [[ -d "$(vzctPath $VZ_VEID_ROOT /lib/systemd/system)" ]] && echo "$SystemDUnit" > "$(vzctPath $VZ_VEID_ROOT /lib/systemd/system/unfsd.service)"
 
     isContainerRunning $CTID && {
+        local install_status
+        local install_stdout
+        local install_stderr
+        local install_details
+
         vzexecRun "$installCmd"
+        install_status=$?
+        install_stdout=$(vzexecGetLastStdOut)
+        install_stderr=$(vzexecGetLastStdErr)
 
         #log output from package manager
-        echo "CTID:$CTID Detected OS: $VZ_VEID_OS package manager response: $(vzexecGetLastStdOut) $(vzexecGetLastStdErr)" >> $ACTIONS_LOG
+        echo "CTID:$CTID Detected OS: $VZ_VEID_OS package manager response: $install_stdout $install_stderr" >> $ACTIONS_LOG
+
+        if [[ $install_status -ne 0 ]] ; then
+            install_details="${install_stderr:-$install_stdout}"
+            install_details=$(setupUtilsFailureDetails "$install_details")
+            [[ -n "$install_details" ]] || install_details="package manager exited with status $install_status"
+            writeJSONResponseErr "result=>4140" "message=>Failed to install following packages: $install_details"
+            return 1
+        fi
 
         # if not installed from TAR-package use the package manager
         if [[ $installFromTAR -eq 0 ]] ; then
@@ -389,6 +422,7 @@ function dosetupUtils() {
             return 1
         fi
     }
+    writeSetupUtilsSuccessResponse
     return 0
 }
 
