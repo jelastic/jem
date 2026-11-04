@@ -265,6 +265,50 @@ function printStack() {
   done
 }
 
+function getAgentJemPidFile() {
+    local subaction="${1:-unknown}"
+    local ctid=
+    local eid=
+    local queueIdentity
+    local queueDigest
+    shift || true
+
+    while (( $# )); do
+        case "$1" in
+            --ctid)
+                (( $# >= 2 )) && ctid="$2"
+                shift 2
+                ;;
+            --ctid=*)
+                ctid="${1#--ctid=}"
+                shift
+                ;;
+            --eid)
+                (( $# >= 2 )) && eid="$2"
+                shift 2
+                ;;
+            --eid=*)
+                eid="${1#--eid=}"
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -n "$ctid" ]]; then
+        queueIdentity="ctid:${ctid}"
+    elif [[ -n "$eid" ]]; then
+        queueIdentity="eid:${eid}"
+    else
+        queueIdentity="action:${subaction,,}"
+    fi
+    queueDigest=$(printf '%s' "$queueIdentity" | md5sum) || return 1
+    queueDigest="${queueDigest%% *}"
+    printf '%s/jem.agent.%s.pid\n' "${JEM_RUN_DIR:-/var/run}" "$queueDigest"
+}
+
 function startJemThreadQueueManager(){
     include exceptor;
 #    local jempidfile="/var/run/jem.pid";
@@ -298,6 +342,8 @@ function startJemThreadQueueManager(){
             esac
         shift;
     done
+    elif [ "x$action" == "xagent" ] ; then
+        jempidfile=$(getAgentJemPidFile "$@") || jempidfile="/var/run/jem.pid"
     elif [ "x$action" == "xauth" ] ; then
         if [ "x$subaction" == "xadd" -o "x$subaction" == "xremove" ]; then
             while [ "$1" != "" ]
