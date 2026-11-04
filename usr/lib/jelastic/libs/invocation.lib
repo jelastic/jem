@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Copyright: 2023 Virtuozzo International GmbH
+
+[ -n "${INVOCATIONLIB_VERSION:-}" ] && return 0
+INVOCATIONLIB_VERSION="0.1"
+
+function jemRedactInvocationArguments() {
+    local argument
+    local redactNext=0
+    local redacted=()
+
+    for argument in "$@"; do
+        if (( redactNext )); then
+            redacted+=( '[REDACTED]' )
+            redactNext=0
+            continue
+        fi
+        case "$argument" in
+            --password|--passwd|--token|--secret|--credentials)
+                redacted+=( "$argument" )
+                redactNext=1
+                ;;
+            --password=*|--passwd=*|--token=*|--secret=*|--credentials=*)
+                redacted+=( "${argument%%=*}=[REDACTED]" )
+                ;;
+            *)
+                redacted+=( "$argument" )
+                ;;
+        esac
+    done
+    (( redactNext == 0 )) || redacted+=( '[REDACTED]' )
+    printf '%s' "${redacted[*]}"
+}
+
+function jemLogInvocation() {
+    local logFile="$1"
+    local processId="$2"
+    local invocation
+    local logMode=0666
+    shift 2
+
+    [[ "${1:-}" != agent ]] || logMode=0600
+    invocation=$(jemRedactInvocationArguments "$@") || return 1
+    umask 077
+    : >> "$logFile" || return 1
+    chmod "$logMode" "$logFile" || return 1
+    printf '%s:[EXEC]      [PID: %s] %s\n' "$(date +%D.%k:%M:%S.%N)" "$processId" "$invocation" >> "$logFile"
+}
