@@ -1,4 +1,5 @@
 /var/log/jem.log {
+    create 0666 root root
     missingok
     size 100M
     compress
