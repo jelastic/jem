@@ -37,15 +37,19 @@ function jemLogInvocation() {
     local logFile="$1"
     local processId="$2"
     local invocation
-    local logMode=0666
+    local effectiveUid
     shift 2
 
-    [[ "${1:-}" != agent ]] || logMode=0600
+    effectiveUid="$(id -u)" || return 1
     invocation=$(jemRedactInvocationArguments "$@") || return 1
     (
         umask 077
-        : >> "$logFile" || exit 1
-        chmod "$logMode" "$logFile" || exit 1
+        if [[ "$effectiveUid" == 0 ]]; then
+            : >> "$logFile" || exit 1
+            chmod 0666 "$logFile" || exit 1
+        else
+            [[ -f "$logFile" && -w "$logFile" ]] || exit 1
+        fi
         printf '%s:[EXEC]      [PID: %s] %s\n' "$(date +%D.%k:%M:%S.%N)" "$processId" "$invocation" >> "$logFile"
     )
 }
