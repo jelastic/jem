@@ -42,8 +42,10 @@ function jemLogInvocation() {
 
     [[ "${1:-}" != agent ]] || logMode=0600
     invocation=$(jemRedactInvocationArguments "$@") || return 1
-    umask 077
-    : >> "$logFile" || return 1
-    chmod "$logMode" "$logFile" || return 1
-    printf '%s:[EXEC]      [PID: %s] %s\n' "$(date +%D.%k:%M:%S.%N)" "$processId" "$invocation" >> "$logFile"
+    (
+        umask 077
+        : >> "$logFile" || exit 1
+        chmod "$logMode" "$logFile" || exit 1
+        printf '%s:[EXEC]      [PID: %s] %s\n' "$(date +%D.%k:%M:%S.%N)" "$processId" "$invocation" >> "$logFile"
+    )
 }
