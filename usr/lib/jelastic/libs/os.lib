@@ -461,7 +461,7 @@ getRealExternalIp(){
 }
 
 getOutgoingIp(){
-    local EXTERNAL_IP=$(ip route get 1 | sed -nre 's/.*src\s(.*)\s/\1/p')
+    local EXTERNAL_IP=$(ip route get 1 | awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}')
     [[ ! -z "$EXTERNAL_IP" ]] && isValidIP "$EXTERNAL_IP" && { echo "$EXTERNAL_IP"; return 0; }
     { writeJSONResponseErr "result=>4212" "message=>Failed to get external IP" ; return 99; }
 }
