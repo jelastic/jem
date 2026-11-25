@@ -30,6 +30,7 @@ $PROGRAM 'svn';
 $PROGRAM 'grep';
 $PROGRAM 'git';
 $PROGRAM 'curl';
+$PROGRAM 'jq';
 $PROGRAM 'awk';
 
 VCS_CONFIG_DIR="/var/lib/jelastic/vcs";
@@ -470,7 +471,17 @@ function doCallProjectUpdate(){
     return 1;
   }
 
-  $CURL "https://app.${domain}/1.0/env/build/rest/builddeploy?appid=01234567890123456789012345678901&projectName=$project_name" &>>"$JEM_CALLS_LOG" || return 1;
+  command -v jq >/dev/null 2>&1 || {
+    error "jq is required to validate the platform API response";
+    return 1;
+  }
+  local api_response;
+  api_response=$($CURL --fail "https://app.${domain}/1.0/environment/build/rest/builddeploy?appid=01234567890123456789012345678901&projectName=$project_name" 2>>"$JEM_CALLS_LOG") || return 1;
+  printf '%s\n' "$api_response" >>"$JEM_CALLS_LOG";
+  $JQ -e -s 'length == 1 and (.[0].result == 0 or .[0].result == "0")' <<< "$api_response" >/dev/null 2>>"$JEM_CALLS_LOG" || {
+    error "Platform API did not accept BuildDeploy";
+    return 1;
+  }
   LAST_DEPLOYED_COMMIT=$last_repo_commit;
   writeProjectConfig;
 }
