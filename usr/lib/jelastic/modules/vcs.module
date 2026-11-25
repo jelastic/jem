@@ -465,14 +465,12 @@ function doCallProjectUpdate(){
   local project_name="$1";
   local last_repo_commit=$(getLastRepoCommit $project_name);
   [ "x${last_repo_commit}" == "x${LAST_DEPLOYED_COMMIT}" ] && return 0;
-  getInfraAddresses infraAddr;
-
-  [[ -z "${CORE_ADDR}" ]] && {
-    error "Cannot obtain core address";
+  getInfraAddresses infraAddr && [[ -n "${domain}" ]] || {
+    error "Cannot obtain platform API domain";
     return 1;
   }
 
-  $CURL "http://${CORE_ADDR}/JElastic/env/build/rest/builddeploy?appid=01234567890123456789012345678901&projectName=$project_name" &>>"$JEM_CALLS_LOG";
+  $CURL "https://app.${domain}/1.0/env/build/rest/builddeploy?appid=01234567890123456789012345678901&projectName=$project_name" &>>"$JEM_CALLS_LOG" || return 1;
   LAST_DEPLOYED_COMMIT=$last_repo_commit;
   writeProjectConfig;
 }
